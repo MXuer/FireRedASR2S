@@ -329,6 +329,8 @@ class ModelIO:
 
                 if tag == self.DEFAULT_OUT:
                     txt += token
+                elif tag == "，":
+                    txt += tag
                 else:
                     txt += token + tag
                     # Get New sentence

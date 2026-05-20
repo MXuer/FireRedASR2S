@@ -47,7 +47,7 @@ asr_g.add_argument('--asr_type', type=str, default="aed", choices=["aed", "llm"]
 asr_g.add_argument('--asr_model_dir', type=str, default="pretrained_models/FireRedASR2-AED")
 asr_g.add_argument('--asr_use_gpu', type=int, default=1)
 asr_g.add_argument('--asr_use_half', type=int, default=0)
-asr_g.add_argument("--asr_batch_size", type=int, default=1)
+asr_g.add_argument("--asr_batch_size", type=int, default=32)
 # FireRedASR-AED
 asr_g.add_argument("--beam_size", type=int, default=3)
 asr_g.add_argument("--decode_max_len", type=int, default=0)
@@ -141,7 +141,7 @@ def main(args):
 
         result = asr_system.process(wav_path, uttid)
 
-        logger.info(f"FINAL: {result}")
+        # logger.info(f"FINAL: {result}")
 
         if fout:
             fout.write(f"{json.dumps(result, ensure_ascii=False)}\n")
@@ -200,7 +200,7 @@ def write_textgrid(tg_dir, name, wav_dur, sentences, words=None):
             continue
         start_s = max(start_s, 0)
         end_s = min(end_s, wav_dur)
-        tier.add(minTime=start_s, maxTime=end_s, mark=f"{text}\n{confi}")
+        tier.add(minTime=start_s, maxTime=end_s, mark=f"{text}")
     textgrid.append(tier)
 
     if words:
