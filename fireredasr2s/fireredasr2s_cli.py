@@ -7,6 +7,7 @@ import glob
 import json
 import logging
 import os
+import datetime
 
 import soundfile as sf
 from textgrid import IntervalTier, TextGrid
@@ -35,6 +36,7 @@ output_g = parser.add_argument_group("Output Options")
 output_g.add_argument("--outdir", type=str, default="output")
 output_g.add_argument("--write_textgrid", type=int, default=1)
 output_g.add_argument("--write_srt", type=int, default=1)
+output_g.add_argument("--write_csv", type=int, default=1)
 output_g.add_argument("--save_segment", type=int, default=0)
 
 module_g = parser.add_argument_group("Module Switches")
@@ -153,6 +155,9 @@ def main(args):
         if args.write_srt:
             srt_dir = os.path.join(args.outdir, "asr_srt")
             write_srt(srt_dir, name, result["sentences"])
+        if args.write_csv:
+            csv_dir = os.path.join(args.outdir, "asr_csv")
+            write_csv(csv_dir, name, result["dur_s"], result["sentences"])
         if args.save_segment:
             save_segment_dir = os.path.join(args.outdir, "vad_segment")
             split_and_save_segment(wav_path, result["vad_segments_ms"], save_segment_dir)
@@ -174,6 +179,8 @@ def get_wav_info(args):
         wavs = [(base(p), p) for p in sorted(args.wav_paths)]
     elif args.wav_scp:
         wavs = [line.strip().split() for line in open(args.wav_scp)]
+        if len(wavs[0]) == 1 and wavs[0].endswith(".wav"):
+            wavs = [(base(p), p) for p in wavs]
     elif args.wav_dir:
         wavs = glob.glob(f"{args.wav_dir}/**/*.wav", recursive=True)
         wavs = [(base(p), p) for p in sorted(wavs)]
@@ -249,6 +256,38 @@ def write_srt(srt_dir, name, sentences):
             if i != len(sentences):
                 fout.write("\n")
 
+
+def time_change(seconds):
+    delta = datetime.timedelta(seconds=seconds)
+    # 使用timedelta对象创建一个datetime对象
+    base_time = datetime.datetime(1, 1, 1)  # 任意日期，只关心时间部分
+    result_time = base_time + delta
+    # 将结果格式化为字符串
+    formatted_time = result_time.strftime('%H:%M:%S.%f')
+    return formatted_time
+
+def write_csv(csv_dir, name, wav_dur, sentences):
+    os.makedirs(csv_dir, exist_ok=True)
+    csv_file = os.path.join(csv_dir, name + ".csv")
+    logger.info(f"Write {csv_file}")
+
+    with open(csv_file, "w") as fout:
+        fout.write("Name\tStart\tDuration\tTime Format\tType\tDescription\n")
+        index = 0
+        for sentence in sentences:
+            start_s = sentence["start_ms"] / 1000.0
+            end_s = sentence["end_ms"] / 1000.0
+            confi = sentence["asr_confidence"]
+            text = sentence["text"]
+            if text.strip() == "":
+                continue
+            index_str = "%06d"%index
+            start_s = max(start_s, 0)
+            end_s = min(end_s, wav_dur)
+            start = time_change(start_s)
+            dur = time_change(end_s - start_s)
+            fout.write(f"{index_str}\t{start}\t{dur}\tdecimal\tCue\t{text}\n")
+            index += 1
 
 def split_and_save_segment(wav_path, timestamps_ms, save_segment_dir):
     logger.info("Split & save segment")
