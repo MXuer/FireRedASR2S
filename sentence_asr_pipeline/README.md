@@ -6,15 +6,16 @@ punctuation models can be added through adapters.
 
 ## Core Idea
 
-The pipeline is not tied to one model family. A good sentence-level result needs
-compatible components:
+The pipeline is not tied to one model family. A good sentence-level result
+requires four compatible components:
 
 - VAD returns speech segments in seconds.
 - ASR transcribes each segment and returns `uttid`, `text`, optional `confidence`.
-- Timestamp predictor or ASR returns token timestamps as `(token, start_s, end_s)`.
+- Timestamp predictor returns token timestamps as `(token, start_s, end_s)`.
 - Punctuation model adds punctuation and, with timestamps, returns sentence spans.
 
 The core then restores long-audio global timestamps and formats the final JSON.
+There is no no-VAD, no-timestamp or no-punctuation mode in this abstraction.
 
 ## Expected Output
 
@@ -37,3 +38,7 @@ The core then restores long-audio global timestamps and formats the final JSON.
 Use `sentence_asr_pipeline.adapters.build_firered_pipeline` to construct the
 same model combination as the current FireRed system, while keeping the core
 pipeline independent.
+
+FireRed ASR already has token timestamp support, so its adapter forces
+`return_timestamp=True` and uses `ExistingTimestampPredictor` to validate that
+timestamps are present.

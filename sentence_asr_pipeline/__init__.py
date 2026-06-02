@@ -1,6 +1,5 @@
 from sentence_asr_pipeline.core import (
     AsrModel,
-    LidModel,
     PipelineConfig,
     PuncModel,
     SentenceAsrPipeline,
@@ -10,7 +9,6 @@ from sentence_asr_pipeline.core import (
 
 __all__ = [
     "AsrModel",
-    "LidModel",
     "PipelineConfig",
     "PuncModel",
     "SentenceAsrPipeline",
