@@ -3,7 +3,8 @@ from sentence_asr_pipeline.core import (
     PipelineConfig,
     PuncModel,
     SentenceAsrPipeline,
-    TimestampPredictorModel,
+    SpeechSegment,
+    TimestampProvider,
     VadModel,
 )
 
@@ -12,6 +13,7 @@ __all__ = [
     "PipelineConfig",
     "PuncModel",
     "SentenceAsrPipeline",
-    "TimestampPredictorModel",
+    "SpeechSegment",
+    "TimestampProvider",
     "VadModel",
 ]

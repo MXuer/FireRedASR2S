@@ -18,8 +18,8 @@ class FireRedPipelineConfig:
     pipeline_config: PipelineConfig = field(default_factory=PipelineConfig)
 
 
-class ExistingTimestampPredictor:
-    def predict(self, batch_asr_result: list[dict]) -> list[dict]:
+class AsrTimestampProvider:
+    def add_timestamps(self, batch_asr_result: list[dict], batch_segments: list) -> list[dict]:
         for asr_result in batch_asr_result:
             if not asr_result.get("timestamp"):
                 raise ValueError(f"FireRed ASR must return timestamp for {asr_result.get('uttid')}")
@@ -34,7 +34,7 @@ def build_firered_pipeline(config: FireRedPipelineConfig) -> SentenceAsrPipeline
     return SentenceAsrPipeline(
         vad=vad,
         asr=asr,
-        timestamp_predictor=ExistingTimestampPredictor(),
+        timestamp_provider=AsrTimestampProvider(),
         punc=punc,
         config=config.pipeline_config,
     )

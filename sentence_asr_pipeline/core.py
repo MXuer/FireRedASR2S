@@ -15,6 +15,15 @@ class PipelineConfig:
     sample_rate: int = 16000
 
 
+@dataclass
+class SpeechSegment:
+    uttid: str
+    start_s: float
+    end_s: float
+    sample_rate: int
+    wav: Any
+
+
 class VadModel(Protocol):
     def detect(self, wav_path: str) -> Any:
         """Return {"timestamps": [(start_s, end_s), ...]} or (that_dict, extra)."""
@@ -25,8 +34,8 @@ class AsrModel(Protocol):
         """Return dicts with uttid, text and optional confidence."""
 
 
-class TimestampPredictorModel(Protocol):
-    def predict(self, batch_asr_result: Sequence[dict]) -> list[dict]:
+class TimestampProvider(Protocol):
+    def add_timestamps(self, batch_asr_result: Sequence[dict], batch_segments: Sequence[SpeechSegment]) -> list[dict]:
         """Return ASR dicts with timestamp filled as [(token, start_s, end_s), ...]."""
 
 
@@ -40,13 +49,13 @@ class SentenceAsrPipeline:
         self,
         vad: VadModel,
         asr: AsrModel,
-        timestamp_predictor: TimestampPredictorModel,
+        timestamp_provider: TimestampProvider,
         punc: PuncModel,
         config: PipelineConfig,
     ):
         self.vad = vad
         self.asr = asr
-        self.timestamp_predictor = timestamp_predictor
+        self.timestamp_provider = timestamp_provider
         self.punc = punc
         self.config = config
 
@@ -56,8 +65,9 @@ class SentenceAsrPipeline:
         assert sample_rate == self.config.sample_rate
 
         vad_result = self._detect(wav_path)
-        asr_results = self._transcribe(uttid, wav_np, sample_rate, vad_result["timestamps"])
-        asr_results = self.timestamp_predictor.predict(asr_results)
+        segments = self._build_segments(uttid, wav_np, sample_rate, vad_result["timestamps"])
+        asr_results, asr_segments = self._transcribe(segments)
+        asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
         self._require_timestamps(asr_results)
         punc_results = self._punctuate(asr_results)
         sentences, words = self._format(asr_results, punc_results)
@@ -83,25 +93,35 @@ class SentenceAsrPipeline:
             raise ValueError("VAD must return non-empty timestamps")
         return vad_result
 
-    def _transcribe(
-        self,
+    @staticmethod
+    def _build_segments(
         uttid: str,
         wav_np: Any,
         sample_rate: int,
         vad_segments: Sequence[tuple[float, float]],
-    ) -> list[dict]:
-        asr_results = []
-        batch_uttid = []
-        batch_wav = []
-
-        for i, (start_s, end_s) in enumerate(vad_segments):
+    ) -> list[SpeechSegment]:
+        segments = []
+        for start_s, end_s in vad_segments:
             segment_wav = wav_np[int(start_s * sample_rate):int(end_s * sample_rate)]
             segment_uttid = f"{uttid}_s{int(start_s * 1000)}_e{int(end_s * 1000)}"
-            batch_uttid.append(segment_uttid)
-            batch_wav.append((sample_rate, segment_wav))
-            if len(batch_uttid) < self.config.asr_batch_size and i != len(vad_segments) - 1:
+            segments.append(SpeechSegment(segment_uttid, start_s, end_s, sample_rate, segment_wav))
+        return segments
+
+    def _transcribe(
+        self,
+        segments: Sequence[SpeechSegment],
+    ) -> tuple[list[dict], list[SpeechSegment]]:
+        asr_results = []
+        asr_segments = []
+        batch_segments = []
+
+        for i, segment in enumerate(segments):
+            batch_segments.append(segment)
+            if len(batch_segments) < self.config.asr_batch_size and i != len(segments) - 1:
                 continue
 
+            batch_uttid = [s.uttid for s in batch_segments]
+            batch_wav = [(s.sample_rate, s.wav) for s in batch_segments]
             batch_asr_results = self.asr.transcribe(batch_uttid, batch_wav)
             logger.info("ASR: %s", batch_asr_results)
 
@@ -110,17 +130,24 @@ class SentenceAsrPipeline:
                 if not text or re.search(r"(<blank>)|(<sil>)", text):
                     continue
                 asr_results.append(asr_result)
+                asr_segments.append(self._find_segment(asr_result["uttid"], batch_segments))
 
-            batch_uttid = []
-            batch_wav = []
+            batch_segments = []
 
-        return asr_results
+        return asr_results, asr_segments
+
+    @staticmethod
+    def _find_segment(uttid: str, segments: Sequence[SpeechSegment]) -> SpeechSegment:
+        for segment in segments:
+            if segment.uttid == uttid:
+                return segment
+        raise ValueError(f"ASR returned unknown uttid: {uttid}")
 
     @staticmethod
     def _require_timestamps(asr_results: Sequence[dict]) -> None:
         for asr_result in asr_results:
             if not asr_result.get("timestamp"):
-                raise ValueError(f"Timestamp predictor must return timestamp for {asr_result.get('uttid')}")
+                raise ValueError(f"Timestamp provider must return timestamp for {asr_result.get('uttid')}")
 
     def _punctuate(self, asr_results: Sequence[dict]) -> list[dict]:
         punc_results = []
