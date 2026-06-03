@@ -10,6 +10,11 @@
 - [x] Remove optional no-VAD, no-timestamp and no-punctuation paths.
 - [x] Make VAD, ASR, timestamp provider and punctuation mandatory.
 - [x] Redesign timestamp as a provider stage supporting ASR-native timestamps and forced alignment.
+- [x] Add Silero VAD adapter with install/download documentation and standalone output test.
+- [x] Add Fun-ASR-Nano-2512 adapter with install/download documentation and standalone test script.
+- [x] Verify Fun-ASR-Nano-2512 real model output after the model download completes.
+- [x] Build and run Silero VAD + Fun-ASR-Nano timestamp + FireRedPunc experiment on `data/test/short.wav`.
+- [x] Add CSV, SRT and TextGrid output support inside `sentence_asr_pipeline`.
 
 ## Review
 
@@ -17,3 +22,8 @@
 - Fake VAD/ASR/Punc smoke test passed with `CUDA_VISIBLE_DEVICES=4,5,6,7`.
 - Fake mandatory VAD/ASR/Timestamp/Punc smoke test passed with `CUDA_VISIBLE_DEVICES=4,5,6,7`.
 - Fake ASR-native timestamp provider and forced-aligner timestamp provider smoke tests passed.
+- `silero-vad` and `tiktoken` were installed in the `fireredasr2s` env.
+- Silero VAD standalone test passed on the first 30 seconds of `data/test/conf_0002_0002_001003.wav`.
+- Fun-ASR-Nano standalone test passed on `data/test/short.wav`.
+- Silero VAD + Fun-ASR-Nano timestamp + FireRedPunc experiment passed on `data/test/short.wav`.
+- Output artifacts were written under `output/experiments/silero_funasr_fireredpunc`: `short.json`, `result.jsonl`, `asr_csv/short.csv`, `asr_srt/short.srt`, and `asr_tg/short.TextGrid`.

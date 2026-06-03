@@ -8,3 +8,4 @@
 - LID and no-VAD/no-timestamp/no-punctuation paths are outside the current abstraction.
 - The mandatory timestamp stage is represented by `TimestampProvider`, not only by a standalone predictor model.
 - `TimestampProvider` can either validate ASR-native timestamps or run a forced aligner using ASR text plus the matching VAD audio segment.
+- Every new model adapter must include install/download/environment documentation and a standalone output test example.

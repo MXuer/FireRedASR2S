@@ -12,7 +12,7 @@ logger = logging.getLogger("sentence_asr_pipeline.core")
 class PipelineConfig:
     asr_batch_size: int = 1
     punc_batch_size: int = 1
-    sample_rate: int = 16000
+    sample_rate: int | None = None
 
 
 @dataclass
@@ -62,7 +62,8 @@ class SentenceAsrPipeline:
     def process(self, wav_path: str, uttid: str = "tmpid") -> dict:
         wav_np, sample_rate = sf.read(wav_path, dtype="int16")
         dur_s = wav_np.shape[0] / sample_rate
-        assert sample_rate == self.config.sample_rate
+        if self.config.sample_rate is not None:
+            assert sample_rate == self.config.sample_rate
 
         vad_result = self._detect(wav_path)
         segments = self._build_segments(uttid, wav_np, sample_rate, vad_result["timestamps"])

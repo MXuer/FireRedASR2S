@@ -38,3 +38,7 @@ def build_firered_pipeline(config: FireRedPipelineConfig) -> SentenceAsrPipeline
         punc=punc,
         config=config.pipeline_config,
     )
+
+
+def build_firered_punc(model_dir: str = "pretrained_models/FireRedPunc", config: FireRedPuncConfig | None = None):
+    return FireRedPunc.from_pretrained(model_dir, config or FireRedPuncConfig())
