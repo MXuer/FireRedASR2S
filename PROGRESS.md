@@ -2,31 +2,40 @@
 
 Current state:
 
-- Created `sentence_asr_pipeline` as a separate abstraction directory.
-- Restored the original `fireredasr2s` package from the earlier in-package extraction attempt.
-- Added model-agnostic core pipeline and FireRed adapter.
-- Verified the standalone pipeline with fake components.
-- Moved the abstraction work from `main` to `red-asr`; local `main` points back to `origin/main`.
-- Tightened the abstraction so VAD, ASR, timestamp provider and punctuation are mandatory.
-- Redesigned the timestamp stage as `TimestampProvider` to support both ASR-native timestamps and external forced alignment.
-- Added Silero VAD and Fun-ASR-Nano-2512 adapters, docs and runnable test examples.
-- Silero VAD test passed on `data/test/conf_0002_0002_001003.wav` first 30 seconds.
-- Fun-ASR-Nano standalone test passed on `data/test/short.wav`.
-- Silero VAD + Fun-ASR-Nano timestamp + FireRedPunc experiment passed on `data/test/short.wav`.
-- Experiment outputs were written as JSON, JSONL, CSV, SRT and TextGrid under `output/experiments/silero_funasr_fireredpunc`.
-- Vendored the FireRed ASR/VAD/Punc runtime code needed by `sentence_asr_pipeline` under `sentence_asr_pipeline/firered_runtime`.
-- Redesigned punctuation as a mandatory strategy stage: external punctuation can strip existing ASR punctuation, while ASR-native punctuation can preserve and split on native punctuation.
-- Updated Fun-ASR-Nano to use batch `AutoModel.generate(input=[...])` when the pipeline ASR batch size is greater than one.
-- Added Whisper large ASR adapter, docs and runnable tests.
-- Verified 60-second `data/test/short.wav` with Silero + FunASR + FireRedPunc and Silero + Whisper large + ASR-native punctuation.
-- Added language-specific profiles for choosing module combinations and parameters by language.
-- Added common ASR VAD merge post-processing with max 30s segments and no merge across gaps above 3s.
-- Moved configurable micro-silence merging below 500ms and final 100ms segment padding to final output VAD segment formatting, not ASR slicing.
-- Aligned sentence boundaries to the final output VAD segment ranges so JSON/TextGrid/SRT/CSV exports reflect output VAD merge and padding.
-- Installed and documented `qwen-asr==0.0.6` for Qwen3-ForcedAligner.
-- Added FireRed VAD + Whisper large + Qwen3-ForcedAligner + Whisper text punctuation for Russian.
-- Verified full `data/test/ru_ru.wav` Russian experiment and wrote JSON, JSONL, CSV, SRT and TextGrid outputs.
+- The project is being reshaped from the original FireRedASR2S repository into a standalone multilingual semantic ASR pipeline project.
+- The original top-level FireRedASR2S package, original README, assets, inference examples and runtime directories were removed by the user as part of this cleanup.
+- The reusable long-audio ASR abstraction now lives in `semantic_asr`.
+- The core pipeline requires four explicit stages: VAD, ASR, timestamp provider and punctuation.
+- Timestamp handling supports both ASR-native timestamps and external forced alignment.
+- Punctuation is mandatory as a strategy stage, but it may preserve ASR-native punctuation or strip existing punctuation before external re-punctuation.
+- FireRed runtime code needed by the standalone project is vendored inside the pipeline package boundary.
+- Existing adapters include Silero VAD, Fun-ASR-Nano-2512, Whisper large, Qwen3-ForcedAligner and FireRed VAD/Punc runtime bridges.
+- Added language-specific profiles for `zh`, `en` and `ru`.
+- ASR VAD slicing uses semantic segment merge defaults: target at least 10s where possible, max 30s, and no merge across gaps above 3s.
+- Final output VAD formatting is separate from ASR slicing: short non-speech gaps can be merged, segments can be padded, and sentence boundaries are aligned to output VAD ranges.
+- Output writers support JSON, JSONL, CSV, SRT and TextGrid.
+- Added a registry/config composition layer:
+  - component factories are registered by role: `vad`, `asr`, `timestamp`, and `punc`;
+  - JSON/YAML pipeline profiles are validated and used to build `SemanticAsrPipeline`;
+  - `run_pipeline.py` provides one config-driven CLI;
+  - each run writes `resolved_config.json` by default.
+- Added config profiles for:
+  - Silero VAD + Fun-ASR-Nano native timestamps + FireRedPunc;
+  - Silero VAD + Whisper large native timestamps + ASR-native punctuation;
+  - FireRed VAD + Whisper large + Qwen3-ForcedAligner + ASR text punctuation for Russian.
+- Existing combination example scripts are compatibility wrappers around the config-driven runner.
+- Fake registry/config smoke tests validate config parsing, component resolution and runner output writing.
+- Architecture diagram exists at `docs/architecture.drawio`.
+
+Recent validation:
+
+- `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the rename.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed after the rename.
+- `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
+- All config profiles under `semantic_asr/configs` parsed successfully after the rename.
+- Top-level `README.md` and `requirements.txt` were refreshed for the standalone project.
 
 Next step:
 
-- Review full Russian output quality and decide whether ASR VAD merge should use stricter sentence-boundary heuristics beyond duration/gap rules.
+- Run one short real-model config through `semantic_asr/run_pipeline.py` and compare output shape with the older wrapper output.
+- Add nested CLI override support if ad-hoc experiment overrides become common.

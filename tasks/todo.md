@@ -1,9 +1,18 @@
 # Todo
 
+- [x] Current work: record restructure plan before coding.
+- [x] Current work: restore deleted `PROGRESS.md` with latest progress.
+- [x] Current work: rename the standalone package to `semantic_asr`.
+- [x] Current work: update imports, configs, examples, docs and architecture references after rename.
+- [x] Current work: refresh top-level `README.md` for the standalone semantic ASR project.
+- [x] Current work: refresh top-level `requirements.txt` for the current environment.
+- [x] Current work: validate compile/tests/help after structure cleanup.
+- [x] Current work: update `PROGRESS.md`, `DECISIONS.md` and TODO review.
+
 - [x] Read `AGENT.md` and align with its workflow.
 - [x] Keep the original `fireredasr2s` package unchanged for this abstraction.
-- [x] Create a separate `sentence_asr_pipeline` project directory.
-- [x] Extract model-agnostic long-audio sentence ASR orchestration.
+- [x] Create a separate `semantic_asr` project directory.
+- [x] Extract model-agnostic long-audio semantic ASR orchestration.
 - [x] Add a FireRed adapter as the first concrete model-family bridge.
 - [x] Verify the standalone pipeline with fake components.
 - [x] Move generated abstraction work from `main` to `red-asr`.
@@ -14,8 +23,8 @@
 - [x] Add Fun-ASR-Nano-2512 adapter with install/download documentation and standalone test script.
 - [x] Verify Fun-ASR-Nano-2512 real model output after the model download completes.
 - [x] Build and run Silero VAD + Fun-ASR-Nano timestamp + FireRedPunc experiment on `data/test/short.wav`.
-- [x] Add CSV, SRT and TextGrid output support inside `sentence_asr_pipeline`.
-- [x] Copy the FireRed runtime code needed by `sentence_asr_pipeline` into the standalone project boundary.
+- [x] Add CSV, SRT and TextGrid output support inside `semantic_asr`.
+- [x] Copy the FireRed runtime code needed by `semantic_asr` into the standalone project boundary.
 - [x] Redesign punctuation handling for ASR models that can emit punctuation natively.
 - [x] Normalize optional punctuation stripping before re-punctuation.
 - [x] Add Whisper large ASR adapter documentation and standalone output-shape test.
@@ -33,10 +42,35 @@
 - [x] Keep ASR VAD slicing on semantic 10s/30s/3s merge policy.
 - [x] Verify output VAD formatting helpers and compile the pipeline after the separation.
 - [x] Align sentence boundaries to final output VAD segment ranges for JSON/TextGrid/SRT/CSV consistency.
+- [x] Draft registry/config-driven architecture diagram for pipeline composition.
+- [x] Draft TODO for moving from one-script-per-combination to registry plus config runner.
+- [x] Generate draw.io architecture diagram at `docs/architecture.drawio`.
+
+## Next Architecture TODO
+
+- [x] Current work: add executable registry/config runner plan before coding.
+- [x] Current work: implement component registry contracts and config loader.
+- [x] Current work: implement a single config-driven `run_pipeline.py` entrypoint.
+- [x] Current work: add config profiles for the three existing model combinations.
+- [x] Current work: add fake registry/config smoke tests.
+- [x] Current work: update progress/decision notes after validation.
+- [x] Define component registry contracts for `vad`, `asr`, `timestamp`, and `punc`.
+- [x] Split current adapters into role-oriented modules or registration entries.
+- [x] Add config schema for pipeline profiles, including model name, device, language, batching, VAD merge policy, output VAD policy, and output writers.
+- [x] Implement a config loader that supports YAML and JSON.
+- [x] Implement a single `run_pipeline.py` entrypoint that builds a pipeline from config.
+- [x] Convert existing combination scripts into config files:
+  - [x] Silero VAD + Fun-ASR-Nano + FireRedPunc
+  - [x] Silero VAD + Whisper large + ASR-native punctuation
+  - [x] FireRed VAD + Whisper large + Qwen3-ForcedAligner + Whisper text punctuation
+- [x] Copy the resolved config into each output directory for experiment provenance.
+- [x] Add standalone tests for registry resolution and config validation.
+- [x] Add smoke tests that run fake registered components from config.
+- [x] Keep existing example scripts temporarily as compatibility wrappers around `run_pipeline.py`.
 
 ## Review
 
-- `conda run -n fireredasr2s python -m compileall sentence_asr_pipeline` passed.
+- `conda run -n fireredasr2s python -m compileall semantic_asr` passed.
 - Fake VAD/ASR/Punc smoke test passed with `CUDA_VISIBLE_DEVICES=4,5,6,7`.
 - Fake mandatory VAD/ASR/Timestamp/Punc smoke test passed with `CUDA_VISIBLE_DEVICES=4,5,6,7`.
 - Fake ASR-native timestamp provider and forced-aligner timestamp provider smoke tests passed.
@@ -45,7 +79,7 @@
 - Fun-ASR-Nano standalone test passed on `data/test/short.wav`.
 - Silero VAD + Fun-ASR-Nano timestamp + FireRedPunc experiment passed on `data/test/short.wav`.
 - Output artifacts were written under `output/experiments/silero_funasr_fireredpunc`: `short.json`, `result.jsonl`, `asr_csv/short.csv`, `asr_srt/short.srt`, and `asr_tg/short.TextGrid`.
-- Added vendored FireRed ASR/VAD/Punc runtime code under `sentence_asr_pipeline/firered_runtime`.
+- Added vendored FireRed ASR/VAD/Punc runtime code under `semantic_asr/firered_runtime`.
 - Added ASR-native punctuation strategy and punctuation stripping before external re-punctuation.
 - Updated Fun-ASR-Nano to batch temporary wav-path inputs in one `AutoModel.generate` call when the pipeline ASR batch size is greater than one.
 - Whisper large standalone test passed on `data/test/short.wav` first 30 seconds.
@@ -60,3 +94,15 @@
 - VAD helper checks passed for micro-silence merge, semantic merge and 100ms padding with half-gap allocation.
 - Verified that ASR VAD slicing remains unpadded while final output `vad_segments_ms` applies micro-silence merge and 100ms padding.
 - Verified sentence boundary alignment expands only the first and last sentence in each final output VAD segment.
+- `conda run -n fireredasr2s python -m compileall semantic_asr` passed after adding the config-driven runner.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed.
+- Parsed all config profiles under `semantic_asr/configs`: Silero + Fun-ASR + FireRedPunc, Silero + Whisper + ASR-native punctuation, and FireRed VAD + Whisper + Qwen3 forced aligner + ASR text punctuation.
+- Existing combination example scripts now load config profiles and call the shared `run_profile()` runner.
+- `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts.
+- Restored deleted `PROGRESS.md`.
+- Renamed the standalone package to `semantic_asr`.
+- Added a top-level standalone project `README.md` and refreshed `requirements.txt` for the current `fireredasr2s` environment.
+- `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the rename.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed after the rename.
+- `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
+- Parsed all config profiles under `semantic_asr/configs` after the rename.

@@ -1,5 +1,4 @@
-__pycache__
-out
+__pycache__/
 *.tar.gz
 *.wav
 *.TextGrid
@@ -10,3 +9,5 @@ utt2event
 pretrained_models/
 *.swp
 *.swo
+data/
+output/

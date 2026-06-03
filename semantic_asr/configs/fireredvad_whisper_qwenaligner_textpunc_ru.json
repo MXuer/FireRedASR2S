@@ -1,0 +1,49 @@
+{
+  "name": "fireredvad_whisper_qwenaligner_textpunc_ru",
+  "language": "ru",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "model_dir": "pretrained_models/FireRedVAD/VAD",
+        "config": {
+          "use_gpu": true
+        }
+      }
+    },
+    "asr": {
+      "name": "whisper_large",
+      "params": {
+        "model_name": "large-v3",
+        "device": "cuda:0",
+        "language": "ru",
+        "word_timestamps": false
+      }
+    },
+    "timestamp": {
+      "name": "qwen3_forced_aligner",
+      "params": {
+        "model": "Qwen/Qwen3-ForcedAligner-0.6B",
+        "device_map": "cuda:0",
+        "language": "Russian",
+        "batch_size": 4
+      }
+    },
+    "punc": {
+      "name": "asr_text",
+      "params": {}
+    }
+  },
+  "pipeline": {
+    "asr_batch_size": 1,
+    "punc_batch_size": 1,
+    "strip_punctuation_before_punc": false
+  },
+  "output": {
+    "outdir": "output/experiments/fireredvad_whisper_qwenaligner_textpunc_ru",
+    "write_textgrid": true,
+    "write_srt": true,
+    "write_csv": true,
+    "copy_resolved_config": true
+  }
+}
