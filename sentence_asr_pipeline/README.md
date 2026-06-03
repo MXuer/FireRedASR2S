@@ -40,6 +40,27 @@ VAD -> ASR -> TimestampProvider -> Punc -> sentence output
 results and their matching VAD audio segments. A future Qwen3-ForcedAligner or
 MMS adapter should implement that method.
 
+## Language Profiles
+
+Different languages can use different VAD, ASR, timestamp and punctuation
+combinations. `sentence_asr_pipeline.language_configs` stores explicit language
+profiles, including module builder names and per-component parameters. For
+example, Russian can use FireRed VAD, Whisper ASR, Qwen3 forced alignment and
+Whisper text punctuation.
+
+## VAD Merge Policy
+
+All VAD adapters feed into a common post-processing step before audio is sliced
+for ASR. The default policy merges adjacent VAD segments into longer semantic
+chunks where possible:
+
+- target at least 10 seconds per segment
+- never exceed 40 seconds per merged segment
+- do not merge across a silence gap greater than 3 seconds
+
+If a segment is still shorter than 10 seconds because the surrounding gaps are
+too large, it is kept as-is.
+
 ## Expected Output
 
 `SentenceAsrPipeline.process(wav_path, uttid)` returns:
@@ -65,7 +86,8 @@ already emit punctuation.
 When external re-punctuation is selected, the pipeline strips punctuation from
 token timestamps before calling the punctuation model. When ASR-native
 punctuation is selected, punctuation is preserved and sentence spans are split
-from the timestamp tokens.
+from the timestamp tokens or from the ASR text, depending on the punctuation
+strategy.
 
 ## FireRed Adapter
 

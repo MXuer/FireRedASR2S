@@ -17,6 +17,7 @@ class WhisperLargeConfig:
     task: str = "transcribe"
     fp16: bool = True
     condition_on_previous_text: bool = False
+    word_timestamps: bool = True
 
 
 class WhisperLarge:
@@ -42,7 +43,7 @@ class WhisperLarge:
                     language=self.config.language,
                     task=self.config.task,
                     fp16=self.config.fp16,
-                    word_timestamps=True,
+                    word_timestamps=self.config.word_timestamps,
                     condition_on_previous_text=self.config.condition_on_previous_text,
                 )
             finally:
@@ -80,4 +81,3 @@ class WhisperLargeTimestampProvider:
             if not asr_result.get("timestamp"):
                 raise ValueError(f"Whisper large must return word timestamps for {asr_result.get('uttid')}")
         return list(batch_asr_result)
-

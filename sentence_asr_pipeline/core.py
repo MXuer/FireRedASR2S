@@ -15,6 +15,10 @@ class PipelineConfig:
     punc_batch_size: int = 1
     sample_rate: int | None = None
     strip_punctuation_before_punc: bool = True
+    merge_vad_segments: bool = True
+    vad_min_segment_s: float = 10.0
+    vad_max_segment_s: float = 40.0
+    vad_max_merge_gap_s: float = 3.0
 
 
 @dataclass
@@ -67,7 +71,8 @@ class SentenceAsrPipeline:
         if self.config.sample_rate is not None:
             assert sample_rate == self.config.sample_rate
 
-        vad_result = self._detect(wav_path)
+        raw_vad_result = self._detect(wav_path)
+        vad_result = self._postprocess_vad(raw_vad_result)
         segments = self._build_segments(uttid, wav_np, sample_rate, vad_result["timestamps"])
         asr_results, asr_segments = self._transcribe(segments)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
@@ -86,6 +91,9 @@ class SentenceAsrPipeline:
             "text": text,
             "sentences": sentences,
             "vad_segments_ms": [(int(s * 1000), int(e * 1000)) for s, e in vad_result["timestamps"]],
+            "raw_vad_segments_ms": [
+                (int(s * 1000), int(e * 1000)) for s, e in raw_vad_result["timestamps"]
+            ],
             "dur_s": dur_s,
             "words": words,
             "wav_path": wav_path,
@@ -98,6 +106,20 @@ class SentenceAsrPipeline:
         if not vad_result.get("timestamps"):
             raise ValueError("VAD must return non-empty timestamps")
         return vad_result
+
+    def _postprocess_vad(self, vad_result: dict) -> dict:
+        if not self.config.merge_vad_segments:
+            return vad_result
+        merged = merge_vad_segments(
+            vad_result["timestamps"],
+            min_segment_s=self.config.vad_min_segment_s,
+            max_segment_s=self.config.vad_max_segment_s,
+            max_merge_gap_s=self.config.vad_max_merge_gap_s,
+        )
+        logger.info("VAD merged: %s", merged)
+        result = dict(vad_result)
+        result["timestamps"] = merged
+        return result
 
     @staticmethod
     def _build_segments(
@@ -165,6 +187,11 @@ class SentenceAsrPipeline:
         return stripped_results
 
     def _punctuate(self, asr_results: Sequence[dict]) -> list[dict]:
+        if hasattr(self.punc, "process_asr_results"):
+            batch_result = self.punc.process_asr_results(asr_results)
+            logger.info("Punc: %s", batch_result)
+            return batch_result
+
         punc_results = []
         batch_uttid = []
         batch_timestamp = []
@@ -227,3 +254,29 @@ class SentenceAsrPipeline:
             "text": text,
             "asr_confidence": asr_result.get("confidence", 0),
         }
+
+
+def merge_vad_segments(
+    timestamps: Sequence[tuple[float, float]],
+    min_segment_s: float = 10.0,
+    max_segment_s: float = 40.0,
+    max_merge_gap_s: float = 3.0,
+) -> list[tuple[float, float]]:
+    segments = [(float(s), float(e)) for s, e in timestamps if float(e) > float(s)]
+    if not segments:
+        return []
+    segments.sort(key=lambda item: item[0])
+
+    merged = []
+    cur_start, cur_end = segments[0]
+    for start, end in segments[1:]:
+        gap_s = start - cur_end
+        can_merge = gap_s <= max_merge_gap_s and (end - cur_start) <= max_segment_s
+        if can_merge:
+            cur_end = max(cur_end, end)
+            continue
+        merged.append((cur_start, cur_end))
+        cur_start, cur_end = start, end
+    merged.append((cur_start, cur_end))
+
+    return merged

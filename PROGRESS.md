@@ -19,7 +19,12 @@ Current state:
 - Updated Fun-ASR-Nano to use batch `AutoModel.generate(input=[...])` when the pipeline ASR batch size is greater than one.
 - Added Whisper large ASR adapter, docs and runnable tests.
 - Verified 60-second `data/test/short.wav` with Silero + FunASR + FireRedPunc and Silero + Whisper large + ASR-native punctuation.
+- Added language-specific profiles for choosing module combinations and parameters by language.
+- Added common VAD merge post-processing with max 40s segments and no merge across gaps above 3s.
+- Installed and documented `qwen-asr==0.0.6` for Qwen3-ForcedAligner.
+- Added FireRed VAD + Whisper large + Qwen3-ForcedAligner + Whisper text punctuation for Russian.
+- Verified full `data/test/ru_ru.wav` Russian experiment and wrote JSON, JSONL, CSV, SRT and TextGrid outputs.
 
 Next step:
 
-- Review the 60-second FunASR and Whisper outputs and decide the next model adapter or forced-aligner integration.
+- Review full Russian output quality and decide whether VAD merge should use stricter sentence-boundary heuristics beyond duration/gap rules.

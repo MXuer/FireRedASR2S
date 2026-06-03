@@ -21,6 +21,11 @@
 - [x] Add Whisper large ASR adapter documentation and standalone output-shape test.
 - [x] Check batch inference support for newly added models and update Fun-ASR-Nano batching if available.
 - [x] Verify the updated pipeline on the 60-second `data/test/short.wav`.
+- [x] Add language-based pipeline/module configuration support.
+- [x] Add VAD segment post-processing merge policy with min 10s, max 40s and max merge gap 3s.
+- [x] Add FireRed VAD + Whisper + Qwen3-ForcedAligner + ASR-native punctuation Russian experiment config/script.
+- [x] Check whether Qwen3-ForcedAligner-0.6B is available locally and document its environment/model setup.
+- [x] Run the Russian `data/test/ru_ru.wav` experiment and write JSON/CSV/SRT/TextGrid outputs.
 
 ## Review
 
@@ -39,3 +44,9 @@
 - Whisper large standalone test passed on `data/test/short.wav` first 30 seconds.
 - Silero VAD + Fun-ASR-Nano timestamp + FireRedPunc passed on 60-second `data/test/short.wav` with `asr_batch_size=8`.
 - Silero VAD + Whisper large timestamp + ASR-native punctuation passed on 60-second `data/test/short.wav`.
+- Added language profiles for `zh`, `en` and `ru`.
+- Added common VAD merge post-processing: max 40s, merge gaps no larger than 3s, target at least 10s when possible.
+- Installed `qwen-asr==0.0.6` from the official Qwen3-ASR GitHub repository; this also installed `transformers==4.57.6`.
+- Added a torch pytree compatibility shim for the current `torch==2.1.0+cu118` plus `transformers==4.57.6` environment.
+- Full `data/test/ru_ru.wav` Russian experiment passed with FireRed VAD + Whisper large + Qwen3-ForcedAligner + Whisper text punctuation.
+- Russian output artifacts were written under `output/experiments/fireredvad_whisper_qwenaligner_textpunc_ru_full`: `ru_ru.json`, `result.jsonl`, `asr_csv/ru_ru.csv`, `asr_srt/ru_ru.srt`, and `asr_tg/ru_ru.TextGrid`.

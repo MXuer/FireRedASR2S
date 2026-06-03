@@ -4,6 +4,7 @@ from typing import Sequence
 _PUNCT_ONLY = re.compile(r"^[^\w\u4e00-\u9fff]+$")
 _EDGE_PUNCT = re.compile(r"(^[^\w\u4e00-\u9fff]+)|([^\w\u4e00-\u9fff]+$)")
 _SENTENCE_END = re.compile(r"[。.!?！？]+$")
+_SENTENCE_SPLIT = re.compile(r"[^。.!?！？]+[。.!?！？]*")
 _ASCII_WORD = re.compile(r"[a-zA-Z0-9#]")
 
 
@@ -29,6 +30,48 @@ class AsrNativePunc:
                 "punc_sentences": split_timestamp_by_native_punctuation(timestamp),
             })
         return results
+
+
+class AsrTextPunc:
+    def process_asr_results(self, batch_asr_result: Sequence[dict]) -> list[dict]:
+        results = []
+        for asr_result in batch_asr_result:
+            results.append({
+                "uttid": asr_result["uttid"],
+                "punc_sentences": split_text_by_punctuation(
+                    asr_result.get("text", ""),
+                    asr_result.get("timestamp", []),
+                ),
+            })
+        return results
+
+
+def split_text_by_punctuation(text: str, timestamp: Sequence[Sequence]) -> list[dict]:
+    sentence_texts = [m.group(0).strip() for m in _SENTENCE_SPLIT.finditer(text) if m.group(0).strip()]
+    if not sentence_texts:
+        sentence_texts = [text.strip()] if text.strip() else []
+
+    timestamps = [item for item in timestamp if str(item[0]).strip()]
+    cursor = 0
+    sentences = []
+    for i, sentence_text in enumerate(sentence_texts):
+        token_count = len(strip_timestamp_punctuation([[tok, 0, 0] for tok in sentence_text.split()]))
+        if i == len(sentence_texts) - 1:
+            token_count = max(token_count, len(timestamps) - cursor)
+        selected = timestamps[cursor:cursor + token_count] if token_count > 0 else []
+        cursor += token_count
+
+        if selected:
+            start_s = float(selected[0][1])
+            end_s = float(selected[-1][2])
+        elif timestamps:
+            start_s = float(timestamps[0][1])
+            end_s = float(timestamps[-1][2])
+        else:
+            start_s = 0.0
+            end_s = 0.0
+        sentences.append(_sentence(start_s, end_s, [sentence_text]))
+    return sentences
 
 
 def split_timestamp_by_native_punctuation(timestamp: Sequence[Sequence]) -> list[dict]:

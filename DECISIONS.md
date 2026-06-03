@@ -12,3 +12,5 @@
 - The punctuation stage is mandatory, but it may be either an external punctuation model or an ASR-native punctuation strategy.
 - External re-punctuation strips existing punctuation from token timestamps before calling the punctuation model.
 - FireRed runtime code needed by `sentence_asr_pipeline` is vendored under `sentence_asr_pipeline.firered_runtime` for future standalone maintenance.
+- Language-specific module combinations and parameters are represented as explicit profiles in `sentence_asr_pipeline.language_configs`.
+- VAD outputs are post-processed by default into longer semantic segments with target constraints: minimum 10s where possible, maximum 40s and no merge across gaps above 3s.
