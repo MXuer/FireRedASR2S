@@ -8,6 +8,7 @@ from typing import Any, Sequence
 import soundfile as sf
 
 from sentence_asr_pipeline.core import SpeechSegment
+from sentence_asr_pipeline.punctuation import strip_timestamp_punctuation
 
 
 @dataclass
@@ -22,6 +23,7 @@ class FunAsrNanoConfig:
     hotwords: list[str] = field(default_factory=list)
     itn: bool = True
     disable_pbar: bool = True
+    preserve_punctuation: bool = False
 
 
 class FunAsrNano:
@@ -49,26 +51,32 @@ class FunAsrNano:
         return os.path.join(model_dir, "model.py")
 
     def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
-        results = []
-        for uttid, (sample_rate, wav) in zip(batch_uttid, batch_wav):
-            wav_path = self._write_temp_wav(wav, sample_rate)
-            try:
-                raw_results = self.model.generate(
-                    input=wav_path,
-                    cache={},
-                    batch_size=self.config.batch_size,
-                    language=self.config.language,
-                    hotwords=self.config.hotwords,
-                    itn=self.config.itn,
-                )
-                raw_result = raw_results[0] if raw_results else {}
-            finally:
+        wav_paths = [self._write_temp_wav(wav, sample_rate) for sample_rate, wav in batch_wav]
+        try:
+            raw_results = self.model.generate(
+                input=wav_paths if len(wav_paths) > 1 else wav_paths[0],
+                cache={},
+                batch_size=self.config.batch_size,
+                language=self.config.language,
+                hotwords=self.config.hotwords,
+                itn=self.config.itn,
+            )
+        finally:
+            for wav_path in wav_paths:
                 os.unlink(wav_path)
+
+        if len(batch_uttid) == 1 and isinstance(raw_results, dict):
+            raw_results = [raw_results]
+        if len(raw_results) != len(batch_uttid):
+            raise ValueError(f"Fun-ASR-Nano returned {len(raw_results)} results for {len(batch_uttid)} inputs")
+
+        results = []
+        for uttid, (sample_rate, _), raw_result in zip(batch_uttid, batch_wav, raw_results):
             results.append({
                 "uttid": uttid,
                 "text": raw_result.get("text", "").strip(),
                 "confidence": 0,
-                "timestamp": self._normalize_timestamps(raw_result),
+                "timestamp": self._normalize_timestamps(raw_result, self.config.preserve_punctuation),
                 "sample_rate": sample_rate,
             })
         return results
@@ -81,7 +89,7 @@ class FunAsrNano:
         return tmp.name
 
     @staticmethod
-    def _normalize_timestamps(raw_result: dict) -> list[list]:
+    def _normalize_timestamps(raw_result: dict, preserve_punctuation: bool = False) -> list[list]:
         timestamps = raw_result.get("timestamps") or raw_result.get("timestamp") or []
         normalized = []
         for item in timestamps:
@@ -92,8 +100,12 @@ class FunAsrNano:
             else:
                 token, start, end = item[0], item[1], item[2]
             token = str(token).strip().lower()
-            if token and not re.fullmatch(r"[^\w\u4e00-\u9fff]+", token):
+            if preserve_punctuation:
                 normalized.append([str(token), float(start), float(end)])
+            elif token and not re.fullmatch(r"[^\w\u4e00-\u9fff]+", token):
+                normalized.append([str(token), float(start), float(end)])
+        if not preserve_punctuation:
+            return strip_timestamp_punctuation(normalized)
         return normalized
 
 

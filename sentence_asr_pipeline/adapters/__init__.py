@@ -14,6 +14,15 @@ from sentence_asr_pipeline.adapters.silero_funasr_fireredpunc import (
     SileroFunAsrFireRedPuncConfig,
     build_silero_funasr_fireredpunc_pipeline,
 )
+from sentence_asr_pipeline.adapters.silero_whisper_nativepunc import (
+    SileroWhisperNativePuncConfig,
+    build_silero_whisper_nativepunc_pipeline,
+)
+from sentence_asr_pipeline.adapters.whisper_large import (
+    WhisperLarge,
+    WhisperLargeConfig,
+    WhisperLargeTimestampProvider,
+)
 
 __all__ = [
     "AsrTimestampProvider",
@@ -22,9 +31,14 @@ __all__ = [
     "FunAsrNanoConfig",
     "FunAsrNanoTimestampProvider",
     "SileroFunAsrFireRedPuncConfig",
+    "SileroWhisperNativePuncConfig",
     "SileroVad",
     "SileroVadConfig",
+    "WhisperLarge",
+    "WhisperLargeConfig",
+    "WhisperLargeTimestampProvider",
     "build_firered_punc",
     "build_firered_pipeline",
     "build_silero_funasr_fireredpunc_pipeline",
+    "build_silero_whisper_nativepunc_pipeline",
 ]

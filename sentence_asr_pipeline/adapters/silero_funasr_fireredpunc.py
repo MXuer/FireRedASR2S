@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 
-from fireredasr2s.fireredpunc import FireRedPuncConfig
 from sentence_asr_pipeline.adapters.firered import build_firered_punc
 from sentence_asr_pipeline.adapters.funasr_nano import (
     FunAsrNano,
@@ -9,6 +8,7 @@ from sentence_asr_pipeline.adapters.funasr_nano import (
 )
 from sentence_asr_pipeline.adapters.silero import SileroVad, SileroVadConfig
 from sentence_asr_pipeline.core import PipelineConfig, SentenceAsrPipeline
+from sentence_asr_pipeline.firered_runtime.fireredpunc import FireRedPuncConfig
 
 
 @dataclass

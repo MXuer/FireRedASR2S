@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, Sequence
 
 import soundfile as sf
+from sentence_asr_pipeline.punctuation import strip_timestamp_punctuation
 
 logger = logging.getLogger("sentence_asr_pipeline.core")
 
@@ -13,6 +14,7 @@ class PipelineConfig:
     asr_batch_size: int = 1
     punc_batch_size: int = 1
     sample_rate: int | None = None
+    strip_punctuation_before_punc: bool = True
 
 
 @dataclass
@@ -70,6 +72,9 @@ class SentenceAsrPipeline:
         asr_results, asr_segments = self._transcribe(segments)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
         self._require_timestamps(asr_results)
+        if self.config.strip_punctuation_before_punc:
+            asr_results = self._strip_punctuation(asr_results)
+            self._require_timestamps(asr_results)
         punc_results = self._punctuate(asr_results)
         sentences, words = self._format(asr_results, punc_results)
 
@@ -149,6 +154,15 @@ class SentenceAsrPipeline:
         for asr_result in asr_results:
             if not asr_result.get("timestamp"):
                 raise ValueError(f"Timestamp provider must return timestamp for {asr_result.get('uttid')}")
+
+    @staticmethod
+    def _strip_punctuation(asr_results: Sequence[dict]) -> list[dict]:
+        stripped_results = []
+        for asr_result in asr_results:
+            stripped = dict(asr_result)
+            stripped["timestamp"] = strip_timestamp_punctuation(asr_result["timestamp"])
+            stripped_results.append(stripped)
+        return stripped_results
 
     def _punctuate(self, asr_results: Sequence[dict]) -> list[dict]:
         punc_results = []

@@ -23,10 +23,12 @@ Timestamp is a mandatory stage, but its source is configurable per adapter:
 
 - ASR-native timestamp provider: for models with built-in token timestamps, such
   as CTC/alignment-branch ASR or non-autoregressive timestamp-capable ASR. The
-  provider validates and normalizes `asr_result["timestamp"]`.
+  provider validates and normalizes `asr_result["timestamp"]`. Whisper large is
+  also handled this way when `word_timestamps=True`.
 - Forced-aligner timestamp provider: for models without token timestamps, such
-  as Whisper or Qwen3-ASR. The provider receives both ASR text and the matching
-  `SpeechSegment` audio, then writes `asr_result["timestamp"]`.
+  as Qwen3-ASR when used without an ASR-native timestamp path. The provider
+  receives both ASR text and the matching `SpeechSegment` audio, then writes
+  `asr_result["timestamp"]`.
 
 This keeps the four-stage contract stable:
 
@@ -54,11 +56,26 @@ MMS adapter should implement that method.
 }
 ```
 
+## Punctuation Design
+
+The fourth stage is a punctuation strategy. It can be an external punctuation
+model such as FireRedPunc, or an ASR-native punctuation splitter for models that
+already emit punctuation.
+
+When external re-punctuation is selected, the pipeline strips punctuation from
+token timestamps before calling the punctuation model. When ASR-native
+punctuation is selected, punctuation is preserved and sentence spans are split
+from the timestamp tokens.
+
 ## FireRed Adapter
 
 Use `sentence_asr_pipeline.adapters.build_firered_pipeline` to construct the
 same model combination as the current FireRed system, while keeping the core
 pipeline independent.
+
+The FireRed ASR, VAD and Punc runtime code needed by the adapter is vendored
+under `sentence_asr_pipeline.firered_runtime`, so the standalone project does
+not need to import the outer `fireredasr2s` package.
 
 FireRed ASR already has token timestamp support, so its adapter forces
 `return_timestamp=True` and uses `AsrTimestampProvider` to validate that

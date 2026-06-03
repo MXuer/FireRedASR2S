@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 
-from fireredasr2s.fireredasr2 import FireRedAsr2, FireRedAsr2Config
-from fireredasr2s.fireredpunc import FireRedPunc, FireRedPuncConfig
-from fireredasr2s.fireredvad import FireRedVad, FireRedVadConfig
+from sentence_asr_pipeline.firered_runtime.fireredasr2 import FireRedAsr2, FireRedAsr2Config
+from sentence_asr_pipeline.firered_runtime.fireredpunc import FireRedPunc, FireRedPuncConfig
+from sentence_asr_pipeline.firered_runtime.fireredvad import FireRedVad, FireRedVadConfig
 from sentence_asr_pipeline.core import PipelineConfig, SentenceAsrPipeline
 
 
