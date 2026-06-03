@@ -48,18 +48,28 @@ profiles, including module builder names and per-component parameters. For
 example, Russian can use FireRed VAD, Whisper ASR, Qwen3 forced alignment and
 Whisper text punctuation.
 
-## VAD Merge Policy
+## ASR VAD Merge Policy
 
 All VAD adapters feed into a common post-processing step before audio is sliced
-for ASR. The default policy merges adjacent VAD segments into longer semantic
-chunks where possible:
+for ASR. This ASR slicing policy merges adjacent VAD segments into longer
+semantic chunks where possible:
 
 - target at least 10 seconds per segment
-- never exceed 40 seconds per merged segment
+- never exceed 30 seconds per merged segment by default
 - do not merge across a silence gap greater than 3 seconds
 
 If a segment is still shorter than 10 seconds because the surrounding gaps are
 too large, it is kept as-is.
+
+## Output VAD Segment Policy
+
+Final non-speech segment output is formatted separately from ASR slicing:
+
+- merge adjacent speech segments when the silence gap is less than 500ms
+- pad final output segments by 100ms on both sides
+- if adjacent padding would overlap, split the middle silence gap equally
+- sentence boundaries are aligned to these final output VAD segment boundaries,
+  so JSON, TextGrid, SRT and CSV outputs use the same expanded ranges
 
 ## Expected Output
 
@@ -71,6 +81,8 @@ too large, it is kept as-is.
     "text": "...",
     "sentences": [{"start_ms": 0, "end_ms": 1000, "text": "..."}],
     "vad_segments_ms": [(0, 1000)],
+    "raw_vad_segments_ms": [(0, 900)],
+    "asr_vad_segments_ms": [(0, 1000)],
     "dur_s": 1.0,
     "words": [{"start_ms": 0, "end_ms": 100, "text": "..."}],
     "wav_path": "...",

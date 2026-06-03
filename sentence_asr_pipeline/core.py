@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, Sequence
 
 import soundfile as sf
+
 from sentence_asr_pipeline.punctuation import strip_timestamp_punctuation
 
 logger = logging.getLogger("sentence_asr_pipeline.core")
@@ -17,8 +18,10 @@ class PipelineConfig:
     strip_punctuation_before_punc: bool = True
     merge_vad_segments: bool = True
     vad_min_segment_s: float = 10.0
-    vad_max_segment_s: float = 40.0
+    vad_max_segment_s: float = 30.0
     vad_max_merge_gap_s: float = 3.0
+    output_vad_min_silence_merge_s: float = 0.2
+    output_vad_pad_s: float = 0.2
 
 
 @dataclass
@@ -82,6 +85,8 @@ class SentenceAsrPipeline:
             self._require_timestamps(asr_results)
         punc_results = self._punctuate(asr_results)
         sentences, words = self._format(asr_results, punc_results)
+        output_vad_segments = self._format_output_vad_segments(raw_vad_result["timestamps"], dur_s)
+        sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
 
         text = "".join(s["text"] for s in sentences)
         text = re.sub(r"([.,!?])\s*([a-zA-Z])", r"\1 \2", text)
@@ -90,10 +95,11 @@ class SentenceAsrPipeline:
             "uttid": uttid,
             "text": text,
             "sentences": sentences,
-            "vad_segments_ms": [(int(s * 1000), int(e * 1000)) for s, e in vad_result["timestamps"]],
+            "vad_segments_ms": self._segments_ms(output_vad_segments),
             "raw_vad_segments_ms": [
                 (int(s * 1000), int(e * 1000)) for s, e in raw_vad_result["timestamps"]
             ],
+            "asr_vad_segments_ms": self._segments_ms(vad_result["timestamps"]),
             "dur_s": dur_s,
             "words": words,
             "wav_path": wav_path,
@@ -108,18 +114,33 @@ class SentenceAsrPipeline:
         return vad_result
 
     def _postprocess_vad(self, vad_result: dict) -> dict:
-        if not self.config.merge_vad_segments:
-            return vad_result
-        merged = merge_vad_segments(
-            vad_result["timestamps"],
-            min_segment_s=self.config.vad_min_segment_s,
-            max_segment_s=self.config.vad_max_segment_s,
-            max_merge_gap_s=self.config.vad_max_merge_gap_s,
-        )
-        logger.info("VAD merged: %s", merged)
+        if self.config.merge_vad_segments:
+            segments = merge_vad_segments(
+                vad_result["timestamps"],
+                min_segment_s=self.config.vad_min_segment_s,
+                max_segment_s=self.config.vad_max_segment_s,
+                max_merge_gap_s=self.config.vad_max_merge_gap_s,
+            )
+        else:
+            segments = _normalize_segments(vad_result["timestamps"])
+        logger.info("VAD ASR segments: %s", segments)
+
         result = dict(vad_result)
-        result["timestamps"] = merged
+        result["timestamps"] = segments
         return result
+
+    def _format_output_vad_segments(
+        self,
+        raw_vad_segments: Sequence[tuple[float, float]],
+        dur_s: float,
+    ) -> list[tuple[float, float]]:
+        segments = merge_close_vad_segments(
+            raw_vad_segments,
+            max_silence_s=self.config.output_vad_min_silence_merge_s,
+        )
+        segments = pad_vad_segments(segments, dur_s=dur_s, pad_s=self.config.output_vad_pad_s)
+        logger.info("VAD output segments: %s", segments)
+        return segments
 
     @staticmethod
     def _build_segments(
@@ -255,6 +276,30 @@ class SentenceAsrPipeline:
             "asr_confidence": asr_result.get("confidence", 0),
         }
 
+    @staticmethod
+    def _segments_ms(segments: Sequence[tuple[float, float]]) -> list[tuple[int, int]]:
+        return [(int(s * 1000), int(e * 1000)) for s, e in segments]
+
+
+def merge_close_vad_segments(
+    timestamps: Sequence[tuple[float, float]],
+    max_silence_s: float = 0.5,
+) -> list[tuple[float, float]]:
+    segments = _normalize_segments(timestamps)
+    if not segments:
+        return []
+
+    merged = []
+    cur_start, cur_end = segments[0]
+    for start, end in segments[1:]:
+        if start - cur_end < max_silence_s:
+            cur_end = max(cur_end, end)
+            continue
+        merged.append((cur_start, cur_end))
+        cur_start, cur_end = start, end
+    merged.append((cur_start, cur_end))
+    return merged
+
 
 def merge_vad_segments(
     timestamps: Sequence[tuple[float, float]],
@@ -262,10 +307,9 @@ def merge_vad_segments(
     max_segment_s: float = 40.0,
     max_merge_gap_s: float = 3.0,
 ) -> list[tuple[float, float]]:
-    segments = [(float(s), float(e)) for s, e in timestamps if float(e) > float(s)]
+    segments = _normalize_segments(timestamps)
     if not segments:
         return []
-    segments.sort(key=lambda item: item[0])
 
     merged = []
     cur_start, cur_end = segments[0]
@@ -280,3 +324,57 @@ def merge_vad_segments(
     merged.append((cur_start, cur_end))
 
     return merged
+
+
+def pad_vad_segments(
+    timestamps: Sequence[tuple[float, float]],
+    dur_s: float,
+    pad_s: float = 0.1,
+) -> list[tuple[float, float]]:
+    segments = _normalize_segments(timestamps)
+    if not segments or pad_s <= 0:
+        return segments
+
+    padded = []
+    for i, (start, end) in enumerate(segments):
+        prev_end = segments[i - 1][1] if i > 0 else 0.0
+        next_start = segments[i + 1][0] if i < len(segments) - 1 else dur_s
+
+        left_gap = max(start - prev_end, 0.0)
+        right_gap = max(next_start - end, 0.0)
+        left_pad = min(pad_s, left_gap / 2 if i > 0 and left_gap < 2 * pad_s else left_gap)
+        right_pad = min(pad_s, right_gap / 2 if i < len(segments) - 1 and right_gap < 2 * pad_s else right_gap)
+        padded.append((
+            max(start - left_pad, 0.0),
+            min(end + right_pad, dur_s),
+        ))
+    return padded
+
+
+def _normalize_segments(timestamps: Sequence[tuple[float, float]]) -> list[tuple[float, float]]:
+    segments = [(float(s), float(e)) for s, e in timestamps if float(e) > float(s)]
+    segments.sort(key=lambda item: item[0])
+    return segments
+
+
+def align_sentences_to_output_vad(
+    sentences: Sequence[dict],
+    output_vad_segments_ms: Sequence[tuple[int, int]],
+) -> list[dict]:
+    adjusted = [dict(sentence) for sentence in sentences]
+    if not adjusted:
+        return adjusted
+
+    for vad_start_ms, vad_end_ms in output_vad_segments_ms:
+        indexes = [
+            i for i, sentence in enumerate(adjusted)
+            if sentence["start_ms"] < vad_end_ms and sentence["end_ms"] > vad_start_ms
+        ]
+        if not indexes:
+            continue
+        first = indexes[0]
+        last = indexes[-1]
+        adjusted[first]["start_ms"] = min(adjusted[first]["start_ms"], vad_start_ms)
+        adjusted[last]["end_ms"] = max(adjusted[last]["end_ms"], vad_end_ms)
+
+    return adjusted

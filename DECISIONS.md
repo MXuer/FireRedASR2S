@@ -13,4 +13,6 @@
 - External re-punctuation strips existing punctuation from token timestamps before calling the punctuation model.
 - FireRed runtime code needed by `sentence_asr_pipeline` is vendored under `sentence_asr_pipeline.firered_runtime` for future standalone maintenance.
 - Language-specific module combinations and parameters are represented as explicit profiles in `sentence_asr_pipeline.language_configs`.
-- VAD outputs are post-processed by default into longer semantic segments with target constraints: minimum 10s where possible, maximum 40s and no merge across gaps above 3s.
+- ASR VAD slicing is post-processed by default into longer semantic segments with target constraints: minimum 10s where possible, maximum 30s and no merge across gaps above 3s.
+- Final output VAD segments are formatted separately: adjacent speech separated by less than 500ms silence is merged, then output segments are padded by 100ms on both sides without crossing adjacent segment boundaries.
+- Sentence boundaries are aligned to final output VAD segment boundaries, so downstream JSON/TextGrid/SRT/CSV exports see the same merged and padded ranges.

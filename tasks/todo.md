@@ -26,6 +26,13 @@
 - [x] Add FireRed VAD + Whisper + Qwen3-ForcedAligner + ASR-native punctuation Russian experiment config/script.
 - [x] Check whether Qwen3-ForcedAligner-0.6B is available locally and document its environment/model setup.
 - [x] Run the Russian `data/test/ru_ru.wav` experiment and write JSON/CSV/SRT/TextGrid outputs.
+- [x] Add configurable micro-silence VAD merge for gaps below 500ms.
+- [x] Add configurable 100ms VAD segment padding with half-gap allocation when adjacent padding would overlap.
+- [x] Verify VAD post-processing helper behavior and compile the pipeline.
+- [x] Move micro-silence merge and padding from ASR VAD slicing to final non-speech segment output only.
+- [x] Keep ASR VAD slicing on semantic 10s/30s/3s merge policy.
+- [x] Verify output VAD formatting helpers and compile the pipeline after the separation.
+- [x] Align sentence boundaries to final output VAD segment ranges for JSON/TextGrid/SRT/CSV consistency.
 
 ## Review
 
@@ -50,3 +57,6 @@
 - Added a torch pytree compatibility shim for the current `torch==2.1.0+cu118` plus `transformers==4.57.6` environment.
 - Full `data/test/ru_ru.wav` Russian experiment passed with FireRed VAD + Whisper large + Qwen3-ForcedAligner + Whisper text punctuation.
 - Russian output artifacts were written under `output/experiments/fireredvad_whisper_qwenaligner_textpunc_ru_full`: `ru_ru.json`, `result.jsonl`, `asr_csv/ru_ru.csv`, `asr_srt/ru_ru.srt`, and `asr_tg/ru_ru.TextGrid`.
+- VAD helper checks passed for micro-silence merge, semantic merge and 100ms padding with half-gap allocation.
+- Verified that ASR VAD slicing remains unpadded while final output `vad_segments_ms` applies micro-silence merge and 100ms padding.
+- Verified sentence boundary alignment expands only the first and last sentence in each final output VAD segment.
