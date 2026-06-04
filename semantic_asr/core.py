@@ -87,6 +87,7 @@ class SemanticAsrPipeline:
         sentences, words = self._format(asr_results, punc_results)
         output_vad_segments = self._format_output_vad_segments(raw_vad_result["timestamps"], dur_s)
         sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
+        sentences = remove_sentence_overlaps(sentences)
 
         text = "".join(s["text"] for s in sentences)
         text = re.sub(r"([.,!?])\s*([a-zA-Z])", r"\1 \2", text)
@@ -377,6 +378,19 @@ def align_sentences_to_output_vad(
         adjusted[first]["start_ms"] = min(adjusted[first]["start_ms"], vad_start_ms)
         adjusted[last]["end_ms"] = max(adjusted[last]["end_ms"], vad_end_ms)
 
+    return adjusted
+
+
+def remove_sentence_overlaps(sentences: Sequence[dict]) -> list[dict]:
+    adjusted = [dict(sentence) for sentence in sentences]
+    for index in range(1, len(adjusted)):
+        previous = adjusted[index - 1]
+        current = adjusted[index]
+        if current["start_ms"] >= previous["end_ms"]:
+            continue
+        boundary_ms = (previous["end_ms"] + current["start_ms"]) // 2
+        previous["end_ms"] = max(previous["start_ms"], boundary_ms)
+        current["start_ms"] = min(current["end_ms"], boundary_ms)
     return adjusted
 
 

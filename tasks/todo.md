@@ -1,5 +1,11 @@
 # Todo
 
+- [x] Current work: inspect `semantic_asr/configs/ar.json` and `data/test/ar_sa-short.wav`.
+- [x] Current work: run the Arabic canonical-language pipeline on a real GPU.
+- [x] Current work: inspect JSON/CSV/SRT/TextGrid outputs and record the result.
+- [x] Current work: fix overlapping sentence intervals that block TextGrid export.
+- [x] Current work: update PROGRESS/TODO and commit the experiment record.
+
 - [x] Current work: audit model adapters for inconsistent language input formats, including MMS default `zh`.
 - [x] Current work: define canonical project language ids such as `zh_cn` and centralized model-native mappings.
 - [x] Current work: make adapters/config profiles accept canonical ids and convert internally.
@@ -158,6 +164,17 @@
 
 ## Review
 
+- The full ten-minute Arabic profile passed with FireRed VAD, Seamless M4T v2
+  large, MMS Forced Aligner and XLM-R punctuation.
+- Final outputs contain 54 non-overlapping sentences and 699 non-overlapping
+  aligned words; JSON, JSONL, CSV, SRT, TextGrid and resolved config were
+  written successfully.
+- Fixed overlapping adjacent sentence intervals introduced by final output VAD
+  alignment at the shared result layer, with a regression test.
+- The Arabic transcript contains 14 `<UNK>` tokens and awkward punctuation, so
+  integration passed but quality approval still requires a reference
+  transcript.
+- Full validation passed: 30 tests, package compile and `git diff --check`.
 - Added centralized `semantic_asr.language_mapping` for canonical profile ids and model-native values.
 - Pipeline profiles now require one canonical top-level language such as `zh_cn`; language-aware ASR/timestamp components receive it automatically.
 - MMS forced aligner defaults to `zh_cn`, and a regression test verifies that the MMS runtime receives native `cmn`.

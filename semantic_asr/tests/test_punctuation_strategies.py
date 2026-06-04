@@ -1,5 +1,6 @@
 import unittest
 
+from semantic_asr.core import remove_sentence_overlaps
 from semantic_asr.punctuation import AsrNativePunc, AsrTextPunc
 
 
@@ -27,6 +28,15 @@ class PunctuationStrategyTest(unittest.TestCase):
 
         self.assertEqual(len(result["punc_sentences"]), 2)
         self.assertEqual(result["punc_sentences"][-1]["end_s"], 0.9)
+
+    def test_sentence_overlap_is_resolved_at_overlap_midpoint(self):
+        sentences = remove_sentence_overlaps([
+            {"start_ms": 181440, "end_ms": 182035, "text": "a"},
+            {"start_ms": 181910, "end_ms": 182359, "text": "b"},
+        ])
+
+        self.assertEqual(sentences[0]["end_ms"], 181972)
+        self.assertEqual(sentences[1]["start_ms"], 181972)
 
 
 if __name__ == "__main__":

@@ -13,3 +13,4 @@
 - Qwen3-ASR language configuration must be converted to the model API's full English language names; do not pass short language codes directly.
 - Fun-ASR-Nano language support in this project is limited to Chinese, English and Japanese; do not infer broader support from generic multilingual examples.
 - Do not expose model-native language values in pipeline profiles. Use one canonical top-level language-region id and keep all model-specific conversion in the centralized mapping layer.
+- Normalize final sentence intervals after output VAD alignment and before any output writer; all JSON, CSV, SRT and TextGrid outputs must receive the same monotonic, non-overlapping sentence list.

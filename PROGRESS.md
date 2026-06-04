@@ -64,6 +64,20 @@ Current state:
 
 Recent validation:
 
+- The full ten-minute Arabic profile passed on `data/test/ar_sa-short.wav`:
+  FireRed VAD + Seamless M4T v2 large + MMS Forced Aligner + XLM-R
+  punctuation.
+- Arabic output artifacts were written under
+  `output/experiments/ar_seamless_mms_xlm_ar_sa_short_final`: JSON, JSONL,
+  CSV, SRT, TextGrid and resolved config.
+- The Arabic run produced 54 sentences and 699 aligned words with no remaining
+  sentence or word overlaps. It also exposed 14 `<UNK>` tokens and awkward
+  punctuation that require later transcript-quality evaluation.
+- Fixed output-VAD alignment creating overlapping adjacent sentence intervals;
+  sentence overlaps are now removed at the shared pipeline-result level before
+  every output writer.
+- Full validation after the Arabic end-to-end fix passed: 30 tests, package
+  compile and `git diff --check`.
 - Unified-language mapping validation passed: all profiles parsed with canonical ids, MMS `zh_cn -> cmn`, Qwen `th_th -> Thai`, and Seamless `ar_sa -> arb`.
 - Full validation after unified language configuration passed: 29 tests, package compile and `git diff --check`.
 - Unified language configuration committed as `51e0480`.
@@ -101,6 +115,7 @@ Next step:
 
 - Implement and evaluate the Thai timestamp-and-pause sentence-boundary strategy.
 - Build speech-bearing quality fixtures with reference transcripts instead of testing fixed file prefixes.
-- Run one short real-model config through `semantic_asr/run_pipeline.py` and compare output shape with the older wrapper output.
+- Evaluate the Arabic end-to-end output against a reference transcript, with
+  emphasis on `<UNK>` tokens and punctuation quality.
 - Add nested CLI override support if ad-hoc experiment overrides become common.
 - Run real smoke tests for Qwen3-ASR, Dolphin and Seamless once local model paths/checkpoints are confirmed.
