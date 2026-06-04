@@ -71,10 +71,16 @@ without bound.
 
 ## Implementation Order
 
-1. Add a pure boundary-classification function operating on candidate
-   sentences, words and raw VAD segments.
-2. Add boundary reason/confidence metadata and regression fixtures.
-3. Apply audio-safe merging and silence snapping before final output VAD
-   alignment.
-4. Evaluate proposed merges on multilingual reference fixtures before enabling
-   the policy by default.
+The first implementation is available in `semantic_asr.sentence_boundaries`
+and is enabled only by profiles that set `pipeline.sentence_boundary_fusion`.
+It:
+
+1. Keeps the punctuation-proposed candidates as `semantic_sentences`.
+2. Merges short active-speech boundaries only when the resulting sentence is
+   no longer than `target_sentence_s`.
+3. Keeps and snaps nearby boundaries supported by raw VAD silence.
+4. Prevents merging beyond `max_sentence_s`.
+5. Writes each candidate decision to `sentence_boundary_decisions`.
+
+The Arabic profile is the first enabled profile. Evaluate proposed merges on
+multilingual reference fixtures before enabling the policy more broadly.

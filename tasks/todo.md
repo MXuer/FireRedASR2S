@@ -1,5 +1,11 @@
 # Todo
 
+- [x] Current work: design configurable audio-safe sentence-boundary fusion contracts and inspect config/test patterns.
+- [x] Current work: implement punctuation + raw VAD + aligned-token-gap sentence fusion with boundary metadata.
+- [x] Current work: add focused regression tests and enable the strategy for `ar.json`.
+- [x] Current work: rerun `ar_sa-short.wav` on GPU and inspect the new output artifacts.
+- [x] Current work: update experiment docs/PROGRESS/TODO and commit the validated implementation.
+
 - [x] Current work: inspect the three reported Arabic sentence boundaries against raw VAD, semantic VAD, output VAD and word timestamps.
 - [x] Current work: determine a robust policy for sentence boundaries that fall inside active speech.
 - [x] Current work: document the recommendation and defer changing default output behavior until multilingual evaluation.
@@ -168,6 +174,18 @@
 
 ## Review
 
+- Implemented configurable sentence-boundary fusion using punctuation
+  candidates, raw VAD silence, aligned-token gaps, waveform valley ratio and
+  target/maximum sentence durations.
+- Enabled the strategy only for `semantic_asr/configs/ar.json`; other language
+  profiles retain their current behavior.
+- The full Arabic retest preserved 54 `semantic_sentences` and produced 47
+  audio-safe `sentences`: seven active-speech boundaries merged, six nearby
+  VAD-silence boundaries snapped, no sentence/word overlaps, and a 27.87s
+  maximum sentence duration.
+- The reported region is now `73.770-87.418` plus `87.418-97.920`, matching
+  the intended active-speech merge and VAD-supported split.
+- Full validation passed: 36 tests, package compile and `git diff --check`.
 - Investigated the reported Arabic boundaries using raw VAD, aligned-word gaps
   and local waveform energy.
 - Confirmed that `83.494s -> 83.634s` cuts active speech inside one raw VAD

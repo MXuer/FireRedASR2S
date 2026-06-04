@@ -64,6 +64,21 @@ Current state:
 
 Recent validation:
 
+- Implemented configurable sentence-boundary fusion in
+  `semantic_asr.sentence_boundaries`. Enabled profiles retain
+  `semantic_sentences`, emit audio-safe `sentences`, and record
+  `sentence_boundary_decisions`.
+- The complete Arabic fusion retest passed and wrote all outputs under
+  `output/experiments/ar_seamless_mms_xlm_ar_sa_short_boundary_fusion`.
+  It reduced 54 semantic candidates to 47 audio-safe sentences by merging
+  seven active-speech boundaries; six VAD-silence boundaries were kept and
+  snapped. Final sentence/word overlaps are zero and the longest sentence is
+  27.87 seconds.
+- The reported Arabic target region is now split at `73.770-87.418` and
+  `87.418-97.920`: the active-speech cut was merged and the VAD-supported
+  boundary was retained.
+- Full validation after sentence-boundary fusion passed: 36 tests, package
+  compile and `git diff --check`.
 - Investigated punctuation-proposed Arabic sentence boundaries against raw
   VAD, aligned-token gaps and local waveform energy. The reported
   `83.494s -> 83.634s` boundary cuts active speech and should be merged, while
@@ -121,9 +136,8 @@ Recent validation:
 
 Next step:
 
-- Implement the pure sentence-boundary classifier described in
-  `semantic_asr/docs/sentence_boundary_fusion.md` and evaluate its proposed
-  merges before enabling it by default.
+- Review the Arabic sentence-boundary fusion output by listening, then tune
+  thresholds or enable the strategy for additional language profiles.
 - Implement and evaluate the Thai timestamp-and-pause sentence-boundary strategy.
 - Build speech-bearing quality fixtures with reference transcripts instead of testing fixed file prefixes.
 - Evaluate the Arabic end-to-end output against a reference transcript, with

@@ -6,6 +6,10 @@ from typing import Any, Protocol, Sequence
 import soundfile as sf
 
 from semantic_asr.punctuation import strip_timestamp_punctuation
+from semantic_asr.sentence_boundaries import (
+    SentenceBoundaryFusionConfig,
+    fuse_sentence_boundaries,
+)
 
 logger = logging.getLogger("semantic_asr.core")
 
@@ -22,6 +26,7 @@ class PipelineConfig:
     vad_max_merge_gap_s: float = 3.0
     output_vad_min_silence_merge_s: float = 0.2
     output_vad_pad_s: float = 0.2
+    sentence_boundary_fusion: SentenceBoundaryFusionConfig | dict | None = None
 
 
 @dataclass
@@ -85,6 +90,18 @@ class SemanticAsrPipeline:
             self._require_timestamps(asr_results)
         punc_results = self._punctuate(asr_results)
         sentences, words = self._format(asr_results, punc_results)
+        semantic_sentences = [dict(sentence) for sentence in sentences]
+        boundary_decisions = []
+        boundary_config = self._sentence_boundary_fusion_config()
+        if boundary_config.enabled:
+            sentences, boundary_decisions = fuse_sentence_boundaries(
+                sentences,
+                words,
+                self._segments_ms(raw_vad_result["timestamps"]),
+                wav_np,
+                sample_rate,
+                boundary_config,
+            )
         output_vad_segments = self._format_output_vad_segments(raw_vad_result["timestamps"], dur_s)
         sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
         sentences = remove_sentence_overlaps(sentences)
@@ -92,7 +109,7 @@ class SemanticAsrPipeline:
         text = "".join(s["text"] for s in sentences)
         text = re.sub(r"([.,!?])\s*([a-zA-Z])", r"\1 \2", text)
 
-        return {
+        result = {
             "uttid": uttid,
             "text": text,
             "sentences": sentences,
@@ -105,6 +122,10 @@ class SemanticAsrPipeline:
             "words": words,
             "wav_path": wav_path,
         }
+        if boundary_config.enabled:
+            result["semantic_sentences"] = semantic_sentences
+            result["sentence_boundary_decisions"] = boundary_decisions
+        return result
 
     def _detect(self, wav_path: str) -> dict:
         result = self.vad.detect(wav_path)
@@ -280,6 +301,16 @@ class SemanticAsrPipeline:
     @staticmethod
     def _segments_ms(segments: Sequence[tuple[float, float]]) -> list[tuple[int, int]]:
         return [(int(s * 1000), int(e * 1000)) for s, e in segments]
+
+    def _sentence_boundary_fusion_config(self) -> SentenceBoundaryFusionConfig:
+        config = self.config.sentence_boundary_fusion
+        if config is None:
+            return SentenceBoundaryFusionConfig()
+        if isinstance(config, SentenceBoundaryFusionConfig):
+            return config
+        if isinstance(config, dict):
+            return SentenceBoundaryFusionConfig(**config)
+        raise TypeError("sentence_boundary_fusion must be a mapping or SentenceBoundaryFusionConfig")
 
 
 def merge_close_vad_segments(

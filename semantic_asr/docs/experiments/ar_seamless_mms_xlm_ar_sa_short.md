@@ -66,3 +66,36 @@ accuracy. The transcript is mostly Arabic/Darija-looking text, but it contains
 as `؟.` and `..`. These should be evaluated with an Arabic reference
 transcript before this combination is treated as quality-approved.
 
+## Sentence-Boundary Fusion Retest
+
+The configurable sentence-boundary fusion stage was enabled for the Arabic
+profile and the complete ten-minute audio was rerun:
+
+```bash
+HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python CUDA_VISIBLE_DEVICES=4 \
+conda run -n fireredasr2s python semantic_asr/run_pipeline.py \
+  --config semantic_asr/configs/ar.json \
+  --wav_path data/test/ar_sa-short.wav \
+  --uttid ar_sa_short \
+  --outdir output/experiments/ar_seamless_mms_xlm_ar_sa_short_boundary_fusion
+```
+
+The result preserves 54 punctuation-proposed `semantic_sentences` and emits 47
+audio-safe `sentences`. Seven active-speech boundaries were merged and six
+nearby VAD-silence boundaries were kept and snapped. The longest final
+sentence is 27.87 seconds; sentence and word overlaps are both zero.
+
+The reported target region changed from three sentences to:
+
+```text
+73.770-87.418  كان يتحدث ... قال لي هذا الشيء الذي كان يفعله،.
+87.418-97.920  و بعد ذلك عندما هددني ... هذا الأسبوع..
+```
+
+The incorrect `83.494-83.634` active-speech boundary was merged. The
+`87.396-87.496` candidate was supported by raw VAD silence
+`87.180-87.440` and snapped to `87.418`.
+
+The punctuation sequences `،.` and `..` remain punctuation-model quality
+issues and are intentionally not changed by sentence-boundary fusion.

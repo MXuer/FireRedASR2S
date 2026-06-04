@@ -88,6 +88,20 @@ class ConfigRunnerTest(unittest.TestCase):
         self.assertEqual(pipeline.config.asr_batch_size, 2)
         self.assertIsInstance(pipeline.vad, FakeVad)
 
+    def test_sentence_boundary_fusion_config_is_preserved(self):
+        raw = fake_profile()
+        raw["pipeline"]["sentence_boundary_fusion"] = {
+            "enabled": True,
+            "merge_max_token_gap_s": 0.25,
+        }
+
+        profile = parse_pipeline_profile(raw)
+        pipeline = build_pipeline_from_profile(profile, registry=fake_registry())
+
+        resolved = pipeline._sentence_boundary_fusion_config()
+        self.assertTrue(resolved.enabled)
+        self.assertEqual(resolved.merge_max_token_gap_s, 0.25)
+
     def test_missing_required_component_fails_validation(self):
         raw = fake_profile()
         del raw["components"]["timestamp"]
