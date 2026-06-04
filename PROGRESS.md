@@ -52,7 +52,10 @@ Current state:
 - Testing fixed adapter/runtime issues for FunASR batch fallback, Qwen3-ASR float waveform input, MMS forced alignment CUDA stability, XLM-R local ONNX loading and Dolphin output normalization.
 - Dolphin official GitHub package version `20260513` passed grouped multilingual word-timestamp smoke tests after result normalization was fixed.
 - Seamless M4T v2 large passed all-nine-language local-model smoke testing after adding 16 kHz resampling and defaulting `tgt_lang` to `src_lang`.
-- FireRedPunc real loading is blocked by the current torch/transformers checkpoint safety restriction.
+- FireRedPunc real inference passes again. Installing Qwen3-ASR upgraded Transformers, whose newer safe loader rejected the trusted legacy BERT `.bin` under torch 2.1; the vendored FireRedPunc runtime now loads and validates that local checkpoint directly.
+- Corrected the XLM-R punctuation smoke test and report: Thai is not supported and is excluded.
+- Added `semantic_asr/docs/thai_sentence_boundary.md`: Thai should preserve ASR text and derive semantic sentence boundaries from aligned-token pauses and duration limits instead of inventing punctuation.
+- Replaced Thai audio retesting passed interface smoke tests for Silero VAD, FireRed VAD, Whisper large-v3, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin, Seamless M4T and FunASR; Dolphin returned 26 Thai word timestamps, while FunASR incorrectly transcribed the Thai sample as Chinese.
 
 Recent validation:
 
@@ -77,13 +80,13 @@ Recent validation:
 - `16` unit tests passed after multilingual smoke-test fixes.
 - Real Qwen3-ASR -> Qwen3 ForcedAligner English alignment passed with timestamps.
 - Real Qwen3-ASR -> MMS ForcedAligner Hindi alignment passed with timestamps.
-- XLM-R punctuation real ONNX inference passed for English, Russian, Japanese, Hindi, Thai and Arabic samples.
+- XLM-R punctuation real ONNX inference passed for its supported English, Russian, Japanese, Hindi and Arabic samples; Thai was removed because it is unsupported.
 - Dolphin GitHub-version grouped tests passed for Arabic, Hindi, Japanese, Korean, Russian and Vietnamese with word timestamps; the selected Thai prefix was empty.
 - Seamless M4T v2 large local-model tests passed all nine languages while preserving source-language output.
 
 Next step:
 
-- Resolve FireRedPunc checkpoint loading under the current environment.
+- Implement and evaluate the Thai timestamp-and-pause sentence-boundary strategy.
 - Build speech-bearing quality fixtures with reference transcripts instead of testing fixed file prefixes.
 - Run one short real-model config through `semantic_asr/run_pipeline.py` and compare output shape with the older wrapper output.
 - Add nested CLI override support if ad-hoc experiment overrides become common.

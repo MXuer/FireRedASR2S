@@ -1,5 +1,11 @@
 # Todo
 
+- [x] Current work: investigate why FireRedPunc previously worked but now fails to load.
+- [x] Current work: correct Thai punctuation support assumptions and multilingual smoke report.
+- [x] Current work: design a Thai semantic sentence-boundary strategy without XLM-R punctuation.
+- [x] Current work: rerun Thai audio smoke tests after the user fixed `th_th.wav`.
+- [x] Current work: update docs/catalog/tests/PROGRESS/TODO and run final validation.
+
 - [x] Current work: record Dolphin GitHub-version and Seamless local-model retest task.
 - [x] Current work: verify Dolphin installation source/version and locate Seamless checkpoint.
 - [x] Current work: rerun Dolphin multilingual word-timestamp tests with the GitHub package.
@@ -20,7 +26,7 @@
 - [x] Current work: summarize pass/fail issues in the multilingual smoke-test report.
 - [x] Follow-up: rerun Dolphin tests after the user installs the official GitHub package.
 - [x] Follow-up: run Seamless M4T tests after the user copies the local model.
-- [ ] Follow-up: resolve FireRedPunc torch/transformers checkpoint-loading compatibility.
+- [x] Follow-up: resolve FireRedPunc torch/transformers checkpoint-loading compatibility.
 - [x] Current work: update PROGRESS/TODO for completed tests and pending follow-ups.
 
 - [x] Current work: record test-audio data matrix task before writing docs.
@@ -140,6 +146,14 @@
 
 ## Review
 
+- FireRedPunc real inference passed after adding a scoped trusted-local legacy BERT checkpoint loader for the current `torch==2.1.0` and `transformers==4.57.6` environment.
+- XLM-R punctuation smoke tests now cover only supported languages; Thai was removed.
+- Added `semantic_asr/docs/thai_sentence_boundary.md` with the recommended pause-and-duration Thai sentence-boundary strategy.
+- Corrected `th_th.wav` passed interface smoke tests for Silero VAD, FireRed VAD, FunASR, Whisper, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin and Seamless M4T.
+- FunASR returned timestamps but transcribed the corrected Thai sample as Chinese; it should not be treated as a quality-approved Thai ASR choice.
+- `conda run -n fireredasr2s python -m compileall -q semantic_asr` passed.
+- `conda run -n fireredasr2s python -m unittest discover -s semantic_asr/tests -p 'test_*.py'` passed: 18 tests.
+- `git diff --check` passed.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed.
 - Fake VAD/ASR/Punc smoke test passed with `CUDA_VISIBLE_DEVICES=4,5,6,7`.
 - Fake mandatory VAD/ASR/Timestamp/Punc smoke test passed with `CUDA_VISIBLE_DEVICES=4,5,6,7`.

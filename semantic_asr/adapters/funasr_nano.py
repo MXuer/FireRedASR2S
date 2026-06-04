@@ -83,6 +83,7 @@ class FunAsrNano:
             "itn": self.config.itn,
         }
         if len(wav_paths) == 1:
+            generate_kwargs["batch_size"] = 1
             return self.model.generate(input=wav_paths[0], **generate_kwargs)
         try:
             return self.model.generate(input=list(wav_paths), **generate_kwargs)

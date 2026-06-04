@@ -1,6 +1,7 @@
 # Copyright 2026 Xiaohongshu. (Author: Kaituo Xu, Junjie Chen)
 
 import logging
+import os
 
 import torch
 import torch.nn as nn
@@ -13,7 +14,7 @@ class FireRedPuncBert(nn.Module):
     @classmethod
     def from_args(cls, args):
         assert args.pretrained_bert, "just support pretrained bert"
-        args.bert = transformers.BertModel.from_pretrained(f"{args.pretrained_bert}")
+        args.bert = _load_local_bert(args.pretrained_bert)
         args.bert.pooler = None
         args.hidden_size = args.bert.config.hidden_size
         return cls(args)
@@ -67,3 +68,26 @@ def create_huggingface_bert_attention_mask(lengths):
     for i in range(N):
         mask[i, lengths[i]:] = 0
     return mask.float()
+
+
+def _load_local_bert(model_dir):
+    config = transformers.BertConfig.from_pretrained(model_dir)
+    model = transformers.BertModel(config)
+    checkpoint_path = os.path.join(model_dir, "pytorch_model.bin")
+    # FireRedPunc ships this trusted local legacy checkpoint with the runtime.
+    state_dict = torch.load(
+        checkpoint_path,
+        map_location="cpu",
+        weights_only=False,
+    )
+    state_dict = {
+        key.removeprefix("bert."): value
+        for key, value in state_dict.items()
+        if key != "bert.embeddings.position_ids" and not key.startswith("cls.")
+    }
+    missing, unexpected = model.load_state_dict(state_dict, strict=False)
+    if missing or unexpected:
+        raise RuntimeError(
+            f"Failed to load local BERT checkpoint: missing={missing}, unexpected={unexpected}"
+        )
+    return model

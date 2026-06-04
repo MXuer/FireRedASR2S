@@ -45,7 +45,6 @@ PUNC_TEXTS = {
     "ru_ru": "привет мир как дела сегодня",
     "ja_jp": "こんにちは 世界 今日は 元気 です",
     "hi_in": "नमस्ते दुनिया आप कैसे हैं",
-    "th_th": "สวัสดี โลก คุณ เป็น อย่างไร",
     "ar_sa": "مرحبا بالعالم كيف حالك اليوم",
 }
 
@@ -198,7 +197,7 @@ def run_silero(audio_dir: str, max_seconds: float) -> dict:
 def run_firered_vad(audio_dir: str, max_seconds: float) -> dict:
     vad = FireRedVad.from_pretrained("pretrained_models/FireRedVAD/VAD", FireRedVadConfig())
     output = {}
-    for language in ("en_us", "ru_ru", "th_th"):
+    for language in (item for item in ("en_us", "ru_ru", "th_th") if item in LANGUAGES):
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
         segment = make_segment(language, sample_rate, wav)
         result, _ = vad.detect(segment.wav)
@@ -208,8 +207,10 @@ def run_firered_vad(audio_dir: str, max_seconds: float) -> dict:
 
 def run_funasr(audio_dir: str, max_seconds: float, hub: str, asr_texts: dict, segments: dict) -> dict:
     local_model = os.path.expanduser("~/.cache/modelscope/hub/models/FunAudioLLM/Fun-ASR-Nano-2512")
-    model_name = local_model if os.path.isdir(local_model) else "FunAudioLLM/Fun-ASR-Nano-2512"
-    model = FunAsrNano(FunAsrNanoConfig(model=model_name, device="cuda:0", hub=hub, language="auto", batch_size=4, preserve_punctuation=True))
+    use_local_model = os.path.isdir(local_model)
+    model_name = local_model if use_local_model else "FunAudioLLM/Fun-ASR-Nano-2512"
+    model_hub = "ms" if use_local_model else hub
+    model = FunAsrNano(FunAsrNanoConfig(model=model_name, device="cuda:0", hub=model_hub, language="auto", batch_size=4, preserve_punctuation=True))
     languages = list(LANGUAGES)
     batch_uttid, batch_wav, batch_segments = [], [], []
     for language in languages:
@@ -306,7 +307,8 @@ def run_firered_punc() -> dict:
     model = build_firered_punc()
     timestamp = [["今天", 0.0, 0.2], ["天气", 0.2, 0.4], ["很好", 0.4, 0.6], ["我们", 0.8, 1.0], ["开始", 1.0, 1.2], ["测试", 1.2, 1.4]]
     result = model.process_with_timestamp([timestamp], ["zh_sample"])[0]
-    return {"sentence_count": len(result), "preview": result[:3]}
+    sentences = result.get("punc_sentences", [])
+    return {"sentence_count": len(sentences), "preview": sentences[:3]}
 
 
 def run_qwen3_aligner(asr_texts: dict, segments: dict) -> dict:

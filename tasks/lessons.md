@@ -8,3 +8,5 @@
 - Install Dolphin from the official `DataoceanAI/Dolphin` GitHub repository, not from PyPI; do not accept Dolphin smoke-test results from a PyPI build as final compatibility evidence.
 - Network access is approved for project work; use it directly when model downloads, dependency installation, or source verification are needed.
 - Real GPU commands must run outside the filesystem sandbox so CUDA devices are visible; use GPUs 4, 5, 6, and 7 through `CUDA_VISIBLE_DEVICES`.
+- Do not infer that a punctuation model supports Thai from its multilingual name; keep Thai out of XLM-R punctuation tests unless the model's explicit support list includes it.
+- Smoke-test runners filtered to one language must not retain hard-coded assumptions that other language fixtures are present.
