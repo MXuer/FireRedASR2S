@@ -64,6 +64,14 @@ Current state:
 
 Recent validation:
 
+- Investigated punctuation-proposed Arabic sentence boundaries against raw
+  VAD, aligned-token gaps and local waveform energy. The reported
+  `83.494s -> 83.634s` boundary cuts active speech and should be merged, while
+  `87.396s -> 87.496s` is supported by a raw VAD silence interval.
+- Added `semantic_asr/docs/sentence_boundary_fusion.md` with a proposed
+  punctuation + raw VAD + token pause + waveform energy + duration-limit
+  policy for audio-safe sentence boundaries. Default behavior remains
+  unchanged until multilingual evaluation.
 - The full ten-minute Arabic profile passed on `data/test/ar_sa-short.wav`:
   FireRed VAD + Seamless M4T v2 large + MMS Forced Aligner + XLM-R
   punctuation.
@@ -113,6 +121,9 @@ Recent validation:
 
 Next step:
 
+- Implement the pure sentence-boundary classifier described in
+  `semantic_asr/docs/sentence_boundary_fusion.md` and evaluate its proposed
+  merges before enabling it by default.
 - Implement and evaluate the Thai timestamp-and-pause sentence-boundary strategy.
 - Build speech-bearing quality fixtures with reference transcripts instead of testing fixed file prefixes.
 - Evaluate the Arabic end-to-end output against a reference transcript, with

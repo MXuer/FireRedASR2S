@@ -1,5 +1,9 @@
 # Todo
 
+- [x] Current work: inspect the three reported Arabic sentence boundaries against raw VAD, semantic VAD, output VAD and word timestamps.
+- [x] Current work: determine a robust policy for sentence boundaries that fall inside active speech.
+- [x] Current work: document the recommendation and defer changing default output behavior until multilingual evaluation.
+
 - [x] Current work: inspect `semantic_asr/configs/ar.json` and `data/test/ar_sa-short.wav`.
 - [x] Current work: run the Arabic canonical-language pipeline on a real GPU.
 - [x] Current work: inspect JSON/CSV/SRT/TextGrid outputs and record the result.
@@ -164,6 +168,16 @@
 
 ## Review
 
+- Investigated the reported Arabic boundaries using raw VAD, aligned-word gaps
+  and local waveform energy.
+- Confirmed that `83.494s -> 83.634s` cuts active speech inside one raw VAD
+  segment, while `87.396s -> 87.496s` is supported by a raw VAD silence gap.
+- Added `semantic_asr/docs/sentence_boundary_fusion.md`, recommending that
+  punctuation propose semantic boundaries while raw VAD, token pauses,
+  waveform energy and duration limits determine audio-safe boundaries.
+- Deferred changing default sentence merging until the policy is evaluated on
+  multilingual reference fixtures; a simple 200ms same-VAD rule would merge
+  12 boundaries in the current Arabic result.
 - The full ten-minute Arabic profile passed with FireRed VAD, Seamless M4T v2
   large, MMS Forced Aligner and XLM-R punctuation.
 - Final outputs contain 54 non-overlapping sentences and 699 non-overlapping
