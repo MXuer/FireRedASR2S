@@ -1,6 +1,6 @@
 {
   "name": "silero_funasr_fireredpunc",
-  "language": "zh",
+  "language": "zh_cn",
   "components": {
     "vad": {
       "name": "silero",
@@ -11,7 +11,6 @@
       "params": {
         "device": "cuda:0",
         "hub": "ms",
-        "language": "Chinese",
         "batch_size": 8
       }
     },

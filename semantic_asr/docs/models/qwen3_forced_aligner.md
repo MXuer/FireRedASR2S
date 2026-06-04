@@ -42,7 +42,8 @@ older `torch.utils._pytree` API before importing Qwen/Transformers.
 - Timestamp provider: yes
 - Input: ASR text plus the matching VAD audio segment
 - Batch alignment: yes, through `Qwen3ForcedAligner.align(audio=[...], text=[...], language=[...])`
-- Russian support: yes, use `language="Russian"`
+- Russian support: yes, configure canonical `language="ru_ru"`; the adapter
+  sends `Russian` to the model.
 
 ## Standalone/Experiment Test
 

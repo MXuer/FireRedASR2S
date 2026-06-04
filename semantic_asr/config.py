@@ -5,9 +5,23 @@ from dataclasses import asdict, dataclass, field
 from typing import Any
 
 from semantic_asr.core import PipelineConfig, SemanticAsrPipeline
+from semantic_asr.language_mapping import require_canonical_language_id
 from semantic_asr.registry import ComponentRegistry, create_default_registry
 
 REQUIRED_ROLES = ("vad", "asr", "timestamp", "punc")
+LANGUAGE_COMPONENTS = {
+    "asr": {
+        "dolphin",
+        "funasr_nano",
+        "qwen3_asr_1_7b",
+        "seamless_m4t_v2_large",
+        "whisper_large",
+    },
+    "timestamp": {
+        "mms_forced_aligner",
+        "qwen3_forced_aligner",
+    },
+}
 
 
 @dataclass
@@ -28,7 +42,7 @@ class OutputConfig:
 @dataclass
 class PipelineProfileConfig:
     name: str
-    language: str | None
+    language: str
     components: dict[str, ComponentSpec]
     pipeline: PipelineConfig = field(default_factory=PipelineConfig)
     output: OutputConfig = field(default_factory=OutputConfig)
@@ -49,6 +63,9 @@ def parse_pipeline_profile(raw: dict[str, Any]) -> PipelineProfileConfig:
     raw_components = raw.get("components")
     if not isinstance(raw_components, dict):
         raise ValueError("Pipeline profile config requires 'components' mapping")
+    language = str(raw.get("language") or "").strip()
+    if not language:
+        raise ValueError("Pipeline profile config requires canonical 'language'")
 
     components: dict[str, ComponentSpec] = {}
     for role in REQUIRED_ROLES:
@@ -65,7 +82,7 @@ def parse_pipeline_profile(raw: dict[str, Any]) -> PipelineProfileConfig:
 
     return PipelineProfileConfig(
         name=name,
-        language=raw.get("language"),
+        language=require_canonical_language_id(language),
         components=components,
         pipeline=_dataclass_from_raw(PipelineConfig, raw.get("pipeline", {})),
         output=_dataclass_from_raw(OutputConfig, raw.get("output", {})),
@@ -77,15 +94,19 @@ def build_pipeline_from_profile(
     registry: ComponentRegistry | None = None,
 ) -> SemanticAsrPipeline:
     registry = registry or create_default_registry()
+    component_params = {
+        role: _resolved_component_params(profile, role)
+        for role in REQUIRED_ROLES
+    }
     return SemanticAsrPipeline(
-        vad=registry.build("vad", profile.components["vad"].name, profile.components["vad"].params),
-        asr=registry.build("asr", profile.components["asr"].name, profile.components["asr"].params),
+        vad=registry.build("vad", profile.components["vad"].name, component_params["vad"]),
+        asr=registry.build("asr", profile.components["asr"].name, component_params["asr"]),
         timestamp_provider=registry.build(
             "timestamp",
             profile.components["timestamp"].name,
-            profile.components["timestamp"].params,
+            component_params["timestamp"],
         ),
-        punc=registry.build("punc", profile.components["punc"].name, profile.components["punc"].params),
+        punc=registry.build("punc", profile.components["punc"].name, component_params["punc"]),
         config=profile.pipeline,
     )
 
@@ -131,3 +152,11 @@ def _dataclass_from_raw(cls, raw: dict[str, Any] | None):
     if unknown:
         raise ValueError(f"Unknown fields for {cls.__name__}: {', '.join(unknown)}")
     return cls(**copy.deepcopy(raw))
+
+
+def _resolved_component_params(profile: PipelineProfileConfig, role: str) -> dict[str, Any]:
+    spec = profile.components[role]
+    params = copy.deepcopy(spec.params)
+    if profile.language and spec.name in LANGUAGE_COMPONENTS.get(role, set()):
+        params["language"] = profile.language
+    return params

@@ -58,9 +58,14 @@ Current state:
 - Replaced Thai audio retesting passed interface smoke tests for Silero VAD, FireRed VAD, Whisper large-v3, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin, Seamless M4T and FunASR; Dolphin returned 26 Thai word timestamps, while FunASR incorrectly transcribed the Thai sample as Chinese.
 - Corrected Qwen3-ASR language support to its specified 30 languages. Catalog queries use short codes, but the adapter converts configured codes such as `th_th` to the full model API value `Thai`.
 - Corrected Fun-ASR-Nano and `funasr_native` timestamp support to Chinese, English and Japanese only.
+- Added centralized canonical language mapping in `semantic_asr.language_mapping`.
+- Pipeline profiles now configure language once at the top level using ids such as `zh_cn`; config construction injects it into language-aware ASR and timestamp components.
+- MMS forced aligner now defaults to `zh_cn` and maps it to native `cmn` before calling MMSAlign, fixing the previous bare-`zh` mismatch.
 
 Recent validation:
 
+- Unified-language mapping validation passed: all profiles parsed with canonical ids, MMS `zh_cn -> cmn`, Qwen `th_th -> Thai`, and Seamless `ar_sa -> arb`.
+- Full validation after unified language configuration passed: 29 tests, package compile and `git diff --check`.
 - Focused Qwen/FunASR language support and adapter tests passed: 13 tests.
 - `semantic_asr/query_models.py language th_th` no longer returns Fun-ASR-Nano.
 - Qwen language conversion returned `Chinese`, `Thai` and `Cantonese` for `zh_cn`, `th_th` and `yue`.

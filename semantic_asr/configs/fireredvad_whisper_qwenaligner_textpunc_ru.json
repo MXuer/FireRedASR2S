@@ -1,6 +1,6 @@
 {
   "name": "fireredvad_whisper_qwenaligner_textpunc_ru",
-  "language": "ru",
+  "language": "ru_ru",
   "components": {
     "vad": {
       "name": "firered_vad",
@@ -16,7 +16,6 @@
       "params": {
         "model_name": "large-v3",
         "device": "cuda:0",
-        "language": "ru",
         "word_timestamps": false
       }
     },
@@ -25,7 +24,6 @@
       "params": {
         "model": "Qwen/Qwen3-ForcedAligner-0.6B",
         "device_map": "cuda:0",
-        "language": "Russian",
         "batch_size": 4
       }
     },

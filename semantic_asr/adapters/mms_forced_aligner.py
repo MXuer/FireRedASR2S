@@ -3,6 +3,7 @@ import re
 from typing import Sequence
 
 from semantic_asr.core import SpeechSegment
+from semantic_asr.language_mapping import canonical_language_id, model_language
 from semantic_asr.mms_runtime.aligner import MmsAligner
 
 
@@ -10,7 +11,7 @@ from semantic_asr.mms_runtime.aligner import MmsAligner
 class MmsForcedAlignerConfig:
     model_path: str = "pretrained_models/mmsalign/model.pt"
     device: str = "cuda:0"
-    language: str = "zh"
+    language: str = "zh_cn"
     use_star: bool = True
     normalize_text: bool = False
     uroman_path: str = "uroman/bin"
@@ -21,6 +22,8 @@ class MmsForcedAlignerTimestampProvider:
 
     def __init__(self, config: MmsForcedAlignerConfig | None = None):
         self.config = config or MmsForcedAlignerConfig()
+        self.config.language = canonical_language_id(self.config.language)
+        model_language("mms_forced_aligner", self.config.language)
         self.aligner = MmsAligner(
             model_path=self.config.model_path,
             device=self.config.device,
@@ -38,7 +41,7 @@ class MmsForcedAlignerTimestampProvider:
                 segment.sample_rate,
                 names,
                 use_star=self.config.use_star,
-                language=self.config.language,
+                language=model_language("mms_forced_aligner", self.config.language),
                 raw_transcripts=tokens,
             )
 

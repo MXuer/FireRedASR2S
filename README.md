@@ -119,6 +119,10 @@ python semantic_asr/query_models.py model qwen3_asr_1_7b --role asr
 
 The query output is grouped by role: `vad`, `asr`, `timestamp`, and `punc`.
 
+Pipeline profiles configure language once using a canonical language-region id
+such as `zh_cn`, `en_us`, or `th_th`. Model-native language values are derived
+internally. See `semantic_asr/docs/language_configuration.md`.
+
 ## Development Contract
 
 Every new model adapter should include:

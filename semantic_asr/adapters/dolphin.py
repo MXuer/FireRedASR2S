@@ -6,14 +6,14 @@ from typing import Any, Sequence
 import soundfile as sf
 
 from semantic_asr.compat import patch_torch_pytree_for_transformers
+from semantic_asr.language_mapping import dolphin_language
 
 
 @dataclass
 class DolphinAsrConfig:
     model_name: str = "small"
     device: str = "cuda:0"
-    lang_sym: str | None = None
-    region_sym: str | None = None
+    language: str = "zh_cn"
     word_timestamp: bool = True
     decoding_method: str = "attention_rescoring"
     beam_size: int = 10
@@ -35,14 +35,15 @@ class DolphinAsr:
 
     def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
         results = []
+        lang_sym, region_sym = dolphin_language(self.config.language)
         for uttid, (sample_rate, wav) in zip(batch_uttid, batch_wav):
             wav_path = self._write_temp_wav(wav, sample_rate)
             try:
                 raw_result = self.dolphin.transcribe(
                     self.model,
                     wav_path,
-                    lang_sym=self.config.lang_sym,
-                    region_sym=self.config.region_sym,
+                    lang_sym=lang_sym,
+                    region_sym=region_sym,
                     word_timestamp=self.config.word_timestamp,
                     decoding_method=self.config.decoding_method,
                     beam_size=self.config.beam_size,

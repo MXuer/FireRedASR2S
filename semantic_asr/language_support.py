@@ -127,20 +127,20 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
             "ct": ("yue", "cantonese", "zh-hk"),
             "fil": ("filipino",),
         },
-        notes="Dolphin supports 40 Eastern languages plus Chinese dialect region codes; use lang_sym/region_sym.",
+        notes="Dolphin supports 40 Eastern languages plus Chinese dialect region codes; configure a canonical language-region id and the adapter derives native symbols.",
         has_native_timestamps=True,
         has_native_punctuation=True,
     ),
     ModelLanguageSupport(
         role="asr",
         name="seamless_m4t_v2_large",
-        languages=(ANY_LANGUAGE,),
+        languages=("ar", "en", "hi", "ja", "ko", "pt", "ru", "th", "vi", "zh"),
         aliases={
             "eng": ("en", "en-us", "en-gb", "english"),
             "cmn": ("zh", "zh-cn", "chinese", "mandarin"),
             "rus": ("ru", "ru-ru", "russian"),
         },
-        notes="Seamless M4T v2 large ASR supports many languages using Seamless/FLORES language codes; configure src_lang explicitly.",
+        notes="The current adapter mapping covers ten validated languages; configure a canonical language-region id and the adapter derives the Seamless/FLORES code.",
         has_native_punctuation=True,
     ),
     ModelLanguageSupport(
@@ -184,12 +184,13 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
             "th-th", "tr-tr", "ug-cn", "uk-ua", "uz-uz", "vi-in", "zh-cn",
         ),
         aliases={
+            "ct-hk": ("yue", "yue-hk", "cantonese"),
             "en-us": ("en", "english"),
             "zh-cn": ("zh", "chinese", "cn"),
             "ru-ru": ("ru", "russian"),
             "vi-in": ("vi", "vi-vn", "vietnamese"),
         },
-        notes="MMS forced aligner via local l2s ALIGNER; language codes follow l2s.utils.model_registry.MMS_CODE_MAP.",
+        notes="MMS forced aligner via vendored runtime; configure a canonical language-region id and the adapter maps it through MMS_CODE_MAP.",
     ),
     ModelLanguageSupport(
         role="punc",
@@ -275,6 +276,7 @@ def _support_to_dict(support: ModelLanguageSupport) -> dict[str, Any]:
     return {
         "role": support.role,
         "name": support.name,
+        "configuration_language_format": "canonical language-region id, for example zh_cn",
         "languages": list(support.languages),
         "aliases": {key: list(value) for key, value in support.aliases.items()},
         "notes": support.notes,

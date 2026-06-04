@@ -27,7 +27,7 @@ Structured outputs are under `output/model_smoke_tests/`.
 | XLM-R 47-language punctuation | Pass after adapter/environment fix | Installed `punctuators`; adapter now loads the local `pcs_47lang` ONNX snapshot. Tested supported English, Russian, Japanese, Hindi and Arabic samples. Thai is not supported by this model. |
 | ASR-native / ASR-text punctuation strategies | Pass | Covered by unit tests. |
 | Dolphin | Pass after GitHub-version retest | Official GitHub package version `20260513` passed grouped tests for Arabic, Hindi, Japanese, Korean, Russian and Vietnamese with normalized word timestamps. The selected Thai prefix returned empty text/timestamps and needs a speech-bearing quality fixture. |
-| Seamless M4T v2 large | Pass after adapter/environment fixes | Local 18GB checkpoint passed all nine languages. Adapter now resamples input to 16kHz and defaults `tgt_lang=src_lang`; current environment uses `PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python`. |
+| Seamless M4T v2 large | Pass after adapter/environment fixes | Local 18GB checkpoint passed all nine languages. Adapter now resamples input to 16kHz and maps the canonical profile language to Seamless source/target codes; current environment uses `PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python`. |
 | FireRedPunc | Pass after compatibility fix | The model and weights were valid. Installing Qwen3-ASR upgraded `transformers` to `4.57.6`, whose safe loader rejects `.bin` checkpoints with `torch==2.1.0`. The vendored runtime now loads the trusted local BERT checkpoint directly and validates its state dict. |
 
 ## Quality Warnings

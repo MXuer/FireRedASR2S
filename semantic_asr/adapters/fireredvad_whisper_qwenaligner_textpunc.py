@@ -15,7 +15,7 @@ class FireRedVadWhisperQwenAlignerTextPuncConfig:
     vad_model_dir: str = "pretrained_models/FireRedVAD/VAD"
     vad_config: FireRedVadConfig = field(default_factory=FireRedVadConfig)
     whisper_config: WhisperLargeConfig = field(
-        default_factory=lambda: WhisperLargeConfig(language="ru", word_timestamps=False)
+        default_factory=lambda: WhisperLargeConfig(language="ru_ru", word_timestamps=False)
     )
     aligner_config: Qwen3ForcedAlignerConfig = field(default_factory=Qwen3ForcedAlignerConfig)
     pipeline_config: PipelineConfig = field(

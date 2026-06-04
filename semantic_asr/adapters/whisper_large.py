@@ -6,6 +6,7 @@ from typing import Any, Sequence
 import soundfile as sf
 
 from semantic_asr.core import SpeechSegment
+from semantic_asr.language_mapping import model_language
 
 
 @dataclass
@@ -40,7 +41,7 @@ class WhisperLarge:
             try:
                 raw_result = self.model.transcribe(
                     wav_path,
-                    language=self.config.language,
+                    language=model_language("whisper_large", self.config.language) if self.config.language else None,
                     task=self.config.task,
                     fp16=self.config.fp16,
                     word_timestamps=self.config.word_timestamps,

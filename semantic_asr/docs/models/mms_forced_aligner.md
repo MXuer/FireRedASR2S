@@ -13,7 +13,7 @@ device_aligns = aligner.align(
     device_wav_file,
     names,
     use_star=True,
-    language="zh",
+    language="zh_cn",
     raw_transcripts=texts,
 )
 ```
@@ -50,9 +50,9 @@ segment wav files.
 
 ## Language Support
 
-Language codes follow `semantic_asr.mms_runtime.model_registry.MMS_CODE_MAP`. The current
-catalog records the 49 local mapping keys, including `zh_cn`, `en_us`, `ru_ru`,
-`ja_jp`, `de_de`, `fr_fr`, `th_th`, `vi_in`, and more.
+Configure the canonical pipeline language id. The adapter maps it through
+`semantic_asr.mms_runtime.model_registry.MMS_CODE_MAP`; for example, `zh_cn`
+becomes MMSAlign's native `cmn`.
 
 For Chinese, the adapter automatically inserts spaces around each CJK character
 before alignment, matching the reference code.

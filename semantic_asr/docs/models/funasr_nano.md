@@ -9,6 +9,8 @@ References:
 
 The pipeline catalog exposes Fun-ASR-Nano only for Chinese, English and
 Japanese. Its ASR-native timestamp provider has the same language restriction.
+Configure them as `zh_cn`, `en_us`, or `ja_jp`; the adapter converts them to
+FunASR's native full language names.
 
 ## Environment
 

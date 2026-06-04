@@ -1,5 +1,12 @@
 # Todo
 
+- [x] Current work: audit model adapters for inconsistent language input formats, including MMS default `zh`.
+- [x] Current work: define canonical project language ids such as `zh_cn` and centralized model-native mappings.
+- [x] Current work: make adapters/config profiles accept canonical ids and convert internally.
+- [x] Current work: add mapping/query/config regression tests and update docs/decisions/progress.
+- [x] Current work: run full validation.
+- [ ] Current work: commit when external git-write approval is available.
+
 - [x] Current work: correct Qwen3-ASR supported-language list and full-name inference parameters.
 - [x] Current work: restrict Fun-ASR-Nano language support to Chinese, English and Japanese.
 - [x] Current work: update language-query tests, model docs, lessons and progress.
@@ -151,6 +158,13 @@
 
 ## Review
 
+- Added centralized `semantic_asr.language_mapping` for canonical profile ids and model-native values.
+- Pipeline profiles now require one canonical top-level language such as `zh_cn`; language-aware ASR/timestamp components receive it automatically.
+- MMS forced aligner defaults to `zh_cn`, and a regression test verifies that the MMS runtime receives native `cmn`.
+- Migrated all existing profiles and standalone model examples away from model-native language fields.
+- Added unified-language documentation and model-specific documentation updates.
+- All existing profiles parsed with canonical ids; model mapping checks passed.
+- Full validation passed: 29 tests, package compile and `git diff --check`.
 - Corrected Qwen3-ASR catalog support to the specified 30 languages.
 - Qwen3-ASR converts short/region codes to the full language names required by the official model API; `zh_cn`, `th_th` and `yue` map to `Chinese`, `Thai` and `Cantonese`.
 - Restricted Fun-ASR-Nano and `funasr_native` timestamp support to Chinese, English and Japanese.

@@ -35,8 +35,8 @@ pipeline catalog records the broad language codes exposed by
 `gu`, `my`, `tl`, `kk`, `or`, `ne`, `mn`, `km`, `jv`, `lo`, `si`, `fil`, `ps`,
 `pa`, `kab`, `ba`, `ks`, `tg`, `su`, `mr`, `ky`, and `az`.
 
-Use adapter params `lang_sym` and `region_sym` for Dolphin's official language
-and dialect symbols.
+Configure a canonical pipeline language id such as `zh_cn` or `th_th`. The
+adapter derives Dolphin's `lang_sym` and `region_sym` internally.
 
 ## Timestamps And Punctuation
 
@@ -66,7 +66,7 @@ Real model smoke test:
 ```bash
 CUDA_VISIBLE_DEVICES=4 conda run -n fireredasr2s python semantic_asr/examples/test_dolphin.py \
   --wav_path data/test/short.wav \
-  --lang_sym zh \
+  --language zh_cn \
   --word_timestamp 1 \
   --max_seconds 30
 ```

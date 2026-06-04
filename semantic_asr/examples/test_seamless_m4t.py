@@ -15,12 +15,12 @@ def main():
     parser.add_argument("--wav_path", default="data/test/short.wav")
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--model", default="facebook/seamless-m4t-v2-large")
-    parser.add_argument("--src_lang", default="eng")
+    parser.add_argument("--language", default="en_us")
     parser.add_argument("--max_seconds", type=float, default=30)
     parser.add_argument("--skip_model_load", type=int, default=0)
     args = parser.parse_args()
 
-    config = SeamlessM4TConfig(model=args.model, device=args.device, src_lang=args.src_lang)
+    config = SeamlessM4TConfig(model=args.model, device=args.device, language=args.language)
     if args.skip_model_load:
         print(json.dumps({"config": config.__dict__}, ensure_ascii=False, indent=2))
         return

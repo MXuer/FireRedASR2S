@@ -1,6 +1,6 @@
 {
   "name": "ar",
-  "language": "ar",
+  "language": "ar_sa",
   "components": {
     "vad": {
       "name": "firered_vad",
@@ -12,16 +12,11 @@
       }
     },
     "asr": {
-      "name": "seamless_m4t_v2_large",
-      "params": {
-        "src_lang": "arb"
-      }
+      "name": "seamless_m4t_v2_large"
     },
     "timestamp": {
       "name": "mms_forced_aligner",
-      "params": {
-        "language": "ar_sa"
-      }
+      "params": {}
     },
     "punc": {
       "name": "xlm_roberta_punctuation"

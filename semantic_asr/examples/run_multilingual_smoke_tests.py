@@ -210,17 +210,16 @@ def run_funasr(audio_dir: str, max_seconds: float, hub: str, asr_texts: dict, se
     use_local_model = os.path.isdir(local_model)
     model_name = local_model if use_local_model else "FunAudioLLM/Fun-ASR-Nano-2512"
     model_hub = "ms" if use_local_model else hub
-    model = FunAsrNano(FunAsrNanoConfig(model=model_name, device="cuda:0", hub=model_hub, language="auto", batch_size=4, preserve_punctuation=True))
+    model = FunAsrNano(FunAsrNanoConfig(model=model_name, device="cuda:0", hub=model_hub, batch_size=1, preserve_punctuation=True))
     languages = [language for language, meta in LANGUAGES.items() if meta["base"] in {"zh", "en", "ja"}]
-    batch_uttid, batch_wav, batch_segments = [], [], []
+    results = []
     for language in languages:
+        model.config.language = language
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
-        batch_uttid.append(language)
-        batch_wav.append((sample_rate, wav))
-        batch_segments.append(make_segment(language, sample_rate, wav))
-        segments.setdefault(language, batch_segments[-1])
-    results = model.transcribe(batch_uttid, batch_wav)
-    results = FunAsrNanoTimestampProvider().add_timestamps(results, batch_segments)
+        segment = make_segment(language, sample_rate, wav)
+        item = model.transcribe([language], [(sample_rate, wav)])[0]
+        results.extend(FunAsrNanoTimestampProvider().add_timestamps([item], [segment]))
+        segments.setdefault(language, segment)
     for item in results:
         if item.get("text"):
             asr_texts.setdefault(item["uttid"], item["text"])
@@ -232,6 +231,7 @@ def run_whisper(audio_dir: str, max_seconds: float, asr_texts: dict, segments: d
     provider = WhisperLargeTimestampProvider()
     outputs = []
     for language, meta in LANGUAGES.items():
+        model.config.language = language
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
         segment = make_segment(language, sample_rate, wav)
         result = model.transcribe([language], [(sample_rate, wav)])
@@ -247,7 +247,7 @@ def run_qwen3_asr(audio_dir: str, max_seconds: float, asr_texts: dict, segments:
     model = Qwen3Asr(Qwen3AsrConfig(model=cached_snapshot("Qwen/Qwen3-ASR-1.7B"), device_map="cuda:0", max_inference_batch_size=4, max_new_tokens=128))
     results = []
     for language, meta in LANGUAGES.items():
-        model.config.language = meta["qwen"]
+        model.config.language = language
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
         segment = make_segment(language, sample_rate, wav)
         item = model.transcribe([language], [(sample_rate, wav)])[0]
@@ -264,7 +264,7 @@ def run_dolphin(audio_dir: str, max_seconds: float, asr_texts: dict, segments: d
     for language, meta in LANGUAGES.items():
         if not meta["dolphin"]:
             continue
-        model.config.lang_sym = meta["dolphin"]
+        model.config.language = language
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
         segment = make_segment(language, sample_rate, wav)
         item = model.transcribe([language], [(sample_rate, wav)])[0]
@@ -282,7 +282,7 @@ def run_seamless(audio_dir: str, max_seconds: float, asr_texts: dict, segments: 
     ))
     results = []
     for language, meta in LANGUAGES.items():
-        model.config.src_lang = meta["seamless"]
+        model.config.language = language
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
         segment = make_segment(language, sample_rate, wav)
         item = model.transcribe([language], [(sample_rate, wav)])[0]
@@ -314,7 +314,7 @@ def run_firered_punc() -> dict:
 
 def run_qwen3_aligner(asr_texts: dict, segments: dict) -> dict:
     language = "en_us" if "en_us" in asr_texts and "en_us" in segments else next(iter(asr_texts))
-    model = Qwen3ForcedAlignerTimestampProvider(Qwen3ForcedAlignerConfig(model=cached_snapshot("Qwen/Qwen3-ForcedAligner-0.6B"), device_map="cuda:0", language="en" if language == "en_us" else LANGUAGES[language]["base"], batch_size=1))
+    model = Qwen3ForcedAlignerTimestampProvider(Qwen3ForcedAlignerConfig(model=cached_snapshot("Qwen/Qwen3-ForcedAligner-0.6B"), device_map="cuda:0", language=language, batch_size=1))
     asr_result = {"uttid": language, "text": asr_texts[language], "confidence": 0, "timestamp": []}
     result = model.add_timestamps([asr_result], [segments[language]])[0]
     return summarize_asr([result])
@@ -322,7 +322,7 @@ def run_qwen3_aligner(asr_texts: dict, segments: dict) -> dict:
 
 def run_mms_aligner(asr_texts: dict, segments: dict) -> dict:
     language = "hi_in" if "hi_in" in asr_texts and "hi_in" in segments else next(iter(asr_texts))
-    model = MmsForcedAlignerTimestampProvider(MmsForcedAlignerConfig(device="cuda:0", language=LANGUAGES[language]["mms"]))
+    model = MmsForcedAlignerTimestampProvider(MmsForcedAlignerConfig(device="cuda:0", language=language))
     asr_result = {"uttid": language, "text": asr_texts[language], "confidence": 0, "timestamp": []}
     result = model.add_timestamps([asr_result], [segments[language]])[0]
     return summarize_asr([result])

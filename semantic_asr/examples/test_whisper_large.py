@@ -21,7 +21,7 @@ def main():
     parser.add_argument("--wav_path", default="data/test/short.wav")
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--model_name", default="large-v3")
-    parser.add_argument("--language", default=None)
+    parser.add_argument("--language", default="en_us")
     parser.add_argument("--max_seconds", type=float, default=30)
     args = parser.parse_args()
 
@@ -55,4 +55,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

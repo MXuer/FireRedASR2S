@@ -42,7 +42,7 @@ These six languages give coverage for:
 | Language | Additional coverage |
 | --- | --- |
 | `ar_sa` | Right-to-left Arabic script; good for MMS, Qwen3-ASR, Dolphin and XLM-R punctuation. |
-| `vi_in` | Vietnamese tone marks and MMS language-code coverage. |
+| `vi_vn` | Vietnamese tone marks and MMS language-code coverage. |
 | `ko_kr` | Korean CJK-like segmentation; supported by Qwen3 aligner and MMS. |
 | `bn_bd` | Bengali script; useful second Indic-style sample for MMS/XLM-R. |
 | `pt_br` | Latin-script non-English sample with MMS region code and Qwen coverage. |

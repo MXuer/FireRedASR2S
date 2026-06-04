@@ -20,6 +20,7 @@ def main():
     parser.add_argument("--wav_path", required=True)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--hub", default="ms")
+    parser.add_argument("--language", default="zh_cn")
     parser.add_argument("--max_seconds", type=float, default=30.0)
     args = parser.parse_args()
 
@@ -28,7 +29,7 @@ def main():
         wav = wav.mean(axis=1).astype("int16")
     wav = wav[: int(args.max_seconds * sample_rate)]
 
-    asr = FunAsrNano(FunAsrNanoConfig(device=args.device, hub=args.hub))
+    asr = FunAsrNano(FunAsrNanoConfig(device=args.device, hub=args.hub, language=args.language))
     result = asr.transcribe(["funasr_test_s0_e%d" % int(len(wav) / sample_rate * 1000)], [(sample_rate, wav)])
     result = FunAsrNanoTimestampProvider().add_timestamps(
         result,

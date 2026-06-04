@@ -5,6 +5,7 @@ import torch
 
 from semantic_asr.compat import patch_torch_pytree_for_transformers
 from semantic_asr.core import SpeechSegment
+from semantic_asr.language_mapping import canonical_language_id, model_language
 
 
 @dataclass
@@ -12,7 +13,7 @@ class Qwen3ForcedAlignerConfig:
     model: str = "Qwen/Qwen3-ForcedAligner-0.6B"
     dtype: str = "bfloat16"
     device_map: str = "cuda:0"
-    language: str = "Russian"
+    language: str = "ru_ru"
     batch_size: int = 4
 
 
@@ -24,6 +25,7 @@ class Qwen3ForcedAlignerTimestampProvider:
         from qwen_asr import Qwen3ForcedAligner
 
         self.config = config or Qwen3ForcedAlignerConfig()
+        self.config.language = canonical_language_id(self.config.language)
         self.model = Qwen3ForcedAligner.from_pretrained(
             self.config.model,
             dtype=getattr(torch, self.config.dtype),
@@ -38,7 +40,7 @@ class Qwen3ForcedAlignerTimestampProvider:
             aligned = self.model.align(
                 audio=[(segment.wav, segment.sample_rate) for segment in segment_chunk],
                 text=[asr_result.get("text", "") for asr_result in asr_chunk],
-                language=[self.config.language] * len(asr_chunk),
+                language=[model_language("qwen3_forced_aligner", self.config.language)] * len(asr_chunk),
             )
             for asr_result, align_result in zip(asr_chunk, aligned):
                 timestamped = dict(asr_result)

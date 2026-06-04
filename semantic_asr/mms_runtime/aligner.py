@@ -10,8 +10,6 @@ from semantic_asr.mms_runtime.align_utils import (
     merge_repeats,
     time_to_frame,
 )
-from semantic_asr.mms_runtime.model_registry import MMS_CODE_MAP
-
 SAMPLING_FREQ = 16000
 EMISSION_INTERVAL = 30
 
@@ -37,7 +35,6 @@ class MmsAligner:
         language: str,
         raw_transcripts: list[str],
     ) -> list[dict]:
-        language = MMS_CODE_MAP.get(language, language)
         transcripts = [text for text in transcripts if text.strip()]
         norm_transcripts = [text.strip().lower() for text in transcripts]
         tokens = get_uroman_tokens(norm_transcripts, self.uroman_path, language)

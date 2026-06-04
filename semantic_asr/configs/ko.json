@@ -1,6 +1,6 @@
 {
   "name": "fireredvad_whisper_qwenaligner_textpunc_ko",
-  "language": "ko",
+  "language": "ko_kr",
   "components": {
     "vad": {
       "name": "firered_vad",
@@ -12,17 +12,13 @@
       }
     },
     "asr": {
-      "name": "qwen3_asr_1_7b",
-      "params": {
-        "language": "Korean"
-      }
+      "name": "qwen3_asr_1_7b"
     },
     "timestamp": {
       "name": "qwen3_forced_aligner",
       "params": {
         "model": "Qwen/Qwen3-ForcedAligner-0.6B",
         "device_map": "cuda:0",
-        "language": "ko",
         "batch_size": 4
       }
     },

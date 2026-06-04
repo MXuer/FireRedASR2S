@@ -32,3 +32,5 @@
 - FireRedPunc loads its trusted vendored local legacy BERT `.bin` checkpoint directly because the current `transformers==4.57.6` safe loader rejects it under `torch==2.1.0`; unexpected state-dict keys remain validated.
 - Qwen3-ASR language metadata uses stable short codes for catalog queries, while the adapter converts configured codes or region codes to the full English language names required by the official model API.
 - Fun-ASR-Nano and its native timestamp provider are exposed only for Chinese, English and Japanese.
+- Pipeline profiles use one canonical lowercase language-region id such as `zh_cn`. Model adapters convert that value to model-native language names/codes internally; component-specific native language fields are not part of user configuration.
+- `PipelineProfileConfig.language` is injected into every language-aware ASR and timestamp component during pipeline construction.

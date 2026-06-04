@@ -8,14 +8,15 @@ import torch
 import torchaudio.functional as audio_functional
 
 from semantic_asr.compat import patch_torch_pytree_for_transformers
+from semantic_asr.language_mapping import model_language
 
 
 @dataclass
 class SeamlessM4TConfig:
     model: str = "facebook/seamless-m4t-v2-large"
     device: str = "cuda:0"
-    src_lang: str = "eng"
-    tgt_lang: str | None = None
+    language: str = "en_us"
+    target_language: str | None = None
     task: str = "transcribe"
     max_new_tokens: int = 256
 
@@ -58,14 +59,14 @@ class SeamlessM4TAsr:
         inputs = self.processor(
             audios=wav,
             sampling_rate=sample_rate,
-            src_lang=self.config.src_lang,
+            src_lang=model_language("seamless_m4t_v2_large", self.config.language),
             return_tensors="pt",
         )
         inputs = {key: value.to(self.config.device) for key, value in inputs.items()}
         kwargs = {"max_new_tokens": self.config.max_new_tokens}
-        target_language = self.config.tgt_lang or self.config.src_lang
+        target_language = self.config.target_language or self.config.language
         if target_language:
-            kwargs["tgt_lang"] = target_language
+            kwargs["tgt_lang"] = model_language("seamless_m4t_v2_large", target_language)
         with torch.no_grad():
             output_ids = self.model.generate(**inputs, **kwargs)
         return self.processor.batch_decode(output_ids, skip_special_tokens=True)[0]

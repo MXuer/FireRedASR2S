@@ -15,8 +15,7 @@ def main():
     parser.add_argument("--wav_path", default="data/test/short.wav")
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--model_name", default="small")
-    parser.add_argument("--lang_sym", default=None)
-    parser.add_argument("--region_sym", default=None)
+    parser.add_argument("--language", default="zh_cn")
     parser.add_argument("--word_timestamp", type=int, default=1)
     parser.add_argument("--max_seconds", type=float, default=30)
     parser.add_argument("--skip_model_load", type=int, default=0)
@@ -25,8 +24,7 @@ def main():
     config = DolphinAsrConfig(
         model_name=args.model_name,
         device=args.device,
-        lang_sym=args.lang_sym,
-        region_sym=args.region_sym,
+        language=args.language,
         word_timestamp=bool(args.word_timestamp),
     )
     if args.skip_model_load:

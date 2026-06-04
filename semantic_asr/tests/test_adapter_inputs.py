@@ -48,7 +48,7 @@ class AdapterInputTest(unittest.TestCase):
         self.assertEqual(normalize_qwen3_asr_language("yue"), "Cantonese")
         self.assertEqual(normalize_qwen3_asr_language("English"), "English")
 
-        with self.assertRaisesRegex(ValueError, "Unsupported Qwen3-ASR language"):
+        with self.assertRaisesRegex(ValueError, "canonical language-region id"):
             normalize_qwen3_asr_language("uk")
 
     def test_qwen_adapter_sends_full_language_name_to_model(self):

@@ -57,7 +57,7 @@ def fake_registry() -> ComponentRegistry:
 def fake_profile(outdir: str = "unused") -> dict:
     return {
         "name": "fake_profile",
-        "language": "test",
+        "language": "en_us",
         "components": {
             "vad": {"name": "fake_vad", "params": {}},
             "asr": {"name": "fake_asr", "params": {}},
@@ -94,6 +94,28 @@ class ConfigRunnerTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "components.timestamp"):
             parse_pipeline_profile(raw)
+
+    def test_profile_requires_canonical_language(self):
+        raw = fake_profile()
+        raw["language"] = "English"
+
+        with self.assertRaisesRegex(ValueError, "canonical id en_us"):
+            parse_pipeline_profile(raw)
+
+    def test_profile_language_is_injected_into_language_aware_components(self):
+        raw = fake_profile()
+        raw["language"] = "zh_cn"
+        raw["components"]["asr"]["name"] = "whisper_large"
+        raw["components"]["timestamp"]["name"] = "mms_forced_aligner"
+        captured = {}
+        registry = fake_registry()
+        registry.register("asr", "whisper_large", lambda params: captured.setdefault("asr", dict(params)) or FakeAsr())
+        registry.register("timestamp", "mms_forced_aligner", lambda params: captured.setdefault("timestamp", dict(params)) or FakeTimestampProvider())
+
+        build_pipeline_from_profile(parse_pipeline_profile(raw), registry=registry)
+
+        self.assertEqual(captured["asr"]["language"], "zh_cn")
+        self.assertEqual(captured["timestamp"]["language"], "zh_cn")
 
     def test_runner_writes_json_jsonl_and_resolved_config(self):
         with tempfile.TemporaryDirectory() as tmpdir:

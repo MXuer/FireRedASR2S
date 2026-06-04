@@ -5,40 +5,7 @@ import numpy as np
 import torch
 
 from semantic_asr.compat import patch_torch_pytree_for_transformers
-
-
-QWEN3_ASR_LANGUAGE_NAMES = {
-    "zh": "Chinese",
-    "en": "English",
-    "yue": "Cantonese",
-    "ar": "Arabic",
-    "de": "German",
-    "fr": "French",
-    "es": "Spanish",
-    "pt": "Portuguese",
-    "id": "Indonesian",
-    "it": "Italian",
-    "ko": "Korean",
-    "ru": "Russian",
-    "th": "Thai",
-    "vi": "Vietnamese",
-    "ja": "Japanese",
-    "tr": "Turkish",
-    "hi": "Hindi",
-    "ms": "Malay",
-    "nl": "Dutch",
-    "sv": "Swedish",
-    "da": "Danish",
-    "fi": "Finnish",
-    "pl": "Polish",
-    "cs": "Czech",
-    "fil": "Filipino",
-    "fa": "Persian",
-    "el": "Greek",
-    "hu": "Hungarian",
-    "mk": "Macedonian",
-    "ro": "Romanian",
-}
+from semantic_asr.language_mapping import model_language
 
 
 @dataclass
@@ -138,11 +105,4 @@ def _to_float32(wav: Any) -> np.ndarray:
 def normalize_qwen3_asr_language(language: str | None) -> str | None:
     if language is None:
         return None
-    normalized = language.strip().lower().replace("_", "-")
-    base = normalized.split("-", 1)[0]
-    if base in QWEN3_ASR_LANGUAGE_NAMES:
-        return QWEN3_ASR_LANGUAGE_NAMES[base]
-    full_names = {name.lower(): name for name in QWEN3_ASR_LANGUAGE_NAMES.values()}
-    if normalized in full_names:
-        return full_names[normalized]
-    raise ValueError(f"Unsupported Qwen3-ASR language: {language}")
+    return model_language("qwen3_asr_1_7b", language)

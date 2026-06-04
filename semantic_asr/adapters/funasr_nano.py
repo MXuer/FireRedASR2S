@@ -8,6 +8,7 @@ from typing import Any, Sequence
 import soundfile as sf
 
 from semantic_asr.core import SpeechSegment
+from semantic_asr.language_mapping import canonical_language_id, model_language
 from semantic_asr.punctuation import strip_timestamp_punctuation
 
 
@@ -16,7 +17,7 @@ class FunAsrNanoConfig:
     model: str = "FunAudioLLM/Fun-ASR-Nano-2512"
     device: str = "cuda:0"
     hub: str = "ms"
-    language: str = "English"
+    language: str = "en_us"
     batch_size: int = 1
     trust_remote_code: bool = True
     remote_code: str | None = None
@@ -31,6 +32,7 @@ class FunAsrNano:
         from funasr import AutoModel
 
         self.config = config or FunAsrNanoConfig()
+        self.config.language = canonical_language_id(self.config.language)
         remote_code = self.config.remote_code or self._default_remote_code()
         self.model = AutoModel(
             model=self.config.model,
@@ -78,7 +80,7 @@ class FunAsrNano:
         generate_kwargs = {
             "cache": {},
             "batch_size": self.config.batch_size,
-            "language": self.config.language,
+            "language": model_language("funasr_nano", self.config.language),
             "hotwords": self.config.hotwords,
             "itn": self.config.itn,
         }
