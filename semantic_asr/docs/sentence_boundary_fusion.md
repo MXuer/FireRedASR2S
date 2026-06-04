@@ -76,11 +76,15 @@ and is enabled only by profiles that set `pipeline.sentence_boundary_fusion`.
 It:
 
 1. Keeps the punctuation-proposed candidates as `semantic_sentences`.
-2. Merges short active-speech boundaries only when the resulting sentence is
-   no longer than `target_sentence_s`.
+2. Treats active-speech safety as a hard constraint: active-speech boundaries
+   are merged whenever the resulting sentence is no longer than
+   `max_sentence_s`.
 3. Keeps and snaps nearby boundaries supported by raw VAD silence.
 4. Prevents merging beyond `max_sentence_s`.
 5. Writes each candidate decision to `sentence_boundary_decisions`.
 
 The Arabic profile is the first enabled profile. Evaluate proposed merges on
 multilingual reference fixtures before enabling the policy more broadly.
+
+`target_sentence_s` is a soft preference for ambiguous boundaries.
+`max_sentence_s` is the hard limit that may prevent an active-speech merge.

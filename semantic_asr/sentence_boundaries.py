@@ -86,7 +86,6 @@ def fuse_sentence_boundaries(
             same_raw_vad
             and token_gap_ms < int(config.merge_max_token_gap_s * 1000)
             and valley_ratio > config.acoustic_valley_ratio
-            and combined_duration_ms <= int(config.target_sentence_s * 1000)
         ):
             action = "merge"
             reason = "merged_active_speech"

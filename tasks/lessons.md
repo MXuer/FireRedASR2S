@@ -15,3 +15,4 @@
 - Do not expose model-native language values in pipeline profiles. Use one canonical top-level language-region id and keep all model-specific conversion in the centralized mapping layer.
 - Normalize final sentence intervals after output VAD alignment and before any output writer; all JSON, CSV, SRT and TextGrid outputs must receive the same monotonic, non-overlapping sentence list.
 - When snapping a sentence boundary to VAD silence, restrict the search to a nearby candidate-boundary gap; do not use a distant silence inside a large aligned-word gap because it can incorrectly expand sentence intervals.
+- Treat a target sentence duration as a soft preference, never as permission to cut inside confirmed active speech; only the hard maximum duration may prevent an active-speech merge.

@@ -64,6 +64,18 @@ Current state:
 
 Recent validation:
 
+- Corrected sentence-boundary fusion priority after Arabic listening review:
+  active-speech safety now overrides the soft target duration whenever the
+  merged sentence remains below the hard maximum duration.
+- The complete Arabic V2 retest passed under
+  `output/experiments/ar_seamless_mms_xlm_ar_sa_short_boundary_fusion_v2`.
+  It emits 41 audio-safe sentences from 54 semantic candidates, merges 13
+  active-speech boundaries, has no remaining boundary that satisfies the merge
+  criteria, and keeps the maximum sentence duration at 27.87 seconds.
+- Reported active-speech cuts at `202.797-203.037` and `350.485-350.525` are
+  now merged into `186.430-211.500` and `337.200-364.789`.
+- Full validation after the active-speech priority correction passed: 37
+  tests, package compile and `git diff --check`.
 - Implemented configurable sentence-boundary fusion in
   `semantic_asr.sentence_boundaries`. Enabled profiles retain
   `semantic_sentences`, emit audio-safe `sentences`, and record

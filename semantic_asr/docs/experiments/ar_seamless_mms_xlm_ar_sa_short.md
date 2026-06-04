@@ -99,3 +99,24 @@ The incorrect `83.494-83.634` active-speech boundary was merged. The
 
 The punctuation sequences `،.` and `..` remain punctuation-model quality
 issues and are intentionally not changed by sentence-boundary fusion.
+
+### Active-Speech Priority Retest
+
+Listening review found two additional active-speech boundaries that the first
+fusion version retained only because merging would exceed the soft 15-second
+target:
+
+```text
+202.797-203.037
+350.485-350.525
+```
+
+Both boundaries are inside one raw VAD speech segment, have short aligned-token
+gaps, have no acoustic valley, and produce sentences below the hard 30-second
+maximum. Active-speech safety now overrides the target duration.
+
+The complete V2 retest is under
+`output/experiments/ar_seamless_mms_xlm_ar_sa_short_boundary_fusion_v2`.
+It preserves 54 semantic candidates and emits 41 audio-safe sentences. Thirteen
+active-speech boundaries were merged, the longest sentence is 27.87 seconds,
+and no remaining boundary satisfies the active-speech merge criteria.

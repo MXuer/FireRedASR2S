@@ -1,5 +1,10 @@
 # Todo
 
+- [x] Current work: inspect the reported `350.485s -> 350.525s` and `202.797s -> 203.037s` Arabic boundaries and their fusion decisions.
+- [x] Current work: make active-speech safety override target sentence duration when under the maximum duration.
+- [x] Current work: add regression coverage and regenerate the Arabic boundary-fusion outputs.
+- [x] Current work: update docs/PROGRESS/TODO and commit the correction.
+
 - [x] Current work: design configurable audio-safe sentence-boundary fusion contracts and inspect config/test patterns.
 - [x] Current work: implement punctuation + raw VAD + aligned-token-gap sentence fusion with boundary metadata.
 - [x] Current work: add focused regression tests and enable the strategy for `ar.json`.
@@ -174,6 +179,14 @@
 
 ## Review
 
+- Corrected fusion priority so active-speech safety overrides the soft target
+  duration whenever the merged sentence stays below the hard maximum.
+- Added regression coverage for the reported `202.797-203.037` and
+  `350.485-350.525` Arabic active-speech boundaries.
+- The complete V2 Arabic retest emits 41 audio-safe sentences from 54 semantic
+  candidates, merges 13 active-speech boundaries, has no remaining boundary
+  satisfying the merge criteria, and keeps the longest sentence at 27.87s.
+- Full validation passed: 37 tests, package compile and `git diff --check`.
 - Implemented configurable sentence-boundary fusion using punctuation
   candidates, raw VAD silence, aligned-token gaps, waveform valley ratio and
   target/maximum sentence durations.
