@@ -3,6 +3,11 @@
 Current state:
 
 - The project is being reshaped from the original FireRedASR2S repository into a standalone multilingual semantic ASR pipeline project.
+- Repository layout now keeps runtime package code under `semantic_asr/` and
+  places documentation, tests and examples at top-level `docs/`, `tests/` and
+  `examples/`.
+- Removed the obsolete top-level `l2s/` source tree; MMS forced alignment uses
+  only the extracted `semantic_asr.mms_runtime`.
 - The original top-level FireRedASR2S package, original README, assets, inference examples and runtime directories were removed by the user as part of this cleanup.
 - The reusable long-audio ASR abstraction now lives in `semantic_asr`.
 - The core pipeline requires four explicit stages: VAD, ASR, timestamp provider and punctuation.
@@ -43,18 +48,18 @@ Current state:
   - language support is based on vendored `semantic_asr.mms_runtime.model_registry.MMS_CODE_MAP`;
   - Chinese text is split into character tokens before alignment.
 - Refactored MMS forced aligner to use vendored `semantic_asr.mms_runtime` and align in-memory `SpeechSegment.wav` audio directly, without writing temporary segment wav files or importing an external `l2s` package.
-- Added `semantic_asr/docs/test_audio_matrix.md` with the minimum multilingual speech data needed to validate current module combinations:
+- Added `docs/test_audio_matrix.md` with the minimum multilingual speech data needed to validate current module combinations:
   - must-have: `zh_cn`, `en_us`, `ru_ru`, `ja_jp`, `th_th`, `hi_in`;
   - optional expansion: `ar_sa`, `vi_in`, `ko_kr`, `bn_bd`, `pt_br`.
-- Added the reusable multilingual real-model smoke runner at `semantic_asr/examples/run_multilingual_smoke_tests.py`.
-- Completed the available-model multilingual smoke run documented in `semantic_asr/docs/experiments/multilingual_smoke_20260604.md`.
+- Added the reusable multilingual real-model smoke runner at `examples/run_multilingual_smoke_tests.py`.
+- Completed the available-model multilingual smoke run documented in `docs/experiments/multilingual_smoke_20260604.md`.
 - Real smoke tests passed for Silero VAD, FireRed VAD, Fun-ASR-Nano, Whisper large, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner and XLM-R punctuation.
 - Testing fixed adapter/runtime issues for FunASR batch fallback, Qwen3-ASR float waveform input, MMS forced alignment CUDA stability, XLM-R local ONNX loading and Dolphin output normalization.
 - Dolphin official GitHub package version `20260513` passed grouped multilingual word-timestamp smoke tests after result normalization was fixed.
 - Seamless M4T v2 large passed all-nine-language local-model smoke testing after adding 16 kHz resampling and defaulting `tgt_lang` to `src_lang`.
 - FireRedPunc real inference passes again. Installing Qwen3-ASR upgraded Transformers, whose newer safe loader rejected the trusted legacy BERT `.bin` under torch 2.1; the vendored FireRedPunc runtime now loads and validates that local checkpoint directly.
 - Corrected the XLM-R punctuation smoke test and report: Thai is not supported and is excluded.
-- Added `semantic_asr/docs/thai_sentence_boundary.md`: Thai should preserve ASR text and derive semantic sentence boundaries from aligned-token pauses and duration limits instead of inventing punctuation.
+- Added `docs/thai_sentence_boundary.md`: Thai should preserve ASR text and derive semantic sentence boundaries from aligned-token pauses and duration limits instead of inventing punctuation.
 - Replaced Thai audio retesting passed interface smoke tests for Silero VAD, FireRed VAD, Whisper large-v3, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin, Seamless M4T and FunASR; Dolphin returned 26 Thai word timestamps, while FunASR incorrectly transcribed the Thai sample as Chinese.
 - Corrected Qwen3-ASR language support to its specified 30 languages. Catalog queries use short codes, but the adapter converts configured codes such as `th_th` to the full model API value `Thai`.
 - Corrected Fun-ASR-Nano and `funasr_native` timestamp support to Chinese, English and Japanese only.
@@ -64,6 +69,13 @@ Current state:
 
 Recent validation:
 
+- Top-level layout validation passed after moving docs/tests/examples and
+  deleting `l2s`: 37 tests, package/tests/examples compile, `git diff --check`,
+  all example `--help` commands, compatibility wrapper config lookup, and five
+  standalone `--skip_model_load` model examples.
+- The validated layout restructure remains uncommitted because the platform
+  rejected the external Git write request after reaching its current usage
+  limit.
 - Corrected sentence-boundary fusion priority after Arabic listening review:
   active-speech safety now overrides the soft target duration whenever the
   merged sentence remains below the hard maximum duration.
@@ -95,7 +107,7 @@ Recent validation:
   VAD, aligned-token gaps and local waveform energy. The reported
   `83.494s -> 83.634s` boundary cuts active speech and should be merged, while
   `87.396s -> 87.496s` is supported by a raw VAD silence interval.
-- Added `semantic_asr/docs/sentence_boundary_fusion.md` with a proposed
+- Added `docs/sentence_boundary_fusion.md` with a proposed
   punctuation + raw VAD + token pause + waveform energy + duration-limit
   policy for audio-safe sentence boundaries. Default behavior remains
   unchanged until multilingual evaluation.
@@ -122,21 +134,21 @@ Recent validation:
 - A focused real Qwen Thai GPU retest was requested but could not run because the platform rejected the external GPU execution request due to its current usage limit.
 - The validated Qwen/FunASR language-support correction remains uncommitted because external `.git` write approval was rejected by the platform's current usage limit.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the rename.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed after the rename.
+- `conda run -n fireredasr2s python -m unittest tests` passed after the rename.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
 - All config profiles under `semantic_asr/configs` parsed successfully after the rename.
 - Top-level `README.md` and `requirements.txt` were refreshed for the standalone project.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support` passed after adding language support metadata.
+- `conda run -n fireredasr2s python -m unittest tests tests` passed after adding language support metadata.
 - `semantic_asr/query_models.py language en_us` and `semantic_asr/query_models.py model qwen3_asr_1_7b --role asr` returned expected JSON.
 - New standalone scripts for Qwen3-ASR, Dolphin and Seamless M4T passed `--skip_model_load 1`.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the Dolphin/XLM-R punctuation changes.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support` passed after the Dolphin/XLM-R punctuation changes.
-- `semantic_asr/examples/test_xlm_roberta_punctuation.py --skip_model_load 1` passed.
+- `conda run -n fireredasr2s python -m unittest tests tests` passed after the Dolphin/XLM-R punctuation changes.
+- `examples/test_xlm_roberta_punctuation.py --skip_model_load 1` passed.
 - `semantic_asr/query_models.py language en_us --role punc` returns `xlm_roberta_punctuation`.
 - Corrected `xlm_roberta_punctuation` support to the full 47-language list provided by the user, including Chinese.
 - `semantic_asr/query_models.py language zh_cn --role punc` now returns `xlm_roberta_punctuation`.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support semantic_asr.tests.test_mms_forced_aligner` passed after adding MMS forced aligner.
-- `semantic_asr/examples/test_mms_forced_aligner.py --skip_model_load 1 --language zh_cn --text "你好 世界"` passed and produced Chinese character tokens.
+- `conda run -n fireredasr2s python -m unittest tests tests tests` passed after adding MMS forced aligner.
+- `examples/test_mms_forced_aligner.py --skip_model_load 1 --language zh_cn --text "你好 世界"` passed and produced Chinese character tokens.
 - `semantic_asr/query_models.py language zh_cn --role timestamp` returns `mms_forced_aligner`.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after MMS in-memory runtime extraction.
 - `16` unit tests passed after multilingual smoke-test fixes.

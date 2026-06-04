@@ -25,12 +25,10 @@ emit usable punctuation, while others need a separate punctuation model.
 
 ```text
 semantic_asr/
-  adapters/          model adapters and old combination wrappers
+  adapters/          model adapters
   configs/           JSON/YAML pipeline profiles
-  docs/              model and experiment notes
-  examples/          runnable examples and compatibility wrappers
   firered_runtime/   vendored FireRed runtime used by FireRed adapters
-  tests/             smoke tests for config/registry orchestration
+  mms_runtime/       vendored MMS forced-alignment runtime
   core.py            semantic ASR pipeline core
   config.py          profile loader and pipeline builder
   registry.py        component registry
@@ -38,10 +36,12 @@ semantic_asr/
   outputs.py         JSONL, CSV, SRT and TextGrid writers
 ```
 
-Top-level support files:
+Top-level repository resources:
 
 ```text
-docs/architecture.drawio
+docs/               architecture, model and experiment notes
+examples/           runnable examples and compatibility wrappers
+tests/              unit and orchestration tests
 tasks/todo.md
 PROGRESS.md
 DECISIONS.md
@@ -67,10 +67,10 @@ pip install -r requirements.txt
 ```
 
 Large model weights are not stored in this repository. Keep model setup notes
-under `semantic_asr/docs/models/` whenever adding a new adapter.
+under `docs/models/` whenever adding a new adapter.
 
 Multilingual test-audio planning lives in
-`semantic_asr/docs/test_audio_matrix.md`.
+`docs/test_audio_matrix.md`.
 
 ## Run A Config
 
@@ -97,7 +97,7 @@ The runner writes:
 - `semantic_asr/configs/silero_whisper_nativepunc.json`
 - `semantic_asr/configs/fireredvad_whisper_qwenaligner_textpunc_ru.json`
 
-The old example scripts in `semantic_asr/examples/` are compatibility wrappers
+The old example scripts in `examples/` are compatibility wrappers
 around the same config runner.
 
 ## Query Model Language Support
@@ -121,13 +121,13 @@ The query output is grouped by role: `vad`, `asr`, `timestamp`, and `punc`.
 
 Pipeline profiles configure language once using a canonical language-region id
 such as `zh_cn`, `en_us`, or `th_th`. Model-native language values are derived
-internally. See `semantic_asr/docs/language_configuration.md`.
+internally. See `docs/language_configuration.md`.
 
 ## Development Contract
 
 Every new model adapter should include:
 
-- installation/download/environment notes under `semantic_asr/docs/models/`;
+- installation/download/environment notes under `docs/models/`;
 - a standalone example or test that verifies the model output shape;
 - registry/config coverage if the model is used in a pipeline profile;
 - batching notes when the model supports batch inference.
@@ -136,5 +136,5 @@ Before marking work complete, run:
 
 ```bash
 conda run -n fireredasr2s python -m compileall semantic_asr
-conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner
+conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py'
 ```

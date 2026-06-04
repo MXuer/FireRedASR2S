@@ -1,5 +1,12 @@
 # Todo
 
+- [x] Current work: inspect `l2s` references and top-level/docs/tests/examples path conflicts.
+- [x] Current work: delete the obsolete top-level `l2s` directory.
+- [x] Current work: move `semantic_asr/docs`, `semantic_asr/tests` and `semantic_asr/examples` to top-level directories.
+- [x] Current work: update imports, commands, links and documentation for the new layout.
+- [x] Current work: run full validation and update PROGRESS/TODO for the restructure.
+- [ ] Current work: commit the validated restructure after external Git write approval is available.
+
 - [x] Current work: inspect the reported `350.485s -> 350.525s` and `202.797s -> 203.037s` Arabic boundaries and their fusion decisions.
 - [x] Current work: make active-speech safety override target sentence duration when under the maximum duration.
 - [x] Current work: add regression coverage and regenerate the Arabic boundary-fusion outputs.
@@ -65,7 +72,7 @@
 - [x] Current work: record test-audio data matrix task before writing docs.
 - [x] Current work: skip Dolphin/Whisper path changes because the user will handle those paths.
 - [x] Current work: derive minimal language/audio test matrix from current model catalog.
-- [x] Current work: document the test-audio language matrix under `semantic_asr/docs`.
+- [x] Current work: document the test-audio language matrix under `docs`.
 - [x] Current work: run a lightweight status/diff review after the test-audio matrix.
 - [x] Current work: update PROGRESS/TODO review for test data needs.
 
@@ -179,6 +186,17 @@
 
 ## Review
 
+- Removed the obsolete top-level `l2s/`; MMS forced alignment continues to use
+  the extracted `semantic_asr.mms_runtime`.
+- Moved package-adjacent resources to top-level `docs/`, `tests/` and
+  `examples/`, leaving `semantic_asr/` focused on runtime code and configs.
+- Updated README layout, documentation commands, example import/config paths
+  and current progress references.
+- Validation passed: 37 tests, package/tests/examples compile,
+  `git diff --check`, every example `--help`, all compatibility wrapper config
+  paths, and five standalone `--skip_model_load` model examples.
+- The validated restructure remains uncommitted because the platform rejected
+  the external Git write request after reaching its current usage limit.
 - Corrected fusion priority so active-speech safety overrides the soft target
   duration whenever the merged sentence stays below the hard maximum.
 - Added regression coverage for the reported `202.797-203.037` and
@@ -203,7 +221,7 @@
   and local waveform energy.
 - Confirmed that `83.494s -> 83.634s` cuts active speech inside one raw VAD
   segment, while `87.396s -> 87.496s` is supported by a raw VAD silence gap.
-- Added `semantic_asr/docs/sentence_boundary_fusion.md`, recommending that
+- Added `docs/sentence_boundary_fusion.md`, recommending that
   punctuation propose semantic boundaries while raw VAD, token pauses,
   waveform energy and duration limits determine audio-safe boundaries.
 - Deferred changing default sentence merging until the policy is evaluated on
@@ -237,11 +255,11 @@
 - The final git commit could not be created because the workspace `.git` directory requires external write approval and the platform rejected that approval due to its current usage limit.
 - FireRedPunc real inference passed after adding a scoped trusted-local legacy BERT checkpoint loader for the current `torch==2.1.0` and `transformers==4.57.6` environment.
 - XLM-R punctuation smoke tests now cover only supported languages; Thai was removed.
-- Added `semantic_asr/docs/thai_sentence_boundary.md` with the recommended pause-and-duration Thai sentence-boundary strategy.
+- Added `docs/thai_sentence_boundary.md` with the recommended pause-and-duration Thai sentence-boundary strategy.
 - Corrected `th_th.wav` passed interface smoke tests for Silero VAD, FireRed VAD, FunASR, Whisper, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin and Seamless M4T.
 - FunASR returned timestamps but transcribed the corrected Thai sample as Chinese; it should not be treated as a quality-approved Thai ASR choice.
 - `conda run -n fireredasr2s python -m compileall -q semantic_asr` passed.
-- `conda run -n fireredasr2s python -m unittest discover -s semantic_asr/tests -p 'test_*.py'` passed: 18 tests.
+- `conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py'` passed: 18 tests.
 - `git diff --check` passed.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed.
 - Fake VAD/ASR/Punc smoke test passed with `CUDA_VISIBLE_DEVICES=4,5,6,7`.
@@ -268,7 +286,7 @@
 - Verified that ASR VAD slicing remains unpadded while final output `vad_segments_ms` applies micro-silence merge and 100ms padding.
 - Verified sentence boundary alignment expands only the first and last sentence in each final output VAD segment.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after adding the config-driven runner.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed.
+- `conda run -n fireredasr2s python -m unittest tests` passed.
 - Parsed all config profiles under `semantic_asr/configs`: Silero + Fun-ASR + FireRedPunc, Silero + Whisper + ASR-native punctuation, and FireRed VAD + Whisper + Qwen3 forced aligner + ASR text punctuation.
 - Existing combination example scripts now load config profiles and call the shared `run_profile()` runner.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts.
@@ -276,7 +294,7 @@
 - Renamed the standalone package to `semantic_asr`.
 - Added a top-level standalone project `README.md` and refreshed `requirements.txt` for the current `fireredasr2s` environment.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the rename.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed after the rename.
+- `conda run -n fireredasr2s python -m unittest tests` passed after the rename.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
 - Parsed all config profiles under `semantic_asr/configs` after the rename.
 - Added `semantic_asr/language_support.py` with model-to-language metadata and language-to-model query helpers.
@@ -284,13 +302,13 @@
 - Added Qwen3-ASR-1.7B, Dolphin and Seamless M4T v2 large ASR adapters.
 - Added docs and standalone `--skip_model_load` tests for Qwen3-ASR-1.7B, Dolphin and Seamless M4T v2 large.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after adding language support and new ASR adapters.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support` passed.
+- `conda run -n fireredasr2s python -m unittest tests tests` passed.
 - Corrected `xlm_roberta_punctuation` language support to the full 47-language list provided by the user, including Chinese.
 - Added a lesson to prefer explicit supported-language lists over incomplete model page tags.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_language_support` passed after the correction.
+- `conda run -n fireredasr2s python -m unittest tests` passed after the correction.
 - `semantic_asr/query_models.py language zh_cn --role punc` now returns `xlm_roberta_punctuation`.
 - Added MMS forced aligner timestamp provider `mms_forced_aligner`.
 - Added MMS docs and standalone skip-load test that verifies Chinese character token splitting.
-- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support semantic_asr.tests.test_mms_forced_aligner` passed.
+- `conda run -n fireredasr2s python -m unittest tests tests tests` passed.
 - `semantic_asr/query_models.py language zh_cn --role timestamp` returns `mms_forced_aligner`.
 - Refactored MMS forced aligner to use vendored `semantic_asr.mms_runtime` and align in-memory `SpeechSegment.wav` audio without writing temporary segment wav files.
