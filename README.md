@@ -69,6 +69,9 @@ pip install -r requirements.txt
 Large model weights are not stored in this repository. Keep model setup notes
 under `semantic_asr/docs/models/` whenever adding a new adapter.
 
+Multilingual test-audio planning lives in
+`semantic_asr/docs/test_audio_matrix.md`.
+
 ## Run A Config
 
 ```bash
@@ -96,6 +99,25 @@ The runner writes:
 
 The old example scripts in `semantic_asr/examples/` are compatibility wrappers
 around the same config runner.
+
+## Query Model Language Support
+
+Model-to-language and language-to-model metadata lives in
+`semantic_asr/language_support.py`.
+
+Query available modules for a language:
+
+```bash
+python semantic_asr/query_models.py language en_us
+```
+
+Query supported languages for a model:
+
+```bash
+python semantic_asr/query_models.py model qwen3_asr_1_7b --role asr
+```
+
+The query output is grouped by role: `vad`, `asr`, `timestamp`, and `punc`.
 
 ## Development Contract
 

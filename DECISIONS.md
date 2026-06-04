@@ -22,3 +22,9 @@
 - Component config files are JSON/YAML serializable and should capture model/device/language/batching/output policy for experiment provenance.
 - The config runner writes `resolved_config.json` into the output directory by default, so each experiment records the exact component names and params used.
 - Existing combination scripts remain temporarily, but the intended long-term entrypoint is one config-driven `run_pipeline.py`.
+- Model language support is tracked separately from pipeline profiles in `semantic_asr.language_support`.
+- Language queries return role-grouped options rather than a single recommended pipeline, because ASR-native timestamps and forced-aligner availability can change the valid combination.
+- New ASR adapters must record whether they provide native timestamps, native punctuation and batch inference in the language support catalog.
+- Dolphin must request word-level timestamps with `word_timestamp`; `predict_time` is sentence-level timing and does not satisfy the pipeline timestamp contract.
+- `xlm_roberta_punctuation` is a multilingual `punc` component, not an ASR-native punctuation strategy; it requires token timestamps from earlier pipeline stages.
+- MMS forced alignment runtime is vendored under `semantic_asr.mms_runtime`; the adapter aligns in-memory `SpeechSegment.wav` directly and does not write temporary segment wav files.

@@ -1,0 +1,71 @@
+import unittest
+
+from semantic_asr.language_support import list_languages_by_model, list_models_by_language
+from semantic_asr.registry import create_default_registry
+
+
+class LanguageSupportTest(unittest.TestCase):
+    def test_language_query_normalizes_region_underscore(self):
+        result = list_models_by_language("en_us")
+
+        self.assertIn("vad", result)
+        self.assertIn("asr", result)
+        self.assertIn("timestamp", result)
+        self.assertIn("punc", result)
+        self.assertIn("qwen3_asr_1_7b", {item["name"] for item in result["asr"]})
+        self.assertIn("whisper_large", {item["name"] for item in result["asr"]})
+        self.assertIn("xlm_roberta_punctuation", {item["name"] for item in result["punc"]})
+
+    def test_region_language_falls_back_to_base_language(self):
+        ja_result = list_models_by_language("ja_jp")
+        hi_result = list_models_by_language("hi_in")
+        vi_result = list_models_by_language("vi_vn")
+
+        self.assertIn("qwen3_asr_1_7b", {item["name"] for item in ja_result["asr"]})
+        self.assertIn("whisper_large", {item["name"] for item in ja_result["asr"]})
+        self.assertIn("xlm_roberta_punctuation", {item["name"] for item in ja_result["punc"]})
+        self.assertIn("qwen3_asr_1_7b", {item["name"] for item in hi_result["asr"]})
+        self.assertIn("mms_forced_aligner", {item["name"] for item in hi_result["timestamp"]})
+        self.assertIn("mms_forced_aligner", {item["name"] for item in vi_result["timestamp"]})
+
+    def test_model_query_returns_languages(self):
+        result = list_languages_by_model("dolphin", role="asr")
+
+        self.assertEqual(result["role"], "asr")
+        self.assertIn("zh", result["languages"])
+        self.assertTrue(result["has_native_timestamps"])
+
+    def test_new_asr_models_are_registered(self):
+        registry = create_default_registry()
+        names = set(registry.names("asr"))
+
+        self.assertIn("qwen3_asr_1_7b", names)
+        self.assertIn("dolphin", names)
+        self.assertIn("seamless_m4t_v2_large", names)
+
+    def test_new_punctuation_model_is_registered(self):
+        registry = create_default_registry()
+        names = set(registry.names("punc"))
+
+        self.assertIn("xlm_roberta_punctuation", names)
+
+    def test_mms_forced_aligner_is_registered_for_timestamp(self):
+        registry = create_default_registry()
+        names = set(registry.names("timestamp"))
+        zh_result = list_models_by_language("zh_cn", role="timestamp")
+
+        self.assertIn("mms_forced_aligner", names)
+        self.assertIn("mms_forced_aligner", {item["name"] for item in zh_result["timestamp"]})
+
+    def test_xlm_roberta_punctuation_supports_full_language_list(self):
+        zh_result = list_models_by_language("zh_cn", role="punc")
+        am_result = list_models_by_language("am", role="punc")
+        rw_result = list_models_by_language("kinyarwanda", role="punc")
+
+        self.assertIn("xlm_roberta_punctuation", {item["name"] for item in zh_result["punc"]})
+        self.assertIn("xlm_roberta_punctuation", {item["name"] for item in am_result["punc"]})
+        self.assertIn("xlm_roberta_punctuation", {item["name"] for item in rw_result["punc"]})
+
+
+if __name__ == "__main__":
+    unittest.main()

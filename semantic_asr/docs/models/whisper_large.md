@@ -18,7 +18,7 @@ python -c "import whisper; print(whisper.available_models())"
 The local model file is available at:
 
 ```text
-/home/duhu/.cache/whisper/large-v3.pt
+~/.cache/whisper/large-v3.pt
 ```
 
 ## Capabilities

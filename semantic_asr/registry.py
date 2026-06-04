@@ -8,15 +8,26 @@ from semantic_asr.adapters.funasr_nano import (
     FunAsrNanoConfig,
     FunAsrNanoTimestampProvider,
 )
+from semantic_asr.adapters.dolphin import DolphinAsr, DolphinAsrConfig
 from semantic_asr.adapters.qwen3_forced_aligner import (
     Qwen3ForcedAlignerConfig,
     Qwen3ForcedAlignerTimestampProvider,
 )
+from semantic_asr.adapters.mms_forced_aligner import (
+    MmsForcedAlignerConfig,
+    MmsForcedAlignerTimestampProvider,
+)
+from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig
+from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
 from semantic_asr.adapters.silero import SileroVad, SileroVadConfig
 from semantic_asr.adapters.whisper_large import (
     WhisperLarge,
     WhisperLargeConfig,
     WhisperLargeTimestampProvider,
+)
+from semantic_asr.adapters.xlm_roberta_punctuation import (
+    XlmRobertaPunctuation,
+    XlmRobertaPunctuationConfig,
 )
 from semantic_asr.core import AsrModel, PuncModel, TimestampProvider, VadModel
 from semantic_asr.firered_runtime.fireredpunc import FireRedPuncConfig
@@ -66,12 +77,17 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("vad", "firered_vad", _build_firered_vad)
     registry.register("asr", "funasr_nano", _build_funasr_nano)
     registry.register("asr", "whisper_large", _build_whisper_large)
+    registry.register("asr", "qwen3_asr_1_7b", _build_qwen3_asr)
+    registry.register("asr", "dolphin", _build_dolphin)
+    registry.register("asr", "seamless_m4t_v2_large", _build_seamless_m4t)
     registry.register("timestamp", "funasr_native", lambda params: FunAsrNanoTimestampProvider())
     registry.register("timestamp", "whisper_native", lambda params: WhisperLargeTimestampProvider())
     registry.register("timestamp", "qwen3_forced_aligner", _build_qwen3_forced_aligner)
+    registry.register("timestamp", "mms_forced_aligner", _build_mms_forced_aligner)
     registry.register("punc", "firered_punc", _build_firered_punc)
     registry.register("punc", "asr_native", lambda params: AsrNativePunc())
     registry.register("punc", "asr_text", lambda params: AsrTextPunc())
+    registry.register("punc", "xlm_roberta_punctuation", _build_xlm_roberta_punctuation)
     return registry
 
 
@@ -93,14 +109,34 @@ def _build_whisper_large(params: Mapping[str, Any]) -> AsrModel:
     return WhisperLarge(_dataclass_from_mapping(WhisperLargeConfig, params))
 
 
+def _build_qwen3_asr(params: Mapping[str, Any]) -> AsrModel:
+    return Qwen3Asr(_dataclass_from_mapping(Qwen3AsrConfig, params))
+
+
+def _build_dolphin(params: Mapping[str, Any]) -> AsrModel:
+    return DolphinAsr(_dataclass_from_mapping(DolphinAsrConfig, params))
+
+
+def _build_seamless_m4t(params: Mapping[str, Any]) -> AsrModel:
+    return SeamlessM4TAsr(_dataclass_from_mapping(SeamlessM4TConfig, params))
+
+
 def _build_qwen3_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
     return Qwen3ForcedAlignerTimestampProvider(_dataclass_from_mapping(Qwen3ForcedAlignerConfig, params))
+
+
+def _build_mms_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
+    return MmsForcedAlignerTimestampProvider(_dataclass_from_mapping(MmsForcedAlignerConfig, params))
 
 
 def _build_firered_punc(params: Mapping[str, Any]) -> PuncModel:
     model_dir = str(params.get("model_dir", "pretrained_models/FireRedPunc"))
     config = _dataclass_from_mapping(FireRedPuncConfig, params.get("config", {}))
     return build_firered_punc(model_dir, config)
+
+
+def _build_xlm_roberta_punctuation(params: Mapping[str, Any]) -> PuncModel:
+    return XlmRobertaPunctuation(_dataclass_from_mapping(XlmRobertaPunctuationConfig, params))
 
 
 def _dataclass_from_mapping(cls, values: Mapping[str, Any]):

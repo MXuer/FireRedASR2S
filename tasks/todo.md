@@ -1,5 +1,75 @@
 # Todo
 
+- [x] Current work: record Dolphin GitHub-version and Seamless local-model retest task.
+- [x] Current work: verify Dolphin installation source/version and locate Seamless checkpoint.
+- [x] Current work: rerun Dolphin multilingual word-timestamp tests with the GitHub package.
+- [x] Current work: run Seamless M4T multilingual ASR smoke tests with the local checkpoint.
+- [x] Current work: update multilingual test report, PROGRESS and TODO with final results.
+- [x] Current work: run final compile/unit/diff validation.
+
+- [x] Current work: record complete multilingual model test task before running tests.
+- [x] Current work: inspect available language audio durations and current model test CLIs.
+- [x] Current work: fix language-region lookup so `ja_jp` can match `ja` model entries.
+- [x] Current work: build a coverage matrix for VAD, ASR, timestamp and punctuation modules.
+- [x] Current work: run lightweight code/unit validation before real-model tests.
+- [x] Current work: run real smoke tests for currently available VAD/ASR/timestamp/punctuation models.
+- [x] Current work: fix FunASR batch fallback for installed versions without batch decoding.
+- [x] Current work: normalize Qwen3-ASR integer waveform input to float32.
+- [x] Current work: replace Dolphin PyPI dependency/docs with GitHub installation and mark Dolphin results for retest.
+- [x] Current work: collect outputs/logs into dated experiment directories.
+- [x] Current work: summarize pass/fail issues in the multilingual smoke-test report.
+- [x] Follow-up: rerun Dolphin tests after the user installs the official GitHub package.
+- [x] Follow-up: run Seamless M4T tests after the user copies the local model.
+- [ ] Follow-up: resolve FireRedPunc torch/transformers checkpoint-loading compatibility.
+- [x] Current work: update PROGRESS/TODO for completed tests and pending follow-ups.
+
+- [x] Current work: record test-audio data matrix task before writing docs.
+- [x] Current work: skip Dolphin/Whisper path changes because the user will handle those paths.
+- [x] Current work: derive minimal language/audio test matrix from current model catalog.
+- [x] Current work: document the test-audio language matrix under `semantic_asr/docs`.
+- [x] Current work: run a lightweight status/diff review after the test-audio matrix.
+- [x] Current work: update PROGRESS/TODO review for test data needs.
+
+- [x] Current work: record MMS adapter correction: no temp segment wav and no external `l2s` package dependency.
+- [x] Current work: extract minimal MMS alignment runtime into `semantic_asr`.
+- [x] Current work: change MMS forced aligner adapter to align in-memory `SpeechSegment.wav`.
+- [x] Current work: update MMS docs/tests after internal runtime extraction.
+- [x] Current work: validate compile/tests after MMS in-memory alignment change.
+- [x] Current work: update PROGRESS/DECISIONS/TODO review for MMS in-memory alignment.
+
+- [x] Current work: record MMS forced aligner timestamp provider plan before coding.
+- [x] Current work: inspect local `l2s` ALIGNER API and existing timestamp provider contract.
+- [x] Current work: add MMS forced aligner timestamp provider adapter.
+- [x] Current work: register MMS forced aligner and add language support metadata.
+- [x] Current work: add MMS forced aligner docs and standalone skip-load test.
+- [x] Current work: validate compile/tests after MMS forced aligner changes.
+- [x] Current work: update PROGRESS/DECISIONS/TODO review for MMS forced aligner.
+
+- [x] Current work: record XLM-R punctuation language support correction.
+- [x] Current work: update XLM-R punctuation support to the full 47-language list including Chinese.
+- [x] Current work: update XLM-R punctuation docs and query tests.
+- [x] Current work: validate compile/tests/query after language correction.
+- [x] Current work: update PROGRESS/TODO review after correction.
+
+- [x] Current work: record Dolphin word timestamp fix and XLM-R punctuation model plan before coding.
+- [x] Current work: verify `1-800-BAD-CODE/xlm-roberta_punctuation_fullstop_truecase` usage and language support.
+- [x] Current work: replace Dolphin timestamp param with `word_timestamp`.
+- [x] Current work: add XLM-R punctuation/truecase adapter.
+- [x] Current work: register XLM-R punctuation model and language support metadata.
+- [x] Current work: add docs and standalone test for XLM-R punctuation model.
+- [x] Current work: validate compile/tests/query after punctuation adapter changes.
+- [x] Current work: update `PROGRESS.md`, `DECISIONS.md` and TODO review.
+
+- [x] Current work: record language/model mapping and new ASR model plan before coding.
+- [x] Current work: verify official language/capability notes for Qwen3-ASR, Dolphin and Seamless M4T v2 large.
+- [x] Current work: add model-to-language support metadata.
+- [x] Current work: add language-to-model query API/CLI.
+- [x] Current work: add Qwen3-ASR-1.7B ASR adapter docs and standalone output test skeleton.
+- [x] Current work: add Dolphin ASR adapter docs and standalone output test skeleton.
+- [x] Current work: add Seamless M4T v2 large ASR adapter docs and standalone output test skeleton.
+- [x] Current work: validate compile/tests after language catalog changes.
+- [x] Current work: update `PROGRESS.md`, `DECISIONS.md` and TODO review.
+
 - [x] Current work: record restructure plan before coding.
 - [x] Current work: restore deleted `PROGRESS.md` with latest progress.
 - [x] Current work: rename the standalone package to `semantic_asr`.
@@ -106,3 +176,18 @@
 - `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed after the rename.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
 - Parsed all config profiles under `semantic_asr/configs` after the rename.
+- Added `semantic_asr/language_support.py` with model-to-language metadata and language-to-model query helpers.
+- Added `semantic_asr/query_models.py` CLI; `language en_us` and `model qwen3_asr_1_7b --role asr` returned expected JSON.
+- Added Qwen3-ASR-1.7B, Dolphin and Seamless M4T v2 large ASR adapters.
+- Added docs and standalone `--skip_model_load` tests for Qwen3-ASR-1.7B, Dolphin and Seamless M4T v2 large.
+- `conda run -n fireredasr2s python -m compileall semantic_asr` passed after adding language support and new ASR adapters.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support` passed.
+- Corrected `xlm_roberta_punctuation` language support to the full 47-language list provided by the user, including Chinese.
+- Added a lesson to prefer explicit supported-language lists over incomplete model page tags.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_language_support` passed after the correction.
+- `semantic_asr/query_models.py language zh_cn --role punc` now returns `xlm_roberta_punctuation`.
+- Added MMS forced aligner timestamp provider `mms_forced_aligner`.
+- Added MMS docs and standalone skip-load test that verifies Chinese character token splitting.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support semantic_asr.tests.test_mms_forced_aligner` passed.
+- `semantic_asr/query_models.py language zh_cn --role timestamp` returns `mms_forced_aligner`.
+- Refactored MMS forced aligner to use vendored `semantic_asr.mms_runtime` and align in-memory `SpeechSegment.wav` audio without writing temporary segment wav files.

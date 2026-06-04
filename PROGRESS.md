@@ -26,6 +26,33 @@ Current state:
 - Existing combination example scripts are compatibility wrappers around the config-driven runner.
 - Fake registry/config smoke tests validate config parsing, component resolution and runner output writing.
 - Architecture diagram exists at `docs/architecture.drawio`.
+- Added model/language support metadata in `semantic_asr.language_support`.
+- Added `semantic_asr/query_models.py` for language-to-model and model-to-language queries.
+- Added ASR adapters, docs and standalone test scripts for:
+  - Qwen3-ASR-1.7B;
+  - Dolphin;
+  - Seamless M4T v2 large.
+- Fixed Dolphin ASR timestamp config to use `word_timestamp` for word-level timestamps; `predict_time` is sentence-level timing and is not used for the pipeline word timestamp contract.
+- Added XLM-R punctuation/fullstop/truecase model as a `punc` component:
+  - adapter: `semantic_asr.adapters.xlm_roberta_punctuation`;
+  - registry name: `xlm_roberta_punctuation`;
+  - docs and standalone skip-load test were added.
+- Added MMS forced aligner as a `timestamp` component:
+  - adapter: `semantic_asr.adapters.mms_forced_aligner`;
+  - registry name: `mms_forced_aligner`;
+  - language support is based on vendored `semantic_asr.mms_runtime.model_registry.MMS_CODE_MAP`;
+  - Chinese text is split into character tokens before alignment.
+- Refactored MMS forced aligner to use vendored `semantic_asr.mms_runtime` and align in-memory `SpeechSegment.wav` audio directly, without writing temporary segment wav files or importing an external `l2s` package.
+- Added `semantic_asr/docs/test_audio_matrix.md` with the minimum multilingual speech data needed to validate current module combinations:
+  - must-have: `zh_cn`, `en_us`, `ru_ru`, `ja_jp`, `th_th`, `hi_in`;
+  - optional expansion: `ar_sa`, `vi_in`, `ko_kr`, `bn_bd`, `pt_br`.
+- Added the reusable multilingual real-model smoke runner at `semantic_asr/examples/run_multilingual_smoke_tests.py`.
+- Completed the available-model multilingual smoke run documented in `semantic_asr/docs/experiments/multilingual_smoke_20260604.md`.
+- Real smoke tests passed for Silero VAD, FireRed VAD, Fun-ASR-Nano, Whisper large, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner and XLM-R punctuation.
+- Testing fixed adapter/runtime issues for FunASR batch fallback, Qwen3-ASR float waveform input, MMS forced alignment CUDA stability, XLM-R local ONNX loading and Dolphin output normalization.
+- Dolphin official GitHub package version `20260513` passed grouped multilingual word-timestamp smoke tests after result normalization was fixed.
+- Seamless M4T v2 large passed all-nine-language local-model smoke testing after adding 16 kHz resampling and defaulting `tgt_lang` to `src_lang`.
+- FireRedPunc real loading is blocked by the current torch/transformers checkpoint safety restriction.
 
 Recent validation:
 
@@ -34,8 +61,30 @@ Recent validation:
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
 - All config profiles under `semantic_asr/configs` parsed successfully after the rename.
 - Top-level `README.md` and `requirements.txt` were refreshed for the standalone project.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support` passed after adding language support metadata.
+- `semantic_asr/query_models.py language en_us` and `semantic_asr/query_models.py model qwen3_asr_1_7b --role asr` returned expected JSON.
+- New standalone scripts for Qwen3-ASR, Dolphin and Seamless M4T passed `--skip_model_load 1`.
+- `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the Dolphin/XLM-R punctuation changes.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support` passed after the Dolphin/XLM-R punctuation changes.
+- `semantic_asr/examples/test_xlm_roberta_punctuation.py --skip_model_load 1` passed.
+- `semantic_asr/query_models.py language en_us --role punc` returns `xlm_roberta_punctuation`.
+- Corrected `xlm_roberta_punctuation` support to the full 47-language list provided by the user, including Chinese.
+- `semantic_asr/query_models.py language zh_cn --role punc` now returns `xlm_roberta_punctuation`.
+- `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner semantic_asr.tests.test_language_support semantic_asr.tests.test_mms_forced_aligner` passed after adding MMS forced aligner.
+- `semantic_asr/examples/test_mms_forced_aligner.py --skip_model_load 1 --language zh_cn --text "你好 世界"` passed and produced Chinese character tokens.
+- `semantic_asr/query_models.py language zh_cn --role timestamp` returns `mms_forced_aligner`.
+- `conda run -n fireredasr2s python -m compileall semantic_asr` passed after MMS in-memory runtime extraction.
+- `16` unit tests passed after multilingual smoke-test fixes.
+- Real Qwen3-ASR -> Qwen3 ForcedAligner English alignment passed with timestamps.
+- Real Qwen3-ASR -> MMS ForcedAligner Hindi alignment passed with timestamps.
+- XLM-R punctuation real ONNX inference passed for English, Russian, Japanese, Hindi, Thai and Arabic samples.
+- Dolphin GitHub-version grouped tests passed for Arabic, Hindi, Japanese, Korean, Russian and Vietnamese with word timestamps; the selected Thai prefix was empty.
+- Seamless M4T v2 large local-model tests passed all nine languages while preserving source-language output.
 
 Next step:
 
+- Resolve FireRedPunc checkpoint loading under the current environment.
+- Build speech-bearing quality fixtures with reference transcripts instead of testing fixed file prefixes.
 - Run one short real-model config through `semantic_asr/run_pipeline.py` and compare output shape with the older wrapper output.
 - Add nested CLI override support if ad-hoc experiment overrides become common.
+- Run real smoke tests for Qwen3-ASR, Dolphin and Seamless once local model paths/checkpoints are confirmed.

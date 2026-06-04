@@ -53,14 +53,7 @@ class FunAsrNano:
     def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
         wav_paths = [self._write_temp_wav(wav, sample_rate) for sample_rate, wav in batch_wav]
         try:
-            raw_results = self.model.generate(
-                input=wav_paths if len(wav_paths) > 1 else wav_paths[0],
-                cache={},
-                batch_size=self.config.batch_size,
-                language=self.config.language,
-                hotwords=self.config.hotwords,
-                itn=self.config.itn,
-            )
+            raw_results = self._generate(wav_paths)
         finally:
             for wav_path in wav_paths:
                 os.unlink(wav_path)
@@ -80,6 +73,29 @@ class FunAsrNano:
                 "sample_rate": sample_rate,
             })
         return results
+
+    def _generate(self, wav_paths: Sequence[str]):
+        generate_kwargs = {
+            "cache": {},
+            "batch_size": self.config.batch_size,
+            "language": self.config.language,
+            "hotwords": self.config.hotwords,
+            "itn": self.config.itn,
+        }
+        if len(wav_paths) == 1:
+            return self.model.generate(input=wav_paths[0], **generate_kwargs)
+        try:
+            return self.model.generate(input=list(wav_paths), **generate_kwargs)
+        except NotImplementedError as error:
+            if "batch decoding is not implemented" not in str(error):
+                raise
+            results = []
+            for wav_path in wav_paths:
+                single_kwargs = dict(generate_kwargs)
+                single_kwargs["cache"] = {}
+                single_kwargs["batch_size"] = 1
+                results.append(_single_result(self.model.generate(input=wav_path, **single_kwargs)))
+            return results
 
     @staticmethod
     def _write_temp_wav(wav: Any, sample_rate: int) -> str:
@@ -115,3 +131,9 @@ class FunAsrNanoTimestampProvider:
             if not asr_result.get("timestamp"):
                 raise ValueError(f"Fun-ASR-Nano must return timestamp for {asr_result.get('uttid')}")
         return list(batch_asr_result)
+
+
+def _single_result(result):
+    if isinstance(result, list) and len(result) == 1:
+        return result[0]
+    return result
