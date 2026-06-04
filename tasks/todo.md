@@ -5,7 +5,7 @@
 - [x] Current work: make adapters/config profiles accept canonical ids and convert internally.
 - [x] Current work: add mapping/query/config regression tests and update docs/decisions/progress.
 - [x] Current work: run full validation.
-- [ ] Current work: commit when external git-write approval is available.
+- [x] Current work: commit unified language configuration.
 
 - [x] Current work: correct Qwen3-ASR supported-language list and full-name inference parameters.
 - [x] Current work: restrict Fun-ASR-Nano language support to Chinese, English and Japanese.

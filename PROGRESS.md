@@ -66,6 +66,7 @@ Recent validation:
 
 - Unified-language mapping validation passed: all profiles parsed with canonical ids, MMS `zh_cn -> cmn`, Qwen `th_th -> Thai`, and Seamless `ar_sa -> arb`.
 - Full validation after unified language configuration passed: 29 tests, package compile and `git diff --check`.
+- Unified language configuration committed as `51e0480`.
 - Focused Qwen/FunASR language support and adapter tests passed: 13 tests.
 - `semantic_asr/query_models.py language th_th` no longer returns Fun-ASR-Nano.
 - Qwen language conversion returned `Chinese`, `Thai` and `Cantonese` for `zh_cn`, `th_th` and `yue`.
