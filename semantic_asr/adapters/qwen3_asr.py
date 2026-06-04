@@ -7,6 +7,40 @@ import torch
 from semantic_asr.compat import patch_torch_pytree_for_transformers
 
 
+QWEN3_ASR_LANGUAGE_NAMES = {
+    "zh": "Chinese",
+    "en": "English",
+    "yue": "Cantonese",
+    "ar": "Arabic",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "pt": "Portuguese",
+    "id": "Indonesian",
+    "it": "Italian",
+    "ko": "Korean",
+    "ru": "Russian",
+    "th": "Thai",
+    "vi": "Vietnamese",
+    "ja": "Japanese",
+    "tr": "Turkish",
+    "hi": "Hindi",
+    "ms": "Malay",
+    "nl": "Dutch",
+    "sv": "Swedish",
+    "da": "Danish",
+    "fi": "Finnish",
+    "pl": "Polish",
+    "cs": "Czech",
+    "fil": "Filipino",
+    "fa": "Persian",
+    "el": "Greek",
+    "hu": "Hungarian",
+    "mk": "Macedonian",
+    "ro": "Romanian",
+}
+
+
 @dataclass
 class Qwen3AsrConfig:
     model: str = "Qwen/Qwen3-ASR-1.7B"
@@ -42,9 +76,10 @@ class Qwen3Asr:
 
     def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
         audio = [(_to_float32(wav), sample_rate) for sample_rate, wav in batch_wav]
+        language = normalize_qwen3_asr_language(self.config.language)
         raw_results = self.model.transcribe(
             audio=audio,
-            language=[self.config.language] * len(audio) if self.config.language else None,
+            language=[language] * len(audio) if language else None,
             return_time_stamps=self.config.return_time_stamps,
         )
         if len(raw_results) != len(batch_uttid):
@@ -98,3 +133,16 @@ def _to_float32(wav: Any) -> np.ndarray:
         scale = max(abs(np.iinfo(array.dtype).min), np.iinfo(array.dtype).max)
         return array.astype(np.float32) / float(scale)
     return array.astype(np.float32, copy=False)
+
+
+def normalize_qwen3_asr_language(language: str | None) -> str | None:
+    if language is None:
+        return None
+    normalized = language.strip().lower().replace("_", "-")
+    base = normalized.split("-", 1)[0]
+    if base in QWEN3_ASR_LANGUAGE_NAMES:
+        return QWEN3_ASR_LANGUAGE_NAMES[base]
+    full_names = {name.lower(): name for name in QWEN3_ASR_LANGUAGE_NAMES.values()}
+    if normalized in full_names:
+        return full_names[normalized]
+    raise ValueError(f"Unsupported Qwen3-ASR language: {language}")

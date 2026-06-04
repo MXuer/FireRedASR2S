@@ -10,3 +10,5 @@
 - Real GPU commands must run outside the filesystem sandbox so CUDA devices are visible; use GPUs 4, 5, 6, and 7 through `CUDA_VISIBLE_DEVICES`.
 - Do not infer that a punctuation model supports Thai from its multilingual name; keep Thai out of XLM-R punctuation tests unless the model's explicit support list includes it.
 - Smoke-test runners filtered to one language must not retain hard-coded assumptions that other language fixtures are present.
+- Qwen3-ASR language configuration must be converted to the model API's full English language names; do not pass short language codes directly.
+- Fun-ASR-Nano language support in this project is limited to Chinese, English and Japanese; do not infer broader support from generic multilingual examples.

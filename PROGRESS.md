@@ -56,9 +56,16 @@ Current state:
 - Corrected the XLM-R punctuation smoke test and report: Thai is not supported and is excluded.
 - Added `semantic_asr/docs/thai_sentence_boundary.md`: Thai should preserve ASR text and derive semantic sentence boundaries from aligned-token pauses and duration limits instead of inventing punctuation.
 - Replaced Thai audio retesting passed interface smoke tests for Silero VAD, FireRed VAD, Whisper large-v3, Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin, Seamless M4T and FunASR; Dolphin returned 26 Thai word timestamps, while FunASR incorrectly transcribed the Thai sample as Chinese.
+- Corrected Qwen3-ASR language support to its specified 30 languages. Catalog queries use short codes, but the adapter converts configured codes such as `th_th` to the full model API value `Thai`.
+- Corrected Fun-ASR-Nano and `funasr_native` timestamp support to Chinese, English and Japanese only.
 
 Recent validation:
 
+- Focused Qwen/FunASR language support and adapter tests passed: 13 tests.
+- `semantic_asr/query_models.py language th_th` no longer returns Fun-ASR-Nano.
+- Qwen language conversion returned `Chinese`, `Thai` and `Cantonese` for `zh_cn`, `th_th` and `yue`.
+- A focused real Qwen Thai GPU retest was requested but could not run because the platform rejected the external GPU execution request due to its current usage limit.
+- The validated Qwen/FunASR language-support correction remains uncommitted because external `.git` write approval was rejected by the platform's current usage limit.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the rename.
 - `conda run -n fireredasr2s python -m unittest semantic_asr.tests.test_config_runner` passed after the rename.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.

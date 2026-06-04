@@ -1,5 +1,10 @@
 # Todo
 
+- [x] Current work: correct Qwen3-ASR supported-language list and full-name inference parameters.
+- [x] Current work: restrict Fun-ASR-Nano language support to Chinese, English and Japanese.
+- [x] Current work: update language-query tests, model docs, lessons and progress.
+- [ ] Current work: commit the validated language-support correction after external git-write approval is available.
+
 - [x] Current work: investigate why FireRedPunc previously worked but now fails to load.
 - [x] Current work: correct Thai punctuation support assumptions and multilingual smoke report.
 - [x] Current work: design a Thai semantic sentence-boundary strategy without XLM-R punctuation.
@@ -146,6 +151,14 @@
 
 ## Review
 
+- Corrected Qwen3-ASR catalog support to the specified 30 languages.
+- Qwen3-ASR converts short/region codes to the full language names required by the official model API; `zh_cn`, `th_th` and `yue` map to `Chinese`, `Thai` and `Cantonese`.
+- Restricted Fun-ASR-Nano and `funasr_native` timestamp support to Chinese, English and Japanese.
+- Multilingual smoke tests now run Fun-ASR-Nano only for supported fixtures and explicitly set Qwen language per fixture.
+- Focused language/adapter tests passed: 13 tests.
+- Full validation passed: 21 tests, package compile and `git diff --check`.
+- A focused real Qwen Thai GPU retest could not run because the platform rejected the external GPU execution request due to its current usage limit.
+- The final git commit could not be created because the workspace `.git` directory requires external write approval and the platform rejected that approval due to its current usage limit.
 - FireRedPunc real inference passed after adding a scoped trusted-local legacy BERT checkpoint loader for the current `torch==2.1.0` and `transformers==4.57.6` environment.
 - XLM-R punctuation smoke tests now cover only supported languages; Thai was removed.
 - Added `semantic_asr/docs/thai_sentence_boundary.md` with the recommended pause-and-duration Thai sentence-boundary strategy.

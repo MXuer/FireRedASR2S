@@ -17,9 +17,17 @@ qwen-asr @ git+https://github.com/QwenLM/Qwen3-ASR.git
 
 ## Language Support
 
-Qwen3-ASR supports 30 languages plus 22 Chinese dialects according to the
-official project documentation. The pipeline catalog records the 30 broad ASR
-languages under model name `qwen3_asr_1_7b`.
+Qwen3-ASR supports these 30 languages:
+
+`Chinese`, `English`, `Cantonese`, `Arabic`, `German`, `French`, `Spanish`,
+`Portuguese`, `Indonesian`, `Italian`, `Korean`, `Russian`, `Thai`,
+`Vietnamese`, `Japanese`, `Turkish`, `Hindi`, `Malay`, `Dutch`, `Swedish`,
+`Danish`, `Finnish`, `Polish`, `Czech`, `Filipino`, `Persian`, `Greek`,
+`Hungarian`, `Macedonian`, and `Romanian`.
+
+The official model API expects full language names rather than short codes.
+The adapter accepts convenient configuration values such as `th`, `th_th` or
+`Thai`, but always sends `Thai` to `Qwen3ASRModel.transcribe`.
 
 The related Qwen3 forced aligner is a timestamp provider and currently records
 11 supported languages: `de`, `en`, `es`, `fr`, `it`, `ja`, `ko`, `pt`, `ru`,
@@ -48,6 +56,6 @@ Real model smoke test:
 ```bash
 CUDA_VISIBLE_DEVICES=4 conda run -n fireredasr2s python semantic_asr/examples/test_qwen3_asr.py \
   --wav_path data/test/short.wav \
-  --language en \
+  --language English \
   --max_seconds 30
 ```

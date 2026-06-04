@@ -28,6 +28,25 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("mms_forced_aligner", {item["name"] for item in hi_result["timestamp"]})
         self.assertIn("mms_forced_aligner", {item["name"] for item in vi_result["timestamp"]})
 
+    def test_corrected_qwen_and_funasr_language_support(self):
+        th_result = list_models_by_language("th_th", role="asr")
+        ja_result = list_models_by_language("ja_jp", role="asr")
+        uk_result = list_models_by_language("uk_ua", role="asr")
+        yue_result = list_models_by_language("Cantonese", role="asr")
+
+        self.assertIn("qwen3_asr_1_7b", {item["name"] for item in th_result["asr"]})
+        self.assertNotIn("funasr_nano", {item["name"] for item in th_result["asr"]})
+        self.assertIn("funasr_nano", {item["name"] for item in ja_result["asr"]})
+        self.assertNotIn("qwen3_asr_1_7b", {item["name"] for item in uk_result["asr"]})
+        self.assertIn("qwen3_asr_1_7b", {item["name"] for item in yue_result["asr"]})
+
+        qwen = list_languages_by_model("qwen3_asr_1_7b", role="asr")
+        funasr = list_languages_by_model("funasr_nano", role="asr")
+        funasr_timestamp = list_languages_by_model("funasr_native", role="timestamp")
+        self.assertEqual(len(qwen["languages"]), 30)
+        self.assertEqual(set(funasr["languages"]), {"zh", "en", "ja"})
+        self.assertEqual(set(funasr_timestamp["languages"]), {"zh", "en", "ja"})
+
     def test_model_query_returns_languages(self):
         result = list_languages_by_model("dolphin", role="asr")
 

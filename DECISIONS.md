@@ -30,3 +30,5 @@
 - MMS forced alignment runtime is vendored under `semantic_asr.mms_runtime`; the adapter aligns in-memory `SpeechSegment.wav` directly and does not write temporary segment wav files.
 - For languages such as Thai where punctuation restoration is unavailable or unreliable, the mandatory fourth stage is a sentence-boundary strategy. It may preserve ASR text unchanged and derive semantic sentence boundaries from aligned token pauses and duration limits.
 - FireRedPunc loads its trusted vendored local legacy BERT `.bin` checkpoint directly because the current `transformers==4.57.6` safe loader rejects it under `torch==2.1.0`; unexpected state-dict keys remain validated.
+- Qwen3-ASR language metadata uses stable short codes for catalog queries, while the adapter converts configured codes or region codes to the full English language names required by the official model API.
+- Fun-ASR-Nano and its native timestamp provider are exposed only for Chinese, English and Japanese.

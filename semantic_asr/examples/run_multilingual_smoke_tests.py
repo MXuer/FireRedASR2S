@@ -211,7 +211,7 @@ def run_funasr(audio_dir: str, max_seconds: float, hub: str, asr_texts: dict, se
     model_name = local_model if use_local_model else "FunAudioLLM/Fun-ASR-Nano-2512"
     model_hub = "ms" if use_local_model else hub
     model = FunAsrNano(FunAsrNanoConfig(model=model_name, device="cuda:0", hub=model_hub, language="auto", batch_size=4, preserve_punctuation=True))
-    languages = list(LANGUAGES)
+    languages = [language for language, meta in LANGUAGES.items() if meta["base"] in {"zh", "en", "ja"}]
     batch_uttid, batch_wav, batch_segments = [], [], []
     for language in languages:
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
@@ -247,6 +247,7 @@ def run_qwen3_asr(audio_dir: str, max_seconds: float, asr_texts: dict, segments:
     model = Qwen3Asr(Qwen3AsrConfig(model=cached_snapshot("Qwen/Qwen3-ASR-1.7B"), device_map="cuda:0", max_inference_batch_size=4, max_new_tokens=128))
     results = []
     for language, meta in LANGUAGES.items():
+        model.config.language = meta["qwen"]
         sample_rate, wav = load_audio(audio_dir, language, max_seconds)
         segment = make_segment(language, sample_rate, wav)
         item = model.transcribe([language], [(sample_rate, wav)])[0]

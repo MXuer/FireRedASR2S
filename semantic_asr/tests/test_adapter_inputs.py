@@ -4,7 +4,7 @@ import numpy as np
 
 from semantic_asr.adapters.dolphin import _get_text, _normalize_timestamps
 from semantic_asr.adapters.funasr_nano import FunAsrNano, FunAsrNanoConfig
-from semantic_asr.adapters.qwen3_asr import _to_float32
+from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig, _to_float32, normalize_qwen3_asr_language
 
 
 class _NoBatchFunAsrModel:
@@ -12,6 +12,15 @@ class _NoBatchFunAsrModel:
         if isinstance(input, list) or kwargs.get("batch_size", 1) > 1:
             raise NotImplementedError("batch decoding is not implemented")
         return [{"text": input}]
+
+
+class _QwenModel:
+    def __init__(self):
+        self.language = None
+
+    def transcribe(self, audio, language, return_time_stamps):
+        self.language = language
+        return [{"text": "ok"} for _ in audio]
 
 
 class AdapterInputTest(unittest.TestCase):
@@ -33,6 +42,23 @@ class AdapterInputTest(unittest.TestCase):
         self.assertEqual(normalized.dtype, np.float32)
         self.assertGreaterEqual(float(normalized.min()), -1.0)
         self.assertLessEqual(float(normalized.max()), 1.0)
+
+    def test_qwen_language_code_is_converted_to_full_model_name(self):
+        self.assertEqual(normalize_qwen3_asr_language("th_th"), "Thai")
+        self.assertEqual(normalize_qwen3_asr_language("yue"), "Cantonese")
+        self.assertEqual(normalize_qwen3_asr_language("English"), "English")
+
+        with self.assertRaisesRegex(ValueError, "Unsupported Qwen3-ASR language"):
+            normalize_qwen3_asr_language("uk")
+
+    def test_qwen_adapter_sends_full_language_name_to_model(self):
+        adapter = Qwen3Asr.__new__(Qwen3Asr)
+        adapter.config = Qwen3AsrConfig(language="th_th")
+        adapter.model = _QwenModel()
+
+        adapter.transcribe(["test"], [(16000, np.zeros(160, dtype=np.float32))])
+
+        self.assertEqual(adapter.model.language, ["Thai"])
 
     def test_funasr_falls_back_when_batch_decoding_is_unavailable(self):
         adapter = object.__new__(FunAsrNano)

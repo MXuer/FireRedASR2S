@@ -19,7 +19,7 @@ Structured outputs are under `output/model_smoke_tests/`.
 | --- | --- | --- |
 | Silero VAD | Pass | Ran all nine languages. Some first-five-second clips contained no detected speech. |
 | FireRed VAD | Pass | Representative `en_us`, `ru_ru`, `th_th` clips. |
-| Fun-ASR-Nano-2512 | Pass after adapter fix | Ran all nine languages with native timestamps. Installed FunASR reports batch decoding is not implemented, so the adapter now falls back to sequential inference. |
+| Fun-ASR-Nano-2512 | Pass after adapter fix | Interface exploration originally ran all nine fixtures, but the supported catalog is now correctly restricted to Chinese, English and Japanese. Installed FunASR reports batch decoding is not implemented, so the adapter falls back to sequential inference. |
 | Whisper large-v3 | Pass | Ran all nine languages with native word timestamps. |
 | Qwen3-ASR-1.7B | Pass after adapter fix | Ran all nine languages. Integer waveforms are now normalized to float32 before Qwen inference. |
 | Qwen3 ForcedAligner | Pass | Real `en_us` Qwen3-ASR -> Qwen3 ForcedAligner chain returned 28 timestamps. |
@@ -39,7 +39,8 @@ correctly:
   language;
 - Qwen3-ASR returned empty text for the original selected `pt_br` and `th_th`
   prefixes; it returned Thai text after `th_th.wav` was replaced;
-- Whisper and FunASR produced incorrect-language text for several prefixes;
+- Whisper and exploratory unsupported-language FunASR runs produced
+  incorrect-language text for several prefixes;
 - FunASR returned 42 timestamps for the corrected Thai fixture but transcribed
   it as Chinese, so it passes interface smoke testing but is not currently a
   suitable Thai ASR choice;
@@ -68,15 +69,19 @@ reference transcripts.
   through the newer Transformers `.bin` safety gate.
 - Single-input FunASR inference always uses `batch_size=1`; configured batch
   size is used only when multiple inputs are submitted.
+- Qwen3-ASR language configuration is converted from catalog codes to the full
+  English names required by the model API.
+- Fun-ASR-Nano catalog and smoke-test coverage are restricted to its supported
+  Chinese, English and Japanese languages.
 
 ## Corrected Thai Audio Retest
 
 The replaced `data/test/th_th.wav` is a 16.17-second, 16 kHz mono speech
 fixture. The retest passed for Silero VAD, FireRed VAD, Whisper large-v3,
-Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin, Seamless M4T and
-FunASR. Dolphin returned 26 Thai word timestamps. FunASR was retested after
-fixing its single-input batch-size handling, but its Thai transcription was
-Chinese and should not be selected for a Thai quality pipeline.
+Qwen3-ASR, Qwen3 ForcedAligner, MMS Forced Aligner, Dolphin and Seamless M4T.
+Dolphin returned 26 Thai word timestamps. An exploratory FunASR run completed
+after fixing its single-input batch-size handling, but Thai is unsupported and
+the resulting transcription was Chinese.
 
 Thai is intentionally excluded from XLM-R punctuation testing. See
 `semantic_asr/docs/thai_sentence_boundary.md` for the recommended

@@ -5,6 +5,11 @@ References:
 - https://github.com/modelscope/FunASR
 - https://modelscope.cn/models/FunAudioLLM/Fun-ASR-Nano-2512
 
+## Language Support
+
+The pipeline catalog exposes Fun-ASR-Nano only for Chinese, English and
+Japanese. Its ASR-native timestamp provider has the same language restriction.
+
 ## Environment
 
 Use the project conda environment:
