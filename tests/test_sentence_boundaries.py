@@ -217,6 +217,54 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(fused[1]["start_ms"], 7000)
         self.assertIsNone(decisions[0]["vad_silence_ms"])
 
+    def test_audio_safe_gap_merges_reported_portuguese_semantic_fragment(self):
+        sentences = [
+            {
+                "start_ms": 47895,
+                "end_ms": 53200,
+                "text": "O primeiro ponto que gostaria de destacaréque, ao alinhar estratégia de tecnologia e negócios,",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 53200,
+                "end_ms": 55408,
+                "text": "as empresas podem criar",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 55600,
+                "end_ms": 58600,
+                "text": "uma conexão harmoniosa entre diferentes setores.",
+                "asr_confidence": 0,
+            },
+        ]
+        words = [
+            {"start_ms": 52800, "end_ms": 52848, "text": "negócios"},
+            {"start_ms": 53552, "end_ms": 54000, "text": "as"},
+            {"start_ms": 55000, "end_ms": 55408, "text": "criar"},
+            {"start_ms": 55600, "end_ms": 56000, "text": "uma"},
+            {"start_ms": 58400, "end_ms": 58600, "text": "setores"},
+        ]
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(48096, 52848), (53552, 55408), (55600, 58480)],
+            np.ones(16000 * 70, dtype=np.float32),
+            16000,
+            self.config,
+        )
+
+        self.assertEqual(len(fused), 1)
+        self.assertEqual(fused[0]["start_ms"], 47895)
+        self.assertEqual(fused[0]["end_ms"], 58600)
+        self.assertIn("negócios, as empresas podem criar uma conexão", fused[0]["text"])
+        self.assertEqual(decisions[0]["action"], "merge")
+        self.assertEqual(decisions[0]["reason"], "merged_semantic_incomplete")
+        self.assertEqual(decisions[0]["semantic_reason"], "previous_continuation_punctuation")
+        self.assertEqual(decisions[1]["action"], "merge")
+        self.assertEqual(decisions[1]["semantic_reason"], "previous_no_terminal_punctuation")
+
 
 if __name__ == "__main__":
     unittest.main()

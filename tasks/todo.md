@@ -1,5 +1,12 @@
 # Todo
 
+- [x] Current work: record semantic-completeness boundary strategy before coding.
+- [x] Current work: make VAD silence/probability/acoustic valley an audio-safe signal, not a mandatory split.
+- [x] Current work: add semantic completeness checks for continuation punctuation and short raw-VAD fragments.
+- [x] Current work: add pt_br regression for the reported `O primeiro ponto...` fragment sequence.
+- [x] Current work: rerun pt_br raw-align smoke and inspect the corrected sentence merge.
+- [x] Current work: update docs/PROGRESS/TODO, validate and commit.
+
 - [x] Current work: record raw-VAD ASR/MMS alignment strategy before coding.
 - [x] Current work: make raw VAD segments feed ASR and MMS by default.
 - [x] Current work: keep `use_star=False` fixed for MMS forced alignment.

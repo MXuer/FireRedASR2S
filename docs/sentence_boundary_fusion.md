@@ -41,21 +41,28 @@ next sentence's first aligned token, calculate:
 
 Then apply these rules:
 
-1. Keep and snap a boundary to the midpoint or lowest-energy point of a raw
-   VAD non-speech interval of at least `200ms`.
-2. Keep and snap a boundary to the local minimum VAD speech probability when
-   that local minimum is below the configured silence threshold.
-3. Merge a punctuation-proposed boundary when frame-level speech probability is
+1. Treat a raw VAD non-speech interval of at least `200ms` as evidence that a
+   boundary is audio-safe, and snap a kept boundary into that interval.
+2. Treat a local minimum VAD speech probability below the configured silence
+   threshold as evidence that a boundary is audio-safe, and snap a kept
+   boundary to that local minimum.
+3. Treat an RMS acoustic valley as secondary evidence that a boundary is
+   audio-safe when VAD probability is unavailable or inconclusive.
+4. Keep an audio-safe boundary only when the text on the left is semantically
+   complete. Continuation punctuation such as commas, colons and semicolons,
+   or a short/incomplete following fragment, should merge even across a safe
+   silence.
+5. Merge a punctuation-proposed boundary when frame-level speech probability is
    high around the boundary, or when both neighboring tokens are in the same raw
    VAD speech segment with a short token gap and no acoustic valley.
-4. Treat `target_sentence_s` and `max_sentence_s` as duration preferences, not
+6. Treat `target_sentence_s` and `max_sentence_s` as duration preferences, not
    permission to cut active speech. If no VAD silence, VAD probability valley or
    acoustic valley supports a boundary, continue merging and record that the
    maximum duration is waiting for silence.
-5. Record boundary metadata such as `punctuation`, `vad_silence`,
+7. Record boundary metadata such as `semantic_boundary`, `vad_silence`,
    `vad_prob_valley`, `acoustic_valley`, `target_duration`,
-   `max_duration_wait_for_silence`, `merged_active_speech` and
-   `merged_active_speech_prob`.
+   `max_duration_wait_for_silence`, `merged_active_speech`,
+   `merged_active_speech_prob` and `merged_semantic_incomplete`.
 
 Thresholds must be configurable and evaluated per VAD model/language. Raw VAD
 is a strong signal, but it is not perfect; frame-level VAD probability is the
@@ -88,10 +95,12 @@ It:
 2. Treats active-speech safety as the first priority: boundaries inside high
    speech probability are merged even when the merged sentence exceeds
    `max_sentence_s`.
-3. Keeps and snaps nearby boundaries supported by raw VAD silence or local
-   frame-level VAD probability valleys.
-4. Uses RMS acoustic valleys as a secondary fallback.
-5. Writes each candidate decision to `sentence_boundary_decisions`.
+3. Treats raw VAD silence, local frame-level VAD probability valleys and RMS
+   valleys as audio-safe evidence, not as mandatory splits.
+4. Keeps an audio-safe boundary only when semantic completeness also supports
+   it; comma/colon/semicolon continuations and short incomplete fragments merge.
+5. Writes each candidate decision to `sentence_boundary_decisions`, including
+   `audio_safe`, `audio_reason`, `semantic_complete` and `semantic_reason`.
 
 The Arabic profile is the first enabled profile. Evaluate proposed merges on
 multilingual reference fixtures before enabling the policy more broadly.
@@ -99,3 +108,20 @@ multilingual reference fixtures before enabling the policy more broadly.
 `target_sentence_s` is a soft preference for ambiguous boundaries.
 `max_sentence_s` is also soft: it encourages earlier supported boundaries but
 does not force a split through active speech.
+
+## Portuguese Raw-Align Example
+
+For `data/test/short/pt_br-short.wav`, raw-VAD ASR/MMS alignment originally
+kept the following three candidates as separate final sentences because VAD
+silence or an acoustic valley existed between them:
+
+```text
+47.895s-53.200s: O primeiro ponto ... negócios,
+53.200s-55.408s: as empresas podem criar
+55.600s-58.600s: uma conexão harmoniosa entre diferentes setores.
+```
+
+After semantic-completeness gating, the first two boundaries merge because the
+left text ends in a comma and then lacks terminal punctuation. The final output
+keeps one sentence from `47.895s` to `58.600s`, and then keeps the next
+VAD-supported boundary after `setores.`.

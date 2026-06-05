@@ -7,6 +7,8 @@ import numpy as np
 
 
 _TRAILING_SENTENCE_PUNCTUATION = re.compile(r"[。.!?！？]+\s*$")
+_TERMINAL_SENTENCE_PUNCTUATION = re.compile(r"[。.!?！？]+[\s\"'”’)]*$")
+_TRAILING_CONTINUATION_PUNCTUATION = re.compile(r"[,،，、؛;:：]+[\s\"'”’)]*$")
 _LEADING_BOUNDARY_PUNCTUATION = re.compile(r"^[\s,،，。.!?！？؛;:：]+")
 _CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
 
@@ -88,55 +90,79 @@ def fuse_sentence_boundaries(
             and speech_stats["mean"] >= config.speech_prob_active_threshold
         )
 
-        action = "keep"
-        reason = "punctuation"
+        audio_safe = False
+        audio_reason = None
+        snapped_boundary_ms = boundary_ms
         if vad_silence is not None:
-            reason = "vad_silence"
-            boundary_ms = _snap_to_supported_silence(
+            audio_safe = True
+            audio_reason = "vad_silence"
+            snapped_boundary_ms = _snap_to_supported_silence(
                 vad_silence,
                 previous["end_ms"],
                 current["start_ms"],
             )
-            previous["end_ms"] = boundary_ms
-            current["start_ms"] = boundary_ms
         elif prob_supported_silence:
-            reason = "vad_prob_valley"
-            boundary_ms = _snap_to_boundary_gap(
+            audio_safe = True
+            audio_reason = "vad_prob_valley"
+            snapped_boundary_ms = _snap_to_boundary_gap(
                 speech_stats["boundary_ms"],
                 previous["end_ms"],
                 current["start_ms"],
             )
-            previous["end_ms"] = boundary_ms
-            current["start_ms"] = boundary_ms
-        elif (
+        elif valley_ratio <= config.acoustic_valley_ratio:
+            audio_safe = True
+            audio_reason = "acoustic_valley"
+
+        semantic_complete, semantic_reason = _semantic_boundary(
+            previous["text"],
+            current["text"],
+            current["end_ms"] - current["start_ms"],
+            combined_duration_ms,
+            config,
+        )
+        active_speech = (
             prob_active_boundary
             or (
                 same_raw_vad
                 and token_gap_ms < int(config.merge_max_token_gap_s * 1000)
-                and valley_ratio > config.acoustic_valley_ratio
+                and not audio_safe
             )
-        ):
+        )
+
+        action = "keep"
+        reason = audio_reason or "semantic_boundary"
+        if audio_safe and semantic_complete:
+            boundary_ms = snapped_boundary_ms
+            previous["end_ms"] = boundary_ms
+            current["start_ms"] = boundary_ms
+        elif audio_safe:
+            action = "merge"
+            reason = "merged_semantic_incomplete"
+            _merge_sentence_into_previous(previous, current)
+        elif active_speech:
             action = "merge"
             reason = "merged_active_speech_prob" if prob_active_boundary else "merged_active_speech"
-            previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
-            previous["text"] = _merge_text(previous["text"], current["text"])
-            previous["asr_confidence"] = min(
-                previous.get("asr_confidence", 0),
-                current.get("asr_confidence", 0),
-            )
-        elif valley_ratio <= config.acoustic_valley_ratio:
-            reason = "acoustic_valley"
-        elif combined_duration_ms > int(config.max_sentence_s * 1000):
+            _merge_sentence_into_previous(previous, current)
+        elif same_raw_vad:
             action = "merge"
-            reason = "max_duration_wait_for_silence"
-            previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
-            previous["text"] = _merge_text(previous["text"], current["text"])
-            previous["asr_confidence"] = min(
-                previous.get("asr_confidence", 0),
-                current.get("asr_confidence", 0),
+            reason = (
+                "max_duration_wait_for_silence"
+                if combined_duration_ms > int(config.max_sentence_s * 1000)
+                else "merged_active_speech"
             )
-        elif combined_duration_ms > int(config.target_sentence_s * 1000):
+            _merge_sentence_into_previous(previous, current)
+        elif semantic_complete and combined_duration_ms > int(config.target_sentence_s * 1000):
             reason = "target_duration"
+        elif semantic_complete and not same_raw_vad and token_gap_ms >= int(config.merge_max_token_gap_s * 1000):
+            reason = "semantic_boundary"
+        else:
+            action = "merge"
+            reason = (
+                "max_duration_wait_for_silence"
+                if combined_duration_ms > int(config.max_sentence_s * 1000)
+                else "merged_semantic_incomplete"
+            )
+            _merge_sentence_into_previous(previous, current)
 
         decisions.append({
             "candidate_index": candidate_index,
@@ -147,6 +173,10 @@ def fuse_sentence_boundaries(
             "token_gap_ms": token_gap_ms,
             "boundary_ms": boundary_ms,
             "same_raw_vad": same_raw_vad,
+            "audio_safe": audio_safe,
+            "audio_reason": audio_reason,
+            "semantic_complete": semantic_complete,
+            "semantic_reason": semantic_reason,
             "vad_silence_ms": list(vad_silence) if vad_silence is not None else None,
             "acoustic_valley_ratio": round(valley_ratio, 4),
             "speech_prob_min": _round_optional(speech_stats["min"]),
@@ -160,6 +190,40 @@ def fuse_sentence_boundaries(
             fused.append(current)
 
     return fused, decisions
+
+
+def _semantic_boundary(
+    previous_text: str,
+    current_text: str,
+    current_duration_ms: int,
+    combined_duration_ms: int,
+    config: SentenceBoundaryFusionConfig,
+) -> tuple[bool, str]:
+    previous = previous_text.strip()
+    current = _LEADING_BOUNDARY_PUNCTUATION.sub("", current_text).strip()
+    if not previous:
+        return False, "empty_previous"
+    if not current:
+        return True, "empty_current"
+    if _TRAILING_CONTINUATION_PUNCTUATION.search(previous):
+        return False, "previous_continuation_punctuation"
+    if _TERMINAL_SENTENCE_PUNCTUATION.search(previous):
+        return True, "terminal_punctuation"
+    target_ms = int(config.target_sentence_s * 1000)
+    if current_duration_ms < 3000 and combined_duration_ms < target_ms:
+        return False, "short_incomplete_fragment"
+    if combined_duration_ms < target_ms:
+        return False, "previous_no_terminal_punctuation"
+    return True, "duration_target_without_terminal"
+
+
+def _merge_sentence_into_previous(previous: dict, current: dict) -> None:
+    previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
+    previous["text"] = _merge_text(previous["text"], current["text"])
+    previous["asr_confidence"] = min(
+        previous.get("asr_confidence", 0),
+        current.get("asr_confidence", 0),
+    )
 
 
 def _last_word_before(words: Sequence[dict], boundary_ms: int) -> dict | None:

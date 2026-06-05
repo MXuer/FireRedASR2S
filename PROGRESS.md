@@ -78,8 +78,22 @@ Current state:
   Semantic sentence merging happens after token timestamps are available.
 - MMS forced aligner forces `use_star=False`; configs cannot override it back
   to true.
+- Sentence-boundary fusion now separates audio safety from semantic
+  completeness. Raw VAD silence, frame-level VAD probability valleys and RMS
+  valleys mark a boundary as safe to cut, but comma/colon/semicolon
+  continuations and short incomplete fragments still merge.
 
 Recent validation:
+
+- Fixed the `pt_br` raw-align semantic fragmentation around `47.895s-58.600s`.
+  The reported three candidates:
+  `... tecnologia e negócios,` / `as empresas podem criar` /
+  `uma conexão harmoniosa ... setores.` now merge into one final sentence.
+- The semantic-completeness retest passed under
+  `output/experiments/tenvad_whisper_mms_nativepunc_pt_br_semantic`: 37 final
+  sentences, 574 words, 18,750 VAD probability frames and zero sentence/word
+  overlaps. Boundary decisions now record `audio_safe`, `audio_reason`,
+  `semantic_complete` and `semantic_reason`.
 
 - Switched the default pipeline strategy from pre-ASR VAD merging to raw-VAD
   ASR/timestamp processing by setting `PipelineConfig.merge_vad_segments=False`.

@@ -48,6 +48,10 @@ After the pipeline switched MMS alignment to raw VAD segments, the same config
 was rerun with `--uttid pt_br_tenvad_rawalign` and
 `--outdir output/experiments/tenvad_whisper_mms_nativepunc_pt_br_rawalign`.
 
+After semantic-completeness gating was added to sentence-boundary fusion, the
+same config was rerun with `--uttid pt_br_tenvad_semantic` and
+`--outdir output/experiments/tenvad_whisper_mms_nativepunc_pt_br_semantic`.
+
 ## Outputs
 
 ```text
@@ -75,7 +79,9 @@ output/experiments/tenvad_whisper_mms_nativepunc_pt_br/resolved_config.json
 | Final sentences before VAD probability support | 30 |
 | Final sentences after VAD probability support | 24 |
 | Final sentences after raw-align strategy | 39 |
+| Final sentences after semantic-completeness gating | 37 |
 | Boundary decisions after raw-align strategy | 45 |
+| Boundary decisions after semantic-completeness gating | 45 |
 | VAD probability frames | 18,750 |
 | Sentence overlaps | 0 |
 | Word overlaps | 0 |
@@ -88,6 +94,19 @@ identical. Boundary-fusion reasons observed: `vad_prob_valley`, `vad_silence`,
 The structural pipeline test passed. The transcript should still be reviewed
 for model quality; a few Portuguese words in the SRT appear fused by the
 Whisper/MMS tokenization path, for example `poisé`.
+
+The reported raw-align fragment around `47.895s-58.600s` is fixed by treating
+VAD silence and acoustic valleys as audio-safe evidence rather than mandatory
+sentence splits. The final sentence is now:
+
+```text
+47.895s-58.600s
+O primeiro ponto que gostaria de destacaréque, ao alinhar estratégia de tecnologia e negócios, as empresas podem criar uma conexão harmoniosa entre diferentes setores.
+```
+
+The next sentence, `resultando em maior sinergia organizacional.`, remains
+separate because the preceding text has terminal punctuation and the boundary
+is supported by VAD silence.
 
 ## Validation
 
