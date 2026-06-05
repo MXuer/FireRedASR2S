@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import torch
 
 from .core.audio_feat import AudioFeat
+from .core.constants import FRAME_LENGTH_MS, FRAME_SHIFT_MS
 from .core.detect_model import DetectModel
 from .core.vad_postprocessor import VadPostprocessor
 
@@ -92,7 +93,12 @@ class FireRedVad:
 
         # Format result
         result = {"dur": round(dur, 3),
-                  "timestamps": starts_ends_s}
+                  "timestamps": starts_ends_s,
+                  "frame_speech_probs": {
+                      "frame_shift_ms": FRAME_SHIFT_MS,
+                      "frame_length_ms": FRAME_LENGTH_MS,
+                      "probs": [float(prob) for prob in probs.tolist()],
+                  }}
         if isinstance(audio, str):
             result["wav_path"] = audio
         return result, probs

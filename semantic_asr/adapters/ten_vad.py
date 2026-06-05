@@ -39,7 +39,14 @@ class TenVadAdapter:
             speech_pad_ms=self.config.speech_pad_ms,
             total_samples=len(wav),
         )
-        return {"timestamps": timestamps}
+        return {
+            "timestamps": timestamps,
+            "frame_speech_probs": {
+                "frame_shift_ms": round(self.config.hop_size / self.config.sampling_rate * 1000, 3),
+                "frame_length_ms": round(self.config.hop_size / self.config.sampling_rate * 1000, 3),
+                "probs": probabilities,
+            },
+        }
 
     def _frame_probabilities(self, wav: np.ndarray) -> list[float]:
         frame_count = len(wav) // self.config.hop_size
@@ -111,4 +118,3 @@ def _mono(wav: np.ndarray) -> np.ndarray:
     if wav.ndim == 1:
         return wav
     return wav.mean(axis=1).astype(np.int16)
-

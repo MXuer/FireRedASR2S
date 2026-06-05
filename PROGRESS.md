@@ -66,8 +66,39 @@ Current state:
 - Added centralized canonical language mapping in `semantic_asr.language_mapping`.
 - Pipeline profiles now configure language once at the top level using ids such as `zh_cn`; config construction injects it into language-aware ASR and timestamp components.
 - MMS forced aligner now defaults to `zh_cn` and maps it to native `cmn` before calling MMSAlign, fixing the previous bare-`zh` mismatch.
+- MMS forced aligner splits Chinese, Korean and Japanese no-space scripts into
+  character tokens before alignment.
+- VAD adapters can expose optional frame-level speech probability via
+  `frame_speech_probs`; current support covers FireRed VAD, Silero VAD and TEN
+  VAD.
+- Sentence-boundary fusion uses frame-level VAD speech probability as the
+  preferred acoustic signal. `max_sentence_s` is a soft preference and no
+  longer forces a split through high-probability active speech.
 
 Recent validation:
+
+- Added frame-level VAD speech probability to the pipeline JSON as
+  `vad_frame_speech_probs` and passed it into sentence-boundary fusion.
+- FireRed VAD writes 10ms-shift / 25ms-frame probabilities, TEN VAD writes
+  16ms probabilities and Silero VAD writes 32ms window probabilities.
+- Boundary decisions now include `speech_prob_min`, `speech_prob_mean`,
+  `speech_prob_max`, `speech_prob_boundary_ms` and
+  `speech_prob_supported_silence`.
+- Boundary-fusion reasons now include `vad_prob_valley`,
+  `merged_active_speech_prob` and `max_duration_wait_for_silence`.
+- Real `pt_br` smoke passed with TEN VAD + Whisper + MMS + ASR-native
+  punctuation under
+  `output/experiments/tenvad_whisper_mms_nativepunc_pt_br_probs`: 18,750 VAD
+  probability frames, 562 words, 24 final sentences, 7 merges and zero
+  sentence/word overlaps.
+- Real `ar_sa` 60-second smoke passed with FireRed VAD + Seamless + MMS +
+  XLM-R punctuation under `output/experiments/ar_sa_short_probs60`: 5,998 VAD
+  probability frames, probability-backed boundary decisions and zero
+  sentence/word overlaps.
+- Silero VAD 30-second smoke on `en_us-short.wav` returned 938 probability
+  frames with 32ms metadata.
+- Validation after frame-level VAD probability integration passed: 45 tests,
+  package/tests/examples compile and all configs parse.
 
 - Added a TEN VAD adapter:
   - adapter: `semantic_asr.adapters.ten_vad.TenVadAdapter`;

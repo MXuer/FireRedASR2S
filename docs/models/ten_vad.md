@@ -21,7 +21,14 @@ already use 16 kHz audio.
 `semantic_asr.adapters.ten_vad.TenVadAdapter` normalizes TEN VAD output to:
 
 ```python
-{"timestamps": [(start_s, end_s), ...]}
+{
+    "timestamps": [(start_s, end_s), ...],
+    "frame_speech_probs": {
+        "frame_shift_ms": 16.0,
+        "frame_length_ms": 16.0,
+        "probs": [0.01, 0.83],
+    },
+}
 ```
 
 The adapter follows the post-processing logic in `ten_vad_utils.py`: TEN VAD
@@ -36,4 +43,3 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 conda run -n fireredasr2s \
   --wav_path data/test/short/pt_br-short.wav \
   --max_seconds 30
 ```
-

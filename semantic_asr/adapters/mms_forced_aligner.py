@@ -56,6 +56,10 @@ class MmsForcedAlignerTimestampProvider:
             text = self._normalize_text(text)
         if self.config.language.startswith("zh"):
             text = re.sub(r"[\u4e00-\u9fa5]", lambda item: f" {item[0]} ", text)
+        if self.config.language.startswith("ko"):
+            text = re.sub(r"[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]", lambda item: f" {item[0]} ", text)
+        if self.config.language.startswith("ja"):
+            text = re.sub(r"[\u3040-\u309f\u4E00-\u9FFF\u30a0-\u30ff]", lambda item: f" {item[0]} ", text)
         return [token for token in text.split() if token.strip()]
 
     def _normalize_text(self, text: str) -> str:

@@ -1,5 +1,12 @@
 # Todo
 
+- [x] Current work: record frame-level VAD probability implementation plan before coding.
+- [x] Current work: add optional `frame_speech_probs` output for FireRed VAD, Ten-VAD and Silero VAD.
+- [x] Current work: pass VAD frame probabilities through pipeline JSON and sentence-boundary fusion.
+- [x] Current work: update boundary fusion to prefer VAD probability valleys and make `max_sentence_s` soft.
+- [x] Current work: add MMS Korean/Japanese tokenization and probability-boundary unit tests.
+- [x] Current work: run targeted real smoke tests for `pt_br`, `ar_sa` and Silero VAD, then validate and update docs/progress.
+
 - [x] Current work: inspect `ten_vad_utils.py` and current VAD adapter contracts.
 - [x] Current work: add a Ten-VAD adapter and registry/language-support entry.
 - [x] Current work: document Ten-VAD GitHub installation and add a standalone output test.
@@ -210,6 +217,25 @@
 - [x] Keep existing example scripts temporarily as compatibility wrappers around `run_pipeline.py`.
 
 ## Review
+
+- Added frame-level VAD speech probability plumbing:
+  `frame_speech_probs` from VAD adapters and `vad_frame_speech_probs` in final
+  JSON.
+- FireRed VAD now exposes existing 10ms/25ms model probabilities, TEN VAD
+  exposes 16ms frame probabilities and Silero VAD collects 32ms window
+  probabilities.
+- Sentence-boundary fusion now uses VAD probability valleys as primary
+  acoustic support, records probability diagnostics in
+  `sentence_boundary_decisions`, and treats `max_sentence_s` as a soft
+  preference instead of a hard active-speech cut.
+- MMS forced aligner token preparation now covers Korean and Japanese
+  character splitting in addition to Chinese.
+- Real smoke checks passed:
+  `pt_br` TEN VAD + Whisper + MMS produced 18,750 probability frames, 24 final
+  sentences and zero overlaps; `ar_sa` 60s FireRed VAD + MMS produced 5,998
+  probability frames and zero overlaps; Silero VAD returned 938 probability
+  frames on a 30s `en_us` sample.
+- Validation passed: 45 tests, compile, config parsing and `git diff --check`.
 
 - Added `semantic_asr.adapters.ten_vad.TenVadAdapter` and registered it as
   `vad.ten_vad`.

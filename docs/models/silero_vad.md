@@ -20,7 +20,14 @@ new dependency for this adapter.
 `semantic_asr.adapters.silero.SileroVad` normalizes Silero output to:
 
 ```python
-{"timestamps": [(start_s, end_s), ...]}
+{
+    "timestamps": [(start_s, end_s), ...],
+    "frame_speech_probs": {
+        "frame_shift_ms": 32,
+        "frame_length_ms": 32,
+        "probs": [0.01, 0.83],
+    },
+}
 ```
 
 ## Test

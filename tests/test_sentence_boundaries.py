@@ -62,14 +62,14 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(decisions[0]["reason"], "vad_silence")
         self.assertEqual(decisions[0]["vad_silence_ms"], [7180, 7440])
 
-    def test_max_duration_prevents_active_speech_merge(self):
+    def test_max_duration_waits_for_silence_inside_active_speech(self):
         sentences = [
-            {"start_ms": 0, "end_ms": 29950, "text": "first.", "asr_confidence": 0.8},
-            {"start_ms": 30050, "end_ms": 35000, "text": "second.", "asr_confidence": 0.7},
+            {"start_ms": 0, "end_ms": 29500, "text": "first.", "asr_confidence": 0.8},
+            {"start_ms": 31000, "end_ms": 35000, "text": "second.", "asr_confidence": 0.7},
         ]
         words = [
-            {"start_ms": 29000, "end_ms": 29950, "text": "first"},
-            {"start_ms": 30050, "end_ms": 31000, "text": "second"},
+            {"start_ms": 29000, "end_ms": 29500, "text": "first"},
+            {"start_ms": 31000, "end_ms": 31500, "text": "second"},
         ]
 
         fused, decisions = fuse_sentence_boundaries(
@@ -81,8 +81,69 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
             self.config,
         )
 
+        self.assertEqual(len(fused), 1)
+        self.assertEqual(decisions[0]["reason"], "max_duration_wait_for_silence")
+
+    def test_probability_valley_keeps_and_snaps_boundary(self):
+        sentences = [
+            {"start_ms": 1000, "end_ms": 5000, "text": "first.", "asr_confidence": 0.8},
+            {"start_ms": 5200, "end_ms": 9000, "text": "second.", "asr_confidence": 0.7},
+        ]
+        words = [
+            {"start_ms": 4500, "end_ms": 5000, "text": "first"},
+            {"start_ms": 5200, "end_ms": 5600, "text": "second"},
+        ]
+        frame_probs = {
+            "frame_shift_ms": 100,
+            "frame_length_ms": 100,
+            "probs": [0.9] * 50 + [0.05] + [0.9] * 50,
+        }
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(0, 10000)],
+            self.wav,
+            16000,
+            self.config,
+            frame_probs,
+        )
+
         self.assertEqual(len(fused), 2)
-        self.assertEqual(decisions[0]["reason"], "max_duration")
+        self.assertEqual(fused[0]["end_ms"], 5050)
+        self.assertEqual(fused[1]["start_ms"], 5050)
+        self.assertEqual(decisions[0]["reason"], "vad_prob_valley")
+        self.assertTrue(decisions[0]["speech_prob_supported_silence"])
+        self.assertEqual(decisions[0]["speech_prob_boundary_ms"], 5050)
+
+    def test_high_probability_boundary_merges_even_past_max_duration(self):
+        sentences = [
+            {"start_ms": 0, "end_ms": 29950, "text": "first.", "asr_confidence": 0.8},
+            {"start_ms": 30050, "end_ms": 35000, "text": "second.", "asr_confidence": 0.7},
+        ]
+        words = [
+            {"start_ms": 29000, "end_ms": 29950, "text": "first"},
+            {"start_ms": 30050, "end_ms": 31000, "text": "second"},
+        ]
+        frame_probs = {
+            "frame_shift_ms": 100,
+            "frame_length_ms": 100,
+            "probs": [0.8] * 400,
+        }
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(0, 40000)],
+            np.ones(16000 * 40, dtype=np.float32),
+            16000,
+            self.config,
+            frame_probs,
+        )
+
+        self.assertEqual(len(fused), 1)
+        self.assertEqual(decisions[0]["reason"], "merged_active_speech_prob")
+        self.assertGreaterEqual(decisions[0]["speech_prob_mean"], 0.5)
 
     def test_active_speech_safety_overrides_target_duration(self):
         sentences = [

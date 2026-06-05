@@ -102,6 +102,7 @@ class SemanticAsrPipeline:
                 wav_np,
                 sample_rate,
                 boundary_config,
+                raw_vad_result.get("frame_speech_probs"),
             )
         output_vad_segments = self._format_output_vad_segments(raw_vad_result["timestamps"], dur_s)
         sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
@@ -122,6 +123,7 @@ class SemanticAsrPipeline:
             "dur_s": dur_s,
             "words": words,
             "timestamp_segments": timestamp_segments,
+            "vad_frame_speech_probs": raw_vad_result.get("frame_speech_probs"),
             "wav_path": wav_path,
         }
         if boundary_config.enabled:

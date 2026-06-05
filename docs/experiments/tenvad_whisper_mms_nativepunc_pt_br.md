@@ -40,6 +40,10 @@ conda run -n fireredasr2s python semantic_asr/run_pipeline.py \
   --outdir output/experiments/tenvad_whisper_mms_nativepunc_pt_br
 ```
 
+After frame-level VAD probability support was added, the same command was
+rerun with `--uttid pt_br_tenvad_probs` and
+`--outdir output/experiments/tenvad_whisper_mms_nativepunc_pt_br_probs`.
+
 ## Outputs
 
 ```text
@@ -62,14 +66,17 @@ output/experiments/tenvad_whisper_mms_nativepunc_pt_br/resolved_config.json
 | Timestamp segments | 12 |
 | Words | 562 |
 | Semantic sentence candidates | 31 |
-| Final sentences | 30 |
+| Final sentences before VAD probability support | 30 |
+| Final sentences after VAD probability support | 24 |
 | Boundary decisions | 30 |
-| Merge decisions | 1 |
+| Merge decisions after VAD probability support | 7 |
+| VAD probability frames | 18,750 |
 | Sentence overlaps | 0 |
 | Word overlaps | 0 |
 
-Boundary-fusion reasons observed: `vad_silence`, `punctuation`,
-`target_duration`, `acoustic_valley` and `merged_active_speech`.
+Boundary-fusion reasons observed after VAD probability support: `vad_silence`,
+`punctuation`, `target_duration`, `merged_active_speech_prob`,
+`vad_prob_valley` and `merged_active_speech`.
 
 The structural pipeline test passed. The transcript should still be reviewed
 for model quality; a few Portuguese words in the SRT appear fused by the
@@ -87,4 +94,3 @@ conda run -n fireredasr2s python examples/test_ten_vad.py \
   --wav_path data/test/short/pt_br-short.wav \
   --max_seconds 30
 ```
-

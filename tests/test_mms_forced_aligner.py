@@ -12,6 +12,18 @@ class MmsForcedAlignerTest(unittest.TestCase):
 
         self.assertEqual(provider._prepare_tokens("你好 world"), ["你", "好", "world"])
 
+    def test_prepare_tokens_splits_korean_characters(self):
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="ko_kr")
+
+        self.assertEqual(provider._prepare_tokens("한국어 test"), ["한", "국", "어", "test"])
+
+    def test_prepare_tokens_splits_japanese_kana_and_kanji(self):
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="ja_jp")
+
+        self.assertEqual(provider._prepare_tokens("日本語かな test"), ["日", "本", "語", "か", "な", "test"])
+
     def test_mms_language_uses_canonical_id_and_maps_to_native_code(self):
         self.assertEqual(MmsForcedAlignerConfig().language, "zh_cn")
         self.assertEqual(model_language("mms_forced_aligner", "zh_cn"), "cmn")

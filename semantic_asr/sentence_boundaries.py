@@ -22,6 +22,10 @@ class SentenceBoundaryFusionConfig:
     acoustic_valley_ratio: float = 0.25
     target_sentence_s: float = 15.0
     max_sentence_s: float = 30.0
+    speech_prob_silence_threshold: float = 0.2
+    speech_prob_active_threshold: float = 0.5
+    speech_prob_window_s: float = 0.08
+    speech_prob_search_window_s: float = 0.5
 
 
 def fuse_sentence_boundaries(
@@ -31,6 +35,7 @@ def fuse_sentence_boundaries(
     wav: Any,
     sample_rate: int,
     config: SentenceBoundaryFusionConfig,
+    vad_frame_speech_probs: dict | None = None,
 ) -> tuple[list[dict], list[dict]]:
     if not sentences:
         return [], []
@@ -68,6 +73,20 @@ def fuse_sentence_boundaries(
             config.acoustic_window_s,
             config.acoustic_context_s,
         )
+        speech_stats = _speech_prob_stats(
+            vad_frame_speech_probs,
+            boundary_ms,
+            config.speech_prob_window_s,
+            config.speech_prob_search_window_s,
+        )
+        prob_supported_silence = (
+            speech_stats["min"] is not None
+            and speech_stats["min"] <= config.speech_prob_silence_threshold
+        )
+        prob_active_boundary = (
+            speech_stats["mean"] is not None
+            and speech_stats["mean"] >= config.speech_prob_active_threshold
+        )
 
         action = "keep"
         reason = "punctuation"
@@ -80,15 +99,25 @@ def fuse_sentence_boundaries(
             )
             previous["end_ms"] = boundary_ms
             current["start_ms"] = boundary_ms
-        elif combined_duration_ms > int(config.max_sentence_s * 1000):
-            reason = "max_duration"
+        elif prob_supported_silence:
+            reason = "vad_prob_valley"
+            boundary_ms = _snap_to_boundary_gap(
+                speech_stats["boundary_ms"],
+                previous["end_ms"],
+                current["start_ms"],
+            )
+            previous["end_ms"] = boundary_ms
+            current["start_ms"] = boundary_ms
         elif (
-            same_raw_vad
-            and token_gap_ms < int(config.merge_max_token_gap_s * 1000)
-            and valley_ratio > config.acoustic_valley_ratio
+            prob_active_boundary
+            or (
+                same_raw_vad
+                and token_gap_ms < int(config.merge_max_token_gap_s * 1000)
+                and valley_ratio > config.acoustic_valley_ratio
+            )
         ):
             action = "merge"
-            reason = "merged_active_speech"
+            reason = "merged_active_speech_prob" if prob_active_boundary else "merged_active_speech"
             previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
             previous["text"] = _merge_text(previous["text"], current["text"])
             previous["asr_confidence"] = min(
@@ -97,6 +126,15 @@ def fuse_sentence_boundaries(
             )
         elif valley_ratio <= config.acoustic_valley_ratio:
             reason = "acoustic_valley"
+        elif combined_duration_ms > int(config.max_sentence_s * 1000):
+            action = "merge"
+            reason = "max_duration_wait_for_silence"
+            previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
+            previous["text"] = _merge_text(previous["text"], current["text"])
+            previous["asr_confidence"] = min(
+                previous.get("asr_confidence", 0),
+                current.get("asr_confidence", 0),
+            )
         elif combined_duration_ms > int(config.target_sentence_s * 1000):
             reason = "target_duration"
 
@@ -111,6 +149,11 @@ def fuse_sentence_boundaries(
             "same_raw_vad": same_raw_vad,
             "vad_silence_ms": list(vad_silence) if vad_silence is not None else None,
             "acoustic_valley_ratio": round(valley_ratio, 4),
+            "speech_prob_min": _round_optional(speech_stats["min"]),
+            "speech_prob_mean": _round_optional(speech_stats["mean"]),
+            "speech_prob_max": _round_optional(speech_stats["max"]),
+            "speech_prob_boundary_ms": speech_stats["boundary_ms"],
+            "speech_prob_supported_silence": prob_supported_silence,
             "combined_duration_ms": combined_duration_ms,
         })
         if action == "keep":
@@ -165,6 +208,14 @@ def _snap_to_supported_silence(
     return (previous_end_ms + current_start_ms) // 2
 
 
+def _snap_to_boundary_gap(boundary_ms: int, previous_end_ms: int, current_start_ms: int) -> int:
+    if previous_end_ms <= boundary_ms <= current_start_ms:
+        return boundary_ms
+    if previous_end_ms <= current_start_ms:
+        return max(previous_end_ms, min(boundary_ms, current_start_ms))
+    return (previous_end_ms + current_start_ms) // 2
+
+
 def _acoustic_valley_ratio(
     wav: Any,
     sample_rate: int,
@@ -184,11 +235,61 @@ def _acoustic_valley_ratio(
     return local_rms / context_rms
 
 
+def _speech_prob_stats(
+    frame_speech_probs: dict | None,
+    boundary_ms: int,
+    window_s: float,
+    search_window_s: float,
+) -> dict:
+    if not frame_speech_probs:
+        return {"min": None, "mean": None, "max": None, "boundary_ms": boundary_ms}
+    probs = frame_speech_probs.get("probs") or []
+    frame_shift_ms = float(frame_speech_probs.get("frame_shift_ms") or 0)
+    frame_length_ms = float(frame_speech_probs.get("frame_length_ms") or frame_shift_ms)
+    if not probs or frame_shift_ms <= 0:
+        return {"min": None, "mean": None, "max": None, "boundary_ms": boundary_ms}
+
+    window_ms = max(float(window_s) * 1000, frame_shift_ms)
+    search_ms = max(float(search_window_s) * 1000, window_ms)
+    frames = [
+        (
+            int(round(index * frame_shift_ms + frame_length_ms / 2)),
+            float(prob),
+        )
+        for index, prob in enumerate(probs)
+    ]
+    search_frames = [
+        (center_ms, prob)
+        for center_ms, prob in frames
+        if abs(center_ms - boundary_ms) <= search_ms
+    ]
+    if not search_frames:
+        return {"min": None, "mean": None, "max": None, "boundary_ms": boundary_ms}
+    min_center_ms, min_prob = min(search_frames, key=lambda item: item[1])
+    window_frames = [
+        prob
+        for center_ms, prob in frames
+        if abs(center_ms - min_center_ms) <= window_ms
+    ]
+    if not window_frames:
+        window_frames = [min_prob]
+    return {
+        "min": min_prob,
+        "mean": float(np.mean(window_frames)),
+        "max": float(np.max(window_frames)),
+        "boundary_ms": min_center_ms,
+    }
+
+
 def _rms(samples: Any) -> float:
     values = np.asarray(samples, dtype=np.float64)
     if values.size == 0:
         return 0.0
     return math.sqrt(float(np.mean(values * values)))
+
+
+def _round_optional(value: float | None) -> float | None:
+    return None if value is None else round(float(value), 4)
 
 
 def _merge_text(previous: str, current: str) -> str:

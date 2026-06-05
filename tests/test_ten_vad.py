@@ -1,5 +1,9 @@
 import unittest
 
+import numpy as np
+import soundfile as sf
+
+from semantic_asr.adapters.ten_vad import TenVadAdapter, TenVadConfig
 from semantic_asr.adapters.ten_vad import get_speech_timestamps
 
 
@@ -33,6 +37,28 @@ class TenVadPostprocessTest(unittest.TestCase):
         )
 
         self.assertEqual(segments, [])
+
+    def test_adapter_returns_frame_speech_probabilities(self):
+        class FakeModel:
+            def __init__(self):
+                self.values = [0.0, 0.8, 0.8, 0.0]
+
+            def process(self, frame):
+                return self.values.pop(0), int(frame.size > 0)
+
+        adapter = object.__new__(TenVadAdapter)
+        adapter.config = TenVadConfig(min_speech_duration_ms=10, min_silence_duration_ms=10)
+        adapter.model = FakeModel()
+
+        import tempfile
+
+        with tempfile.NamedTemporaryFile(suffix=".wav") as tmp:
+            sf.write(tmp.name, np.zeros(256 * 4, dtype=np.int16), 16000)
+            result = adapter.detect(tmp.name)
+
+        self.assertEqual(result["frame_speech_probs"]["frame_shift_ms"], 16.0)
+        self.assertEqual(result["frame_speech_probs"]["frame_length_ms"], 16.0)
+        self.assertEqual(result["frame_speech_probs"]["probs"], [0.0, 0.8, 0.8, 0.0])
 
 
 if __name__ == "__main__":

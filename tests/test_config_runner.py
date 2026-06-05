@@ -13,7 +13,14 @@ from semantic_asr.run_pipeline import run_from_config
 
 class FakeVad:
     def detect(self, wav_path: str):
-        return {"timestamps": [(0.0, 1.0)]}
+        return {
+            "timestamps": [(0.0, 1.0)],
+            "frame_speech_probs": {
+                "frame_shift_ms": 10,
+                "frame_length_ms": 25,
+                "probs": [0.0, 0.8, 0.1],
+            },
+        }
 
 
 class FakeAsr:
@@ -157,6 +164,8 @@ class ConfigRunnerTest(unittest.TestCase):
             self.assertEqual(len(result["timestamp_segments"]), 1)
             self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["text"], "hello")
             self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["start_ms"], 0)
+            self.assertEqual(result["vad_frame_speech_probs"]["frame_shift_ms"], 10)
+            self.assertEqual(result["vad_frame_speech_probs"]["probs"], [0.0, 0.8, 0.1])
 
 
 if __name__ == "__main__":
