@@ -1,5 +1,13 @@
 # Todo
 
+- [x] Current work: inspect `ten_vad_utils.py` and current VAD adapter contracts.
+- [x] Current work: add a Ten-VAD adapter and registry/language-support entry.
+- [x] Current work: document Ten-VAD GitHub installation and add a standalone output test.
+- [x] Current work: add a `ten-vad + whisper + mms + asr_native` Portuguese config.
+- [x] Current work: run `data/test/short/pt_br-short.wav` through the new config and inspect JSON/exports.
+- [x] Current work: run validation and update PROGRESS/TODO.
+- [ ] Current work: commit the Ten-VAD integration after external Git write approval is available.
+
 - [x] Current work: inspect `data/test/short` 300s fixtures and match them to language configs.
 - [x] Current work: enable sentence-boundary fusion for all checked-in configs.
 - [x] Current work: run every short fixture and write JSON outputs.
@@ -202,6 +210,24 @@
 - [x] Keep existing example scripts temporarily as compatibility wrappers around `run_pipeline.py`.
 
 ## Review
+
+- Added `semantic_asr.adapters.ten_vad.TenVadAdapter` and registered it as
+  `vad.ten_vad`.
+- Added TEN VAD language-support metadata, model docs with the GitHub install
+  command, a standalone `examples/test_ten_vad.py` output test and focused
+  post-processing unit tests.
+- Added `configs/tenvad_whisper_mms_nativepunc_pt_br.json` for
+  TEN VAD + Whisper large + MMS Forced Aligner + ASR-native punctuation.
+- Ran the full Portuguese 300s fixture:
+  `data/test/short/pt_br-short.wav` -> `output/experiments/tenvad_whisper_mms_nativepunc_pt_br`.
+- Output metrics: 37 raw TEN VAD segments, 12 ASR VAD segments, 12 timestamp
+  segments, 562 words, 31 semantic candidates, 30 final sentences, one
+  active-speech merge, and zero sentence/word overlaps.
+- Validation passed: Ten-VAD standalone 30s test, config parsing, `pt_br` VAD
+  query includes `ten_vad`, 40 tests and package/tests/examples compile.
+- Quality caveat: the SRT has a few fused Portuguese tokens such as `poisé`,
+  likely from the Whisper + MMS tokenization path; the structural pipeline
+  output is valid.
 
 - Enabled `sentence_boundary_fusion` for every `configs/*.json` profile,
   including the language-named profiles and older combination profiles.

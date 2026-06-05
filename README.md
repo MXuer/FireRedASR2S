@@ -96,6 +96,7 @@ The runner writes:
 - `configs/silero_funasr_fireredpunc.json`
 - `configs/silero_whisper_nativepunc.json`
 - `configs/fireredvad_whisper_qwenaligner_textpunc_ru.json`
+- `configs/tenvad_whisper_mms_nativepunc_pt_br.json`
 
 The old example scripts in `examples/` are compatibility wrappers
 around the same config runner.

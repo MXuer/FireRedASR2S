@@ -35,6 +35,12 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
         notes="Language-agnostic speech activity detector in this pipeline contract.",
     ),
     ModelLanguageSupport(
+        role="vad",
+        name="ten_vad",
+        languages=(ANY_LANGUAGE,),
+        notes="Language-agnostic TEN VAD adapter using 16 kHz, 256-sample frames.",
+    ),
+    ModelLanguageSupport(
         role="asr",
         name="funasr_nano",
         languages=("en", "ja", "zh"),

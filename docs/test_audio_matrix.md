@@ -30,7 +30,7 @@ regression languages `zh_cn`, `en_us` and `ru_ru`.
 
 These six languages give coverage for:
 
-- both VAD adapters: language-agnostic Silero and FireRed VAD;
+- VAD adapters: language-agnostic Silero, FireRed VAD and TEN VAD;
 - native timestamp ASR: FunASR, Whisper and Dolphin;
 - external timestamp providers: Qwen3-ForcedAligner and MMS forced aligner;
 - punctuation strategies: FireRedPunc, ASR-native punctuation, ASR-text splitting

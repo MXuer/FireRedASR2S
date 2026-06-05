@@ -69,6 +69,26 @@ Current state:
 
 Recent validation:
 
+- Added a TEN VAD adapter:
+  - adapter: `semantic_asr.adapters.ten_vad.TenVadAdapter`;
+  - registry name: `ten_vad`;
+  - language support: language-agnostic VAD entry;
+  - docs: `docs/models/ten_vad.md`;
+  - standalone test: `examples/test_ten_vad.py`.
+- Documented TEN VAD installation:
+  `git clone git@github.com:TEN-framework/ten-vad.git && cd ten-vad && python setup.py install`.
+- Added `configs/tenvad_whisper_mms_nativepunc_pt_br.json` for
+  TEN VAD + Whisper large + MMS Forced Aligner + ASR-native punctuation.
+- The full `pt_br` run passed on `data/test/short/pt_br-short.wav` and wrote
+  JSON, JSONL, CSV, SRT, TextGrid and resolved config outputs under
+  `output/experiments/tenvad_whisper_mms_nativepunc_pt_br`.
+- The TEN VAD Portuguese run produced 37 raw VAD segments, 12 ASR VAD
+  segments, 12 timestamp segments, 562 words and 30 final sentences with zero
+  sentence/word timestamp overlaps.
+- Validation after TEN VAD integration passed: 40 tests, package/tests/examples
+  compile, `pt_br` VAD query includes `ten_vad`, config parsing passed and the
+  standalone Ten-VAD 30-second sample produced timestamps.
+
 - Enabled `sentence_boundary_fusion` for every checked-in `configs/*.json`
   profile, including language-named configs and legacy combination configs.
 - Ran all available short fixtures from `data/test/short` through their

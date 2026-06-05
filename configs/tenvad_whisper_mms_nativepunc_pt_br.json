@@ -1,0 +1,53 @@
+{
+  "name": "tenvad_whisper_mms_nativepunc_pt_br",
+  "language": "pt_br",
+  "components": {
+    "vad": {
+      "name": "ten_vad",
+      "params": {
+        "threshold": 0.5,
+        "min_speech_duration_ms": 250,
+        "min_silence_duration_ms": 100
+      }
+    },
+    "asr": {
+      "name": "whisper_large",
+      "params": {
+        "model_name": "large-v3",
+        "device": "cuda:0",
+        "word_timestamps": false
+      }
+    },
+    "timestamp": {
+      "name": "mms_forced_aligner",
+      "params": {}
+    },
+    "punc": {
+      "name": "asr_native",
+      "params": {}
+    }
+  },
+  "pipeline": {
+    "asr_batch_size": 1,
+    "punc_batch_size": 1,
+    "strip_punctuation_before_punc": false,
+    "sentence_boundary_fusion": {
+      "enabled": true,
+      "min_vad_silence_s": 0.2,
+      "max_vad_snap_gap_s": 1.0,
+      "merge_max_token_gap_s": 0.3,
+      "acoustic_window_s": 0.05,
+      "acoustic_context_s": 0.3,
+      "acoustic_valley_ratio": 0.25,
+      "target_sentence_s": 15.0,
+      "max_sentence_s": 30.0
+    }
+  },
+  "output": {
+    "outdir": "output/experiments/tenvad_whisper_mms_nativepunc_pt_br",
+    "write_textgrid": true,
+    "write_srt": true,
+    "write_csv": true,
+    "copy_resolved_config": true
+  }
+}

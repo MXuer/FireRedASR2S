@@ -25,6 +25,7 @@ from semantic_asr.adapters.mms_forced_aligner import (
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig
 from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
 from semantic_asr.adapters.silero import SileroVad, SileroVadConfig
+from semantic_asr.adapters.ten_vad import TenVadAdapter, TenVadConfig
 from semantic_asr.adapters.silero_funasr_fireredpunc import (
     SileroFunAsrFireRedPuncConfig,
     build_silero_funasr_fireredpunc_pipeline,
@@ -64,6 +65,8 @@ __all__ = [
     "SileroWhisperNativePuncConfig",
     "SileroVad",
     "SileroVadConfig",
+    "TenVadAdapter",
+    "TenVadConfig",
     "WhisperLarge",
     "WhisperLargeConfig",
     "WhisperLargeTimestampProvider",

@@ -20,6 +20,7 @@ from semantic_asr.adapters.mms_forced_aligner import (
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig
 from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
 from semantic_asr.adapters.silero import SileroVad, SileroVadConfig
+from semantic_asr.adapters.ten_vad import TenVadAdapter, TenVadConfig
 from semantic_asr.adapters.whisper_large import (
     WhisperLarge,
     WhisperLargeConfig,
@@ -75,6 +76,7 @@ def create_default_registry() -> ComponentRegistry:
     registry = ComponentRegistry()
     registry.register("vad", "silero", _build_silero_vad)
     registry.register("vad", "firered_vad", _build_firered_vad)
+    registry.register("vad", "ten_vad", _build_ten_vad)
     registry.register("asr", "funasr_nano", _build_funasr_nano)
     registry.register("asr", "whisper_large", _build_whisper_large)
     registry.register("asr", "qwen3_asr_1_7b", _build_qwen3_asr)
@@ -93,6 +95,10 @@ def create_default_registry() -> ComponentRegistry:
 
 def _build_silero_vad(params: Mapping[str, Any]) -> VadModel:
     return SileroVad(_dataclass_from_mapping(SileroVadConfig, params))
+
+
+def _build_ten_vad(params: Mapping[str, Any]) -> VadModel:
+    return TenVadAdapter(_dataclass_from_mapping(TenVadConfig, params))
 
 
 def _build_firered_vad(params: Mapping[str, Any]) -> VadModel:

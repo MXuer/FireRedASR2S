@@ -62,6 +62,14 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("dolphin", names)
         self.assertIn("seamless_m4t_v2_large", names)
 
+    def test_ten_vad_is_registered(self):
+        registry = create_default_registry()
+        names = set(registry.names("vad"))
+        pt_result = list_models_by_language("pt_br", role="vad")
+
+        self.assertIn("ten_vad", names)
+        self.assertIn("ten_vad", {item["name"] for item in pt_result["vad"]})
+
     def test_new_punctuation_model_is_registered(self):
         registry = create_default_registry()
         names = set(registry.names("punc"))
