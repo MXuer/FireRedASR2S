@@ -29,7 +29,18 @@
   "pipeline": {
     "asr_batch_size": 1,
     "punc_batch_size": 1,
-    "strip_punctuation_before_punc": false
+    "strip_punctuation_before_punc": false,
+    "sentence_boundary_fusion": {
+      "enabled": true,
+      "min_vad_silence_s": 0.2,
+      "max_vad_snap_gap_s": 1.0,
+      "merge_max_token_gap_s": 0.3,
+      "acoustic_window_s": 0.05,
+      "acoustic_context_s": 0.3,
+      "acoustic_valley_ratio": 0.25,
+      "target_sentence_s": 15.0,
+      "max_sentence_s": 30.0
+    }
   },
   "output": {
     "outdir": "output/experiments/ko_xlm",

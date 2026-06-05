@@ -69,6 +69,22 @@ Current state:
 
 Recent validation:
 
+- Enabled `sentence_boundary_fusion` for every checked-in `configs/*.json`
+  profile, including language-named configs and legacy combination configs.
+- Ran all available short fixtures from `data/test/short` through their
+  language-named profiles and wrote outputs under
+  `output/experiments/multilingual_short_boundary_fusion/<language>/`.
+- The multilingual short run produced JSON, JSONL, CSV, SRT, TextGrid and
+  resolved-config outputs for `ar_sa`, `en_us`, `hi_in`, `ja_jp`, `ko_kr`,
+  `pt_br`, `ru_ru`, `th_th` and `vi_vn`.
+- Every multilingual short output includes `timestamp_segments`,
+  `semantic_sentences` and `sentence_boundary_decisions` when applicable.
+  Final sentence and word overlap counts are zero for all nine fixtures.
+- `th_th-short.wav` is currently 16.17 seconds, while the other short fixtures
+  are approximately 300 seconds.
+- Validation after enabling all-language boundary fusion passed: all configs
+  confirm fusion enabled, 37 tests pass and package/tests/examples compile.
+
 - Completed a 5-minute multilingual config run for all available `data/test`
   language fixtures: `ar_sa`, `en_us`, `hi_in`, `ja_jp`, `ko_kr`, `pt_br`,
   `ru_ru`, `th_th` and `vi_vn`.

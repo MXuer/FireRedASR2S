@@ -1,5 +1,11 @@
 # Todo
 
+- [x] Current work: inspect `data/test/short` 300s fixtures and match them to language configs.
+- [x] Current work: enable sentence-boundary fusion for all checked-in configs.
+- [x] Current work: run every short fixture and write JSON outputs.
+- [x] Current work: inspect sentence-boundary decisions, timestamp fields and overlap counts.
+- [x] Current work: update docs/PROGRESS/TODO and commit the all-language boundary-fusion run.
+
 - [x] Current work: inspect `data/test` language fixtures and existing top-level configs.
 - [x] Current work: create or select one config per available test language.
 - [x] Current work: run each language for five minutes and write JSON outputs.
@@ -196,6 +202,22 @@
 - [x] Keep existing example scripts temporarily as compatibility wrappers around `run_pipeline.py`.
 
 ## Review
+
+- Enabled `sentence_boundary_fusion` for every `configs/*.json` profile,
+  including the language-named profiles and older combination profiles.
+- Ran the nine available `data/test/short/*-short.wav` fixtures through
+  `configs/<language>.json` and wrote JSON/JSONL/CSV/SRT/TextGrid outputs under
+  `output/experiments/multilingual_short_boundary_fusion/<language>/`.
+- Output summary: `ar_sa` 20 sentences from 29 semantic candidates, `en_us` 36
+  from 51, `hi_in` 14 from 14, `ja_jp` 23 from 27, `ko_kr` 27 from 30,
+  `pt_br` 28 from 32, `ru_ru` 43 from 45, `th_th` 1 from 1, and `vi_vn` 20
+  from 20.
+- All nine outputs include `timestamp_segments`; final sentence and word
+  overlap counts are zero for every fixture.
+- Noted fixture caveat: `th_th-short.wav` is 16.17s in the current test set,
+  while the other short clips are about 300s.
+- Validation passed: all configs confirm fusion enabled, 37 tests, package
+  compile.
 
 - Added language-named configs for all nine available `data/test` language
   fixtures and ran each one with `--max_seconds 300`.
