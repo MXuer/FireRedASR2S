@@ -31,6 +31,15 @@ timestamps as:
 [token, start_s, end_s]
 ```
 
+The pipeline feeds MMS with raw VAD speech segments by default. Semantic
+sentence merging is performed after token timestamps are available.
+
+`use_star` is fixed to `False` in the adapter. This avoids inserting `<star>`
+between every input token, which can otherwise force gaps between adjacent
+tokens and make word timestamps less precise. Because `use_star=False` assigns
+the full segment span across tokens, keeping MMS on raw VAD segments is
+important to avoid expanding the first and last token into surrounding silence.
+
 ## Install And Model Files
 
 The MMS alignment runtime needed by the adapter is vendored inside
@@ -53,8 +62,8 @@ Configure the canonical pipeline language id. The adapter maps it through
 `semantic_asr.mms_runtime.model_registry.MMS_CODE_MAP`; for example, `zh_cn`
 becomes MMSAlign's native `cmn`.
 
-For Chinese, the adapter automatically inserts spaces around each CJK character
-before alignment, matching the reference code.
+For Chinese, Korean and Japanese, the adapter automatically inserts spaces
+around no-space script characters before alignment.
 
 ## Standalone Test
 

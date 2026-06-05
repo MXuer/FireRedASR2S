@@ -14,7 +14,7 @@ from semantic_asr.run_pipeline import run_from_config
 class FakeVad:
     def detect(self, wav_path: str):
         return {
-            "timestamps": [(0.0, 1.0)],
+            "timestamps": [(0.0, 0.4), (0.5, 1.0)],
             "frame_speech_probs": {
                 "frame_shift_ms": 10,
                 "frame_length_ms": 25,
@@ -24,7 +24,11 @@ class FakeVad:
 
 
 class FakeAsr:
+    def __init__(self):
+        self.batch_wav = []
+
     def transcribe(self, batch_uttid, batch_wav):
+        self.batch_wav.extend(batch_wav)
         return [
             {
                 "uttid": uttid,
@@ -37,7 +41,11 @@ class FakeAsr:
 
 
 class FakeTimestampProvider:
+    def __init__(self):
+        self.segment_ranges = []
+
     def add_timestamps(self, batch_asr_result, batch_segments):
+        self.segment_ranges.extend((segment.start_s, segment.end_s) for segment in batch_segments)
         return list(batch_asr_result)
 
 
@@ -57,6 +65,15 @@ def fake_registry() -> ComponentRegistry:
     registry.register("vad", "fake_vad", lambda params: FakeVad())
     registry.register("asr", "fake_asr", lambda params: FakeAsr())
     registry.register("timestamp", "fake_timestamp", lambda params: FakeTimestampProvider())
+    registry.register("punc", "fake_punc", lambda params: FakePunc())
+    return registry
+
+
+def fake_registry_with_instances(fake_asr: FakeAsr, fake_timestamp: FakeTimestampProvider) -> ComponentRegistry:
+    registry = ComponentRegistry()
+    registry.register("vad", "fake_vad", lambda params: FakeVad())
+    registry.register("asr", "fake_asr", lambda params: fake_asr)
+    registry.register("timestamp", "fake_timestamp", lambda params: fake_timestamp)
     registry.register("punc", "fake_punc", lambda params: FakePunc())
     return registry
 
@@ -160,12 +177,55 @@ class ConfigRunnerTest(unittest.TestCase):
             self.assertTrue(os.path.exists(outputs["resolved_config"]))
             with open(outputs["json"], "r", encoding="utf-8") as fin:
                 result = json.load(fin)
-            self.assertEqual(result["text"], "hello.")
-            self.assertEqual(len(result["timestamp_segments"]), 1)
+            self.assertEqual(result["text"], "hello. hello.")
+            self.assertEqual(len(result["timestamp_segments"]), 2)
             self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["text"], "hello")
             self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["start_ms"], 0)
+            self.assertEqual(result["raw_vad_segments_ms"], [[0, 400], [500, 1000]])
+            self.assertEqual(result["asr_vad_segments_ms"], [[0, 400], [500, 1000]])
             self.assertEqual(result["vad_frame_speech_probs"]["frame_shift_ms"], 10)
             self.assertEqual(result["vad_frame_speech_probs"]["probs"], [0.0, 0.8, 0.1])
+
+    def test_default_pipeline_uses_raw_vad_segments_for_asr_and_timestamp(self):
+        profile = parse_pipeline_profile(fake_profile())
+        fake_asr = FakeAsr()
+        fake_timestamp = FakeTimestampProvider()
+        pipeline = build_pipeline_from_profile(
+            profile,
+            registry=fake_registry_with_instances(fake_asr, fake_timestamp),
+        )
+
+        result = pipeline.process(self._write_silence_wav(), "sample")
+
+        self.assertFalse(profile.pipeline.merge_vad_segments)
+        self.assertEqual(fake_timestamp.segment_ranges, [(0.0, 0.4), (0.5, 1.0)])
+        self.assertEqual(result["raw_vad_segments_ms"], [(0, 400), (500, 1000)])
+        self.assertEqual(result["asr_vad_segments_ms"], [(0, 400), (500, 1000)])
+
+    def test_explicit_merge_vad_segments_keeps_legacy_asr_context_merge(self):
+        raw = fake_profile()
+        raw["pipeline"]["merge_vad_segments"] = True
+        raw["pipeline"]["vad_min_segment_s"] = 1.0
+        raw["pipeline"]["vad_max_segment_s"] = 2.0
+        profile = parse_pipeline_profile(raw)
+        fake_timestamp = FakeTimestampProvider()
+        pipeline = build_pipeline_from_profile(
+            profile,
+            registry=fake_registry_with_instances(FakeAsr(), fake_timestamp),
+        )
+
+        result = pipeline.process(self._write_silence_wav(), "sample")
+
+        self.assertEqual(fake_timestamp.segment_ranges, [(0.0, 1.0)])
+        self.assertEqual(result["raw_vad_segments_ms"], [(0, 400), (500, 1000)])
+        self.assertEqual(result["asr_vad_segments_ms"], [(0, 1000)])
+
+    @staticmethod
+    def _write_silence_wav() -> str:
+        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp.close()
+        sf.write(tmp.name, np.zeros(16000, dtype=np.int16), 16000)
+        return tmp.name
 
 
 if __name__ == "__main__":

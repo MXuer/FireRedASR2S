@@ -20,7 +20,7 @@ class PipelineConfig:
     punc_batch_size: int = 1
     sample_rate: int | None = None
     strip_punctuation_before_punc: bool = True
-    merge_vad_segments: bool = True
+    merge_vad_segments: bool = False
     vad_min_segment_s: float = 10.0
     vad_max_segment_s: float = 30.0
     vad_max_merge_gap_s: float = 3.0
@@ -134,7 +134,7 @@ class SemanticAsrPipeline:
     def _detect(self, wav_path: str) -> dict:
         result = self.vad.detect(wav_path)
         vad_result = result[0] if isinstance(result, tuple) else result
-        logger.info("VAD: %s", vad_result)
+        logger.info("VAD: %s", _compact_vad_for_log(vad_result))
         if not vad_result.get("timestamps"):
             raise ValueError("VAD must return non-empty timestamps")
         return vad_result
@@ -204,6 +204,8 @@ class SemanticAsrPipeline:
                 text = asr_result.get("text", "").strip()
                 if not text or re.search(r"(<blank>)|(<sil>)", text):
                     continue
+                text = re.sub('<.*?>', '', text).replace('*', '').replace('–', '')
+                asr_result['text'] = text
                 asr_results.append(asr_result)
                 asr_segments.append(self._find_segment(asr_result["uttid"], batch_segments))
 
@@ -415,6 +417,16 @@ def _normalize_segments(timestamps: Sequence[tuple[float, float]]) -> list[tuple
     segments = [(float(s), float(e)) for s, e in timestamps if float(e) > float(s)]
     segments.sort(key=lambda item: item[0])
     return segments
+
+
+def _compact_vad_for_log(vad_result: dict) -> dict:
+    result = dict(vad_result)
+    frame_probs = result.get("frame_speech_probs")
+    if isinstance(frame_probs, dict):
+        compact = dict(frame_probs)
+        compact["probs"] = f"<{len(frame_probs.get('probs') or [])} frame probabilities>"
+        result["frame_speech_probs"] = compact
+    return result
 
 
 def align_sentences_to_output_vad(

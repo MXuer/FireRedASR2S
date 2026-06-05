@@ -12,7 +12,7 @@ class MmsForcedAlignerConfig:
     model_path: str = "pretrained_models/mmsalign/model.pt"
     device: str = "cuda:0"
     language: str = "zh_cn"
-    use_star: bool = True
+    use_star: bool = False
     normalize_text: bool = False
     uroman_path: str = "uroman/bin"
 
@@ -23,6 +23,7 @@ class MmsForcedAlignerTimestampProvider:
     def __init__(self, config: MmsForcedAlignerConfig | None = None):
         self.config = config or MmsForcedAlignerConfig()
         self.config.language = canonical_language_id(self.config.language)
+        self.config.use_star = False
         model_language("mms_forced_aligner", self.config.language)
         self.aligner = MmsAligner(
             model_path=self.config.model_path,

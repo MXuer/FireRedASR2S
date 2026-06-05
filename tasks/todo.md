@@ -1,5 +1,12 @@
 # Todo
 
+- [x] Current work: record raw-VAD ASR/MMS alignment strategy before coding.
+- [x] Current work: make raw VAD segments feed ASR and MMS by default.
+- [x] Current work: keep `use_star=False` fixed for MMS forced alignment.
+- [x] Current work: add regression tests that ASR/MMS segments use raw VAD and `asr_vad_segments_ms` equals raw VAD by default.
+- [x] Current work: run pt_br Ten-VAD + Whisper + MMS smoke and inspect timestamp/VAD boundaries.
+- [x] Current work: update docs/PROGRESS/TODO, validate and commit.
+
 - [x] Current work: record frame-level VAD probability implementation plan before coding.
 - [x] Current work: add optional `frame_speech_probs` output for FireRed VAD, Ten-VAD and Silero VAD.
 - [x] Current work: pass VAD frame probabilities through pipeline JSON and sentence-boundary fusion.
@@ -217,6 +224,20 @@
 - [x] Keep existing example scripts temporarily as compatibility wrappers around `run_pipeline.py`.
 
 ## Review
+
+- Changed the default ASR/timestamp input strategy to raw VAD segments:
+  `PipelineConfig.merge_vad_segments=False`.
+- Kept explicit legacy merge support with `pipeline.merge_vad_segments=true`.
+- Fixed MMS forced alignment to keep `use_star=False` even if a config passes
+  `use_star=true`.
+- Added regression tests for default raw-VAD ASR/timestamp segments, explicit
+  merged VAD behavior and forced MMS `use_star=False`.
+- Real `pt_br` raw-align smoke passed:
+  `raw_vad_segments_ms == asr_vad_segments_ms`, 37 ASR/MMS segments, 36
+  timestamp segments, 574 words, 39 final sentences and zero sentence/word
+  overlaps.
+- Updated MMS docs and the Portuguese TEN VAD experiment report for the new
+  raw-align strategy.
 
 - Added frame-level VAD speech probability plumbing:
   `frame_speech_probs` from VAD adapters and `vad_frame_speech_probs` in final

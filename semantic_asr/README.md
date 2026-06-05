@@ -48,11 +48,16 @@ profiles, including module builder names and per-component parameters. For
 example, Russian can use FireRed VAD, Whisper ASR, Qwen3 forced alignment and
 Whisper text punctuation.
 
-## ASR VAD Merge Policy
+## ASR And Timestamp VAD Policy
 
-All VAD adapters feed into a common post-processing step before audio is sliced
-for ASR. This ASR slicing policy merges adjacent VAD segments into longer
-semantic chunks where possible:
+By default, ASR and timestamp providers receive the raw VAD speech segments.
+For forced aligners such as MMS, this keeps alignment audio close to the
+detected speech and avoids assigning leading or trailing silence to the first
+or last token.
+
+The legacy ASR-context merge policy is still available by setting
+`pipeline.merge_vad_segments=true`. When enabled, it merges adjacent VAD
+segments into longer chunks:
 
 - target at least 10 seconds per segment
 - never exceed 30 seconds per merged segment by default
@@ -60,6 +65,10 @@ semantic chunks where possible:
 
 If a segment is still shorter than 10 seconds because the surrounding gaps are
 too large, it is kept as-is.
+
+Semantic sentence merging happens after timestamps are available, using
+punctuation, token timestamps, raw VAD, frame-level VAD speech probabilities
+and acoustic evidence.
 
 ## Output VAD Segment Policy
 
@@ -85,6 +94,8 @@ Final non-speech segment output is formatted separately from ASR slicing:
     "asr_vad_segments_ms": [(0, 1000)],
     "dur_s": 1.0,
     "words": [{"start_ms": 0, "end_ms": 100, "text": "..."}],
+    "timestamp_segments": [...],
+    "vad_frame_speech_probs": {"frame_shift_ms": 10, "frame_length_ms": 25, "probs": [...]},
     "wav_path": "...",
 }
 ```

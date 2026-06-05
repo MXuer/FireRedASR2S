@@ -44,6 +44,22 @@ class MmsForcedAlignerTest(unittest.TestCase):
 
         self.assertEqual(provider.aligner.language, "cmn")
 
+    def test_provider_forces_use_star_false(self):
+        class FakeAligner:
+            def __init__(inner_self, *args, **kwargs):
+                pass
+
+        config = MmsForcedAlignerConfig(use_star=True)
+
+        original_aligner = MmsForcedAlignerTimestampProvider.__init__.__globals__["MmsAligner"]
+        try:
+            MmsForcedAlignerTimestampProvider.__init__.__globals__["MmsAligner"] = FakeAligner
+            provider = MmsForcedAlignerTimestampProvider(config)
+        finally:
+            MmsForcedAlignerTimestampProvider.__init__.__globals__["MmsAligner"] = original_aligner
+
+        self.assertFalse(provider.config.use_star)
+
     def test_normalize_alignment(self):
         aligned = [{"text": "hello", "start": 0.1, "end": 0.3}]
 

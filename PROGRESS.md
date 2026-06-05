@@ -74,8 +74,25 @@ Current state:
 - Sentence-boundary fusion uses frame-level VAD speech probability as the
   preferred acoustic signal. `max_sentence_s` is a soft preference and no
   longer forces a split through high-probability active speech.
+- ASR and MMS forced alignment now use raw VAD speech segments by default.
+  Semantic sentence merging happens after token timestamps are available.
+- MMS forced aligner forces `use_star=False`; configs cannot override it back
+  to true.
 
 Recent validation:
+
+- Switched the default pipeline strategy from pre-ASR VAD merging to raw-VAD
+  ASR/timestamp processing by setting `PipelineConfig.merge_vad_segments=False`.
+- Kept the legacy ASR context merge available through explicit
+  `pipeline.merge_vad_segments=true`.
+- Real `pt_br` raw-align smoke passed with TEN VAD + Whisper + MMS +
+  ASR-native punctuation under
+  `output/experiments/tenvad_whisper_mms_nativepunc_pt_br_rawalign`: 37 raw VAD
+  segments, 37 ASR/MMS segments, 36 timestamp segments, 574 words, 39 final
+  sentences and zero sentence/word overlaps.
+- The raw-align run confirmed `raw_vad_segments_ms == asr_vad_segments_ms`.
+- Added regression coverage for default raw-VAD ASR/timestamp processing,
+  explicit legacy VAD merge and forced `use_star=False`.
 
 - Added frame-level VAD speech probability to the pipeline JSON as
   `vad_frame_speech_probs` and passed it into sentence-boundary fusion.

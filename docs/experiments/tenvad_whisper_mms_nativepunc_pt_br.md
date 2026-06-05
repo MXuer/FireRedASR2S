@@ -44,6 +44,10 @@ After frame-level VAD probability support was added, the same command was
 rerun with `--uttid pt_br_tenvad_probs` and
 `--outdir output/experiments/tenvad_whisper_mms_nativepunc_pt_br_probs`.
 
+After the pipeline switched MMS alignment to raw VAD segments, the same config
+was rerun with `--uttid pt_br_tenvad_rawalign` and
+`--outdir output/experiments/tenvad_whisper_mms_nativepunc_pt_br_rawalign`.
+
 ## Outputs
 
 ```text
@@ -61,22 +65,25 @@ output/experiments/tenvad_whisper_mms_nativepunc_pt_br/resolved_config.json
 | --- | ---: |
 | Duration | 300.00s |
 | Raw TEN VAD segments | 37 |
-| ASR VAD segments | 12 |
+| ASR VAD segments before raw-align strategy | 12 |
+| ASR VAD segments after raw-align strategy | 37 |
 | Output VAD segments | 35 |
-| Timestamp segments | 12 |
-| Words | 562 |
-| Semantic sentence candidates | 31 |
+| Timestamp segments before raw-align strategy | 12 |
+| Timestamp segments after raw-align strategy | 36 |
+| Words after raw-align strategy | 574 |
+| Semantic sentence candidates after raw-align strategy | 46 |
 | Final sentences before VAD probability support | 30 |
 | Final sentences after VAD probability support | 24 |
-| Boundary decisions | 30 |
-| Merge decisions after VAD probability support | 7 |
+| Final sentences after raw-align strategy | 39 |
+| Boundary decisions after raw-align strategy | 45 |
 | VAD probability frames | 18,750 |
 | Sentence overlaps | 0 |
 | Word overlaps | 0 |
 
-Boundary-fusion reasons observed after VAD probability support: `vad_silence`,
-`punctuation`, `target_duration`, `merged_active_speech_prob`,
-`vad_prob_valley` and `merged_active_speech`.
+After raw-align strategy, `raw_vad_segments_ms` and `asr_vad_segments_ms` are
+identical. Boundary-fusion reasons observed: `vad_prob_valley`, `vad_silence`,
+`acoustic_valley`, `target_duration`, `punctuation`,
+`merged_active_speech_prob` and `merged_active_speech`.
 
 The structural pipeline test passed. The transcript should still be reviewed
 for model quality; a few Portuguese words in the SRT appear fused by the
