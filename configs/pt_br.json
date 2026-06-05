@@ -1,0 +1,43 @@
+{
+  "name": "pt_br",
+  "language": "pt_br",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "model_dir": "pretrained_models/FireRedVAD/VAD",
+        "config": {
+          "use_gpu": true
+        }
+      }
+    },
+    "asr": {
+      "name": "whisper_large",
+      "params": {
+        "model_name": "large-v3",
+        "device": "cuda:0",
+        "word_timestamps": true
+      }
+    },
+    "timestamp": {
+      "name": "whisper_native",
+      "params": {}
+    },
+    "punc": {
+      "name": "asr_native",
+      "params": {}
+    }
+  },
+  "pipeline": {
+    "asr_batch_size": 1,
+    "punc_batch_size": 1,
+    "strip_punctuation_before_punc": false
+  },
+  "output": {
+    "outdir": "output/experiments/multilingual_5min/pt_br",
+    "write_textgrid": true,
+    "write_srt": true,
+    "write_csv": true,
+    "copy_resolved_config": true
+  }
+}

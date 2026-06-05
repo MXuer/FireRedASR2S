@@ -1,5 +1,11 @@
 # Todo
 
+- [x] Current work: inspect `data/test` language fixtures and existing top-level configs.
+- [x] Current work: create or select one config per available test language.
+- [x] Current work: run each language for five minutes and write JSON outputs.
+- [x] Current work: inspect output shape, timestamp fields and sentence-boundary validity.
+- [x] Current work: update PROGRESS/TODO and commit the multilingual 5-minute config run.
+
 - [x] Current work: move config profiles to top-level `configs` and update all config references.
 - [x] Current work: add timestamp-provider outputs to the final JSON in a segment-grouped form.
 - [x] Current work: update docs/examples/tests for the top-level config layout and timestamp JSON field.
@@ -191,6 +197,18 @@
 
 ## Review
 
+- Added language-named configs for all nine available `data/test` language
+  fixtures and ran each one with `--max_seconds 300`.
+- Wrote JSON outputs under `output/experiments/multilingual_5min/<language>/`;
+  all include `timestamp_segments`, and every language has zero sentence/word
+  timestamp overlaps.
+- Switched `ja_jp`, `pt_br` and `vi_vn` coverage configs to Whisper native
+  timestamps. The initial Japanese Seamless + MMS attempt failed with a CTC
+  target-length error.
+- Added `docs/experiments/multilingual_5min_20260605.md` with config choices,
+  output paths and per-language counts.
+- Validation passed: all language-named configs parse, 37 tests, compile and
+  `git diff --check`.
 - Moved config profiles from `semantic_asr/configs` to top-level `configs/`
   and updated README, experiment docs and example wrapper paths.
 - Final JSON now includes `timestamp_segments`, preserving timestamp-provider

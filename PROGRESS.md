@@ -69,6 +69,20 @@ Current state:
 
 Recent validation:
 
+- Completed a 5-minute multilingual config run for all available `data/test`
+  language fixtures: `ar_sa`, `en_us`, `hi_in`, `ja_jp`, `ko_kr`, `pt_br`,
+  `ru_ru`, `th_th` and `vi_vn`.
+- Added language-named profiles under `configs/` for those nine fixtures and
+  wrote JSON outputs under `output/experiments/multilingual_5min/<language>/`.
+- Every multilingual 5-minute output includes `timestamp_segments`; sentence
+  and word overlap counts are zero for all nine languages.
+- `ja_jp` initially failed with Seamless + MMS because MMS CTC alignment
+  reported targets too long; the coverage profile now uses Whisper native
+  timestamps.
+- Multilingual 5-minute validation passed: all nine JSON/CSV/SRT/TextGrid
+  outputs exist, all six legacy configs plus the nine language-named configs
+  parse, 37 tests pass, package/tests/examples compile and `git diff --check`
+  passes.
 - Config profiles moved to top-level `configs/`. All six profiles parse, and
   example wrappers load their configs from the new location.
 - Final JSON now includes segment-grouped `timestamp_segments`, preserving the

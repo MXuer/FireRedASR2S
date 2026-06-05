@@ -1,0 +1,37 @@
+{
+  "name": "hi_in",
+  "language": "hi_in",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "model_dir": "pretrained_models/FireRedVAD/VAD",
+        "config": {
+          "use_gpu": true
+        }
+      }
+    },
+    "asr": {
+      "name": "seamless_m4t_v2_large"
+    },
+    "timestamp": {
+      "name": "mms_forced_aligner",
+      "params": {}
+    },
+    "punc": {
+      "name": "xlm_roberta_punctuation"
+    }
+  },
+  "pipeline": {
+    "asr_batch_size": 1,
+    "punc_batch_size": 1,
+    "strip_punctuation_before_punc": false
+  },
+  "output": {
+    "outdir": "output/experiments/multilingual_5min/hi_in",
+    "write_textgrid": true,
+    "write_srt": true,
+    "write_csv": true,
+    "copy_resolved_config": true
+  }
+}
