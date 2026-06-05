@@ -1,5 +1,10 @@
 # Todo
 
+- [x] Current work: move config profiles to top-level `configs` and update all config references.
+- [x] Current work: add timestamp-provider outputs to the final JSON in a segment-grouped form.
+- [x] Current work: update docs/examples/tests for the top-level config layout and timestamp JSON field.
+- [x] Current work: run validation and update PROGRESS/TODO.
+
 - [x] Current work: inspect `l2s` references and top-level/docs/tests/examples path conflicts.
 - [x] Current work: delete the obsolete top-level `l2s` directory.
 - [x] Current work: move `semantic_asr/docs`, `semantic_asr/tests` and `semantic_asr/examples` to top-level directories.
@@ -22,7 +27,7 @@
 - [x] Current work: determine a robust policy for sentence boundaries that fall inside active speech.
 - [x] Current work: document the recommendation and defer changing default output behavior until multilingual evaluation.
 
-- [x] Current work: inspect `semantic_asr/configs/ar.json` and `data/test/ar_sa-short.wav`.
+- [x] Current work: inspect `configs/ar.json` and `data/test/ar_sa-short.wav`.
 - [x] Current work: run the Arabic canonical-language pipeline on a real GPU.
 - [x] Current work: inspect JSON/CSV/SRT/TextGrid outputs and record the result.
 - [x] Current work: fix overlapping sentence intervals that block TextGrid export.
@@ -186,6 +191,14 @@
 
 ## Review
 
+- Moved config profiles from `semantic_asr/configs` to top-level `configs/`
+  and updated README, experiment docs and example wrapper paths.
+- Final JSON now includes `timestamp_segments`, preserving timestamp-provider
+  output by ASR segment with segment text, confidence, relative seconds and
+  absolute millisecond token timestamps.
+- Validation passed: all six top-level config profiles parse, 37 tests,
+  package/tests/examples compile, `git diff --check`, wrapper `--help`, and a
+  fake runner JSON check for `timestamp_segments`.
 - Removed the obsolete top-level `l2s/`; MMS forced alignment continues to use
   the extracted `semantic_asr.mms_runtime`.
 - Moved package-adjacent resources to top-level `docs/`, `tests/` and
@@ -208,7 +221,7 @@
 - Implemented configurable sentence-boundary fusion using punctuation
   candidates, raw VAD silence, aligned-token gaps, waveform valley ratio and
   target/maximum sentence durations.
-- Enabled the strategy only for `semantic_asr/configs/ar.json`; other language
+- Enabled the strategy only for `configs/ar.json`; other language
   profiles retain their current behavior.
 - The full Arabic retest preserved 54 `semantic_sentences` and produced 47
   audio-safe `sentences`: seven active-speech boundaries merged, six nearby
@@ -287,7 +300,7 @@
 - Verified sentence boundary alignment expands only the first and last sentence in each final output VAD segment.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after adding the config-driven runner.
 - `conda run -n fireredasr2s python -m unittest tests` passed.
-- Parsed all config profiles under `semantic_asr/configs`: Silero + Fun-ASR + FireRedPunc, Silero + Whisper + ASR-native punctuation, and FireRed VAD + Whisper + Qwen3 forced aligner + ASR text punctuation.
+- Parsed all config profiles under `configs`: Silero + Fun-ASR + FireRedPunc, Silero + Whisper + ASR-native punctuation, and FireRed VAD + Whisper + Qwen3 forced aligner + ASR text punctuation.
 - Existing combination example scripts now load config profiles and call the shared `run_profile()` runner.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts.
 - Restored deleted `PROGRESS.md`.
@@ -296,19 +309,19 @@
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the rename.
 - `conda run -n fireredasr2s python -m unittest tests` passed after the rename.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
-- Parsed all config profiles under `semantic_asr/configs` after the rename.
+- Parsed all config profiles under `configs` after the rename.
 - Added `semantic_asr/language_support.py` with model-to-language metadata and language-to-model query helpers.
 - Added `semantic_asr/query_models.py` CLI; `language en_us` and `model qwen3_asr_1_7b --role asr` returned expected JSON.
 - Added Qwen3-ASR-1.7B, Dolphin and Seamless M4T v2 large ASR adapters.
 - Added docs and standalone `--skip_model_load` tests for Qwen3-ASR-1.7B, Dolphin and Seamless M4T v2 large.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after adding language support and new ASR adapters.
-- `conda run -n fireredasr2s python -m unittest tests tests` passed.
+- `conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py'` passed.
 - Corrected `xlm_roberta_punctuation` language support to the full 47-language list provided by the user, including Chinese.
 - Added a lesson to prefer explicit supported-language lists over incomplete model page tags.
 - `conda run -n fireredasr2s python -m unittest tests` passed after the correction.
 - `semantic_asr/query_models.py language zh_cn --role punc` now returns `xlm_roberta_punctuation`.
 - Added MMS forced aligner timestamp provider `mms_forced_aligner`.
 - Added MMS docs and standalone skip-load test that verifies Chinese character token splitting.
-- `conda run -n fireredasr2s python -m unittest tests tests tests` passed.
+- `conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py' tests` passed.
 - `semantic_asr/query_models.py language zh_cn --role timestamp` returns `mms_forced_aligner`.
 - Refactored MMS forced aligner to use vendored `semantic_asr.mms_runtime` and align in-memory `SpeechSegment.wav` audio without writing temporary segment wav files.

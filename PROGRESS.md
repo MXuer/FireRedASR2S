@@ -4,8 +4,8 @@ Current state:
 
 - The project is being reshaped from the original FireRedASR2S repository into a standalone multilingual semantic ASR pipeline project.
 - Repository layout now keeps runtime package code under `semantic_asr/` and
-  places documentation, tests and examples at top-level `docs/`, `tests/` and
-  `examples/`.
+  places configuration, documentation, tests and examples at top-level
+  `configs/`, `docs/`, `tests/` and `examples/`.
 - Removed the obsolete top-level `l2s/` source tree; MMS forced alignment uses
   only the extracted `semantic_asr.mms_runtime`.
 - The original top-level FireRedASR2S package, original README, assets, inference examples and runtime directories were removed by the user as part of this cleanup.
@@ -69,6 +69,14 @@ Current state:
 
 Recent validation:
 
+- Config profiles moved to top-level `configs/`. All six profiles parse, and
+  example wrappers load their configs from the new location.
+- Final JSON now includes segment-grouped `timestamp_segments`, preserving the
+  timestamp provider output with segment text/confidence plus relative seconds
+  and absolute millisecond token timestamps.
+- Validation after config relocation and timestamp JSON recording passed: 37
+  tests, package/tests/examples compile, `git diff --check`, wrapper `--help`,
+  and a fake runner JSON check for `timestamp_segments`.
 - Top-level layout validation passed after moving docs/tests/examples and
   deleting `l2s`: 37 tests, package/tests/examples compile, `git diff --check`,
   all example `--help` commands, compatibility wrapper config lookup, and five
@@ -136,18 +144,18 @@ Recent validation:
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the rename.
 - `conda run -n fireredasr2s python -m unittest tests` passed after the rename.
 - `--help` passed for `semantic_asr/run_pipeline.py` and all three compatibility wrapper scripts after the rename.
-- All config profiles under `semantic_asr/configs` parsed successfully after the rename.
+- All config profiles under `configs` parsed successfully after the rename.
 - Top-level `README.md` and `requirements.txt` were refreshed for the standalone project.
-- `conda run -n fireredasr2s python -m unittest tests tests` passed after adding language support metadata.
+- `conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py'` passed after adding language support metadata.
 - `semantic_asr/query_models.py language en_us` and `semantic_asr/query_models.py model qwen3_asr_1_7b --role asr` returned expected JSON.
 - New standalone scripts for Qwen3-ASR, Dolphin and Seamless M4T passed `--skip_model_load 1`.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after the Dolphin/XLM-R punctuation changes.
-- `conda run -n fireredasr2s python -m unittest tests tests` passed after the Dolphin/XLM-R punctuation changes.
+- `conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py'` passed after the Dolphin/XLM-R punctuation changes.
 - `examples/test_xlm_roberta_punctuation.py --skip_model_load 1` passed.
 - `semantic_asr/query_models.py language en_us --role punc` returns `xlm_roberta_punctuation`.
 - Corrected `xlm_roberta_punctuation` support to the full 47-language list provided by the user, including Chinese.
 - `semantic_asr/query_models.py language zh_cn --role punc` now returns `xlm_roberta_punctuation`.
-- `conda run -n fireredasr2s python -m unittest tests tests tests` passed after adding MMS forced aligner.
+- `conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py' tests` passed after adding MMS forced aligner.
 - `examples/test_mms_forced_aligner.py --skip_model_load 1 --language zh_cn --text "你好 世界"` passed and produced Chinese character tokens.
 - `semantic_asr/query_models.py language zh_cn --role timestamp` returns `mms_forced_aligner`.
 - `conda run -n fireredasr2s python -m compileall semantic_asr` passed after MMS in-memory runtime extraction.

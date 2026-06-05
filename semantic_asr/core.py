@@ -85,6 +85,7 @@ class SemanticAsrPipeline:
         asr_results, asr_segments = self._transcribe(segments)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
         self._require_timestamps(asr_results)
+        timestamp_segments = self._format_timestamp_segments(asr_results)
         if self.config.strip_punctuation_before_punc:
             asr_results = self._strip_punctuation(asr_results)
             self._require_timestamps(asr_results)
@@ -120,6 +121,7 @@ class SemanticAsrPipeline:
             "asr_vad_segments_ms": self._segments_ms(vad_result["timestamps"]),
             "dur_s": dur_s,
             "words": words,
+            "timestamp_segments": timestamp_segments,
             "wav_path": wav_path,
         }
         if boundary_config.enabled:
@@ -282,6 +284,30 @@ class SemanticAsrPipeline:
                 })
 
         return sentences, words
+
+    def _format_timestamp_segments(self, asr_results: Sequence[dict]) -> list[dict]:
+        timestamp_segments = []
+        for asr_result in asr_results:
+            segment_start_ms, segment_end_ms = self._parse_uttid_ms(asr_result["uttid"])
+            timestamps = []
+            for item in asr_result.get("timestamp", []):
+                token, start_s, end_s = item[0], float(item[1]), float(item[2])
+                timestamps.append({
+                    "text": token,
+                    "start_s": start_s,
+                    "end_s": end_s,
+                    "start_ms": int(start_s * 1000 + segment_start_ms),
+                    "end_ms": int(end_s * 1000 + segment_start_ms),
+                })
+            timestamp_segments.append({
+                "uttid": asr_result["uttid"],
+                "start_ms": segment_start_ms,
+                "end_ms": segment_end_ms,
+                "text": asr_result.get("text", ""),
+                "confidence": asr_result.get("confidence", 0),
+                "timestamps": timestamps,
+            })
+        return timestamp_segments
 
     @staticmethod
     def _parse_uttid_ms(uttid: str) -> tuple[int, int]:

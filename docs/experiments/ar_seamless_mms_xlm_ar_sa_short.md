@@ -2,7 +2,7 @@
 
 ## Scope
 
-- Config: `semantic_asr/configs/ar.json`
+- Config: `configs/ar.json`
 - Audio: `data/test/ar_sa-short.wav`
 - Audio duration: 600 seconds
 - Pipeline: FireRed VAD + Seamless M4T v2 large + MMS Forced Aligner + XLM-R punctuation
@@ -17,7 +17,7 @@ unreliable `hf-mirror.com` metadata request during model loading.
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python CUDA_VISIBLE_DEVICES=4 \
 conda run -n fireredasr2s python semantic_asr/run_pipeline.py \
-  --config semantic_asr/configs/ar.json \
+  --config configs/ar.json \
   --wav_path data/test/ar_sa-short.wav \
   --uttid ar_sa_short \
   --outdir output/experiments/ar_seamless_mms_xlm_ar_sa_short_final
@@ -75,7 +75,7 @@ profile and the complete ten-minute audio was rerun:
 HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python CUDA_VISIBLE_DEVICES=4 \
 conda run -n fireredasr2s python semantic_asr/run_pipeline.py \
-  --config semantic_asr/configs/ar.json \
+  --config configs/ar.json \
   --wav_path data/test/ar_sa-short.wav \
   --uttid ar_sa_short \
   --outdir output/experiments/ar_seamless_mms_xlm_ar_sa_short_boundary_fusion

@@ -12,7 +12,7 @@ from semantic_asr.run_pipeline import run_profile
 CONFIG_PATH = os.path.abspath(
     os.path.join(
         os.path.dirname(__file__),
-        "../semantic_asr/configs/silero_funasr_fireredpunc.json",
+        "../configs/silero_funasr_fireredpunc.json",
     )
 )
 

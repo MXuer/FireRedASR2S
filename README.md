@@ -26,7 +26,6 @@ emit usable punctuation, while others need a separate punctuation model.
 ```text
 semantic_asr/
   adapters/          model adapters
-  configs/           JSON/YAML pipeline profiles
   firered_runtime/   vendored FireRed runtime used by FireRed adapters
   mms_runtime/       vendored MMS forced-alignment runtime
   core.py            semantic ASR pipeline core
@@ -40,6 +39,7 @@ Top-level repository resources:
 
 ```text
 docs/               architecture, model and experiment notes
+configs/            JSON/YAML pipeline profiles
 examples/           runnable examples and compatibility wrappers
 tests/              unit and orchestration tests
 tasks/todo.md
@@ -76,7 +76,7 @@ Multilingual test-audio planning lives in
 
 ```bash
 python semantic_asr/run_pipeline.py \
-  --config semantic_asr/configs/silero_funasr_fireredpunc.json \
+  --config configs/silero_funasr_fireredpunc.json \
   --wav_path data/test/short.wav \
   --uttid short \
   --outdir output/experiments/silero_funasr_fireredpunc
@@ -93,9 +93,9 @@ The runner writes:
 
 ## Existing Profiles
 
-- `semantic_asr/configs/silero_funasr_fireredpunc.json`
-- `semantic_asr/configs/silero_whisper_nativepunc.json`
-- `semantic_asr/configs/fireredvad_whisper_qwenaligner_textpunc_ru.json`
+- `configs/silero_funasr_fireredpunc.json`
+- `configs/silero_whisper_nativepunc.json`
+- `configs/fireredvad_whisper_qwenaligner_textpunc_ru.json`
 
 The old example scripts in `examples/` are compatibility wrappers
 around the same config runner.

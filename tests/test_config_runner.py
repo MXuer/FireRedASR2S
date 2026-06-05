@@ -154,6 +154,9 @@ class ConfigRunnerTest(unittest.TestCase):
             with open(outputs["json"], "r", encoding="utf-8") as fin:
                 result = json.load(fin)
             self.assertEqual(result["text"], "hello.")
+            self.assertEqual(len(result["timestamp_segments"]), 1)
+            self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["text"], "hello")
+            self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["start_ms"], 0)
 
 
 if __name__ == "__main__":
