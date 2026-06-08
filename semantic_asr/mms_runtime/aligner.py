@@ -34,25 +34,44 @@ class MmsAligner:
         use_star: bool,
         language: str,
         raw_transcripts: list[str],
+        alignment_transcripts: list[str] | None = None,
     ) -> list[dict]:
-        transcripts = [text for text in transcripts if text.strip()]
-        norm_transcripts = [text.strip().lower() for text in transcripts]
-        tokens = get_uroman_tokens(norm_transcripts, self.uroman_path, language)
+        alignment_transcripts = alignment_transcripts or transcripts
+        items = [
+            {
+                "transcript": transcript,
+                "raw_transcript": raw_transcript,
+                "alignment_transcript": alignment_transcript,
+                "name": name,
+                "inserted_star": False,
+            }
+            for transcript, raw_transcript, alignment_transcript, name in zip(
+                transcripts,
+                raw_transcripts,
+                alignment_transcripts,
+                names,
+            )
+            if str(transcript).strip() and str(alignment_transcript).strip()
+        ]
+        tokens = self._uromanize_alignment_tokens(
+            [str(item["alignment_transcript"]).strip().lower() for item in items],
+            language,
+        )
         if use_star:
-            stars = ["<star>"] * len(tokens)
-            tokens = [item for pair in zip(tokens, stars) for item in pair]
-            tokens = ["<star>"] + tokens
-            transcripts = [item for pair in zip(transcripts, stars) for item in pair]
-            transcripts = ["<star>"] + transcripts
-            norm_transcripts = [item for pair in zip(norm_transcripts, stars) for item in pair]
-            norm_transcripts = ["<star>"] + norm_transcripts
-
-        segments, stride = self.get_alignments(waveform, sample_rate, tokens, use_star)
+            expanded_items = [{"inserted_star": True}]
+            expanded_tokens = ["<star>"]
+            for item, token in zip(items, tokens):
+                expanded_items.append(item)
+                expanded_tokens.append(token)
+                expanded_items.append({"inserted_star": True})
+                expanded_tokens.append("<star>")
+            items = expanded_items
+            tokens = expanded_tokens
+        segments, stride = self.get_alignments(waveform, sample_rate, tokens)
         spans = get_spans(tokens, segments)
         align_segments = []
-        true_index = 0
-        for i, transcript in enumerate(transcripts):
-            if transcript == "<star>":
+        for i, item in enumerate(items):
+            if item.get("inserted_star"):
                 continue
             span = spans[i]
             audio_start = round(span[0].start * stride / 1000, 3)
@@ -61,17 +80,22 @@ class MmsAligner:
                 "start": round(audio_start, 3),
                 "end": round(audio_end, 3),
                 "duration": round(audio_end - audio_start, 3),
-                "clean_text": transcript,
-                "text": raw_transcripts[true_index],
-                "name": names[true_index],
+                "clean_text": item["transcript"],
+                "text": item["raw_transcript"],
+                "name": item["name"],
             })
-            true_index += 1
         return align_segments
 
-    def get_alignments(self, waveform, sample_rate: int, tokens: list[str], use_star: bool):
+    def _uromanize_alignment_tokens(self, alignment_transcripts: list[str], language: str) -> list[str]:
+        uroman_inputs = [token for token in alignment_transcripts if token != "<star>"]
+        uroman_tokens = get_uroman_tokens(uroman_inputs, self.uroman_path, language) if uroman_inputs else []
+        next_uroman = iter(uroman_tokens)
+        return ["<star>" if token == "<star>" else next(next_uroman) for token in alignment_transcripts]
+
+    def get_alignments(self, waveform, sample_rate: int, tokens: list[str]):
         emissions, stride = self.generate_emissions(waveform, sample_rate)
         time_steps, _ = emissions.size()
-        if use_star:
+        if any(token == "<star>" for token in tokens):
             emissions = torch.cat([emissions, torch.zeros(time_steps, 1).to(self.device)], dim=1)
 
         token_indices = [self.dictionary[c] for c in " ".join(tokens).split(" ") if c in self.dictionary]

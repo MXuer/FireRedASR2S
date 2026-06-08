@@ -3,12 +3,8 @@
   "language": "pt_br",
   "components": {
     "vad": {
-      "name": "ten_vad",
-      "params": {
-        "threshold": 0.5,
-        "min_speech_duration_ms": 250,
-        "min_silence_duration_ms": 100
-      }
+      "name": "firered_vad",
+      "params": {}
     },
     "asr": {
       "name": "whisper_large",

@@ -65,6 +65,13 @@ becomes MMSAlign's native `cmn`.
 For Chinese, Korean and Japanese, the adapter automatically inserts spaces
 around no-space script characters before alignment.
 
+MMS alignment does not handle numeric-form tokens reliably. The adapter keeps a
+separate alignment-token stream for MMS: numeric tokens such as `1952` are
+temporarily aligned as `<star>`, while the original token is preserved in the
+returned timestamp. This placeholder is distinct from the optional `use_star`
+noise tokens inserted by MMS; inserted stars are filtered, numeric placeholder
+stars are restored to their original text.
+
 ## Standalone Test
 
 Configuration/tokenization shape only:

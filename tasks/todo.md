@@ -1,5 +1,22 @@
 # Todo
 
+- [x] Current work: add `preserve_sentence_gaps` config for final sentence timing.
+- [x] Current work: preserve silence gaps when boundary fusion keeps an audio-safe boundary.
+- [x] Current work: skip output VAD sentence expansion and final short-gap merge when preserving gaps.
+- [x] Current work: add regression tests and run targeted validation.
+
+- [x] Current work: design MMS numeric-token placeholder strategy without conflicting with inserted `<star>`.
+- [x] Current work: implement numeric token placeholder alignment and restore original numeric tokens in timestamps.
+- [x] Current work: add unit coverage for Korean numeric token preparation/restoration.
+- [x] Current work: run MMS smoke on `data/test/0a41b2ee-4947-4192-9f9e-cf796d5dc955.wav` if a matching config is available.
+
+- [x] Current work: add configurable final sentence merge by short silence gap and max merged duration.
+- [x] Current work: apply final merge after boundary fusion, output VAD alignment and overlap removal.
+- [x] Current work: add unit tests for gap/duration final sentence merge behavior.
+- [x] Current work: run targeted validation.
+
+- [x] Current work: summarize recent Codex-assisted complex work into a Markdown report.
+
 - [x] Current work: record semantic-completeness boundary strategy before coding.
 - [x] Current work: make VAD silence/probability/acoustic valley an audio-safe signal, not a mandatory split.
 - [x] Current work: add semantic completeness checks for continuation punctuation and short raw-VAD fragments.

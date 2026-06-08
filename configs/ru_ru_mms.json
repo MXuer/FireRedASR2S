@@ -1,6 +1,6 @@
 {
-  "name": "ko_kr",
-  "language": "ko_kr",
+  "name": "ru_ru",
+  "language": "ru_ru",
   "components": {
     "vad": {
       "name": "firered_vad",
@@ -24,7 +24,8 @@
       "params": {}
     },
     "punc": {
-      "name": "asr_text"
+      "name": "asr_text",
+      "params": {}
     }
   },
   "pipeline": {
@@ -44,7 +45,7 @@
     }
   },
   "output": {
-    "outdir": "output/experiments/ko_test2-1",
+    "outdir": "output/experiments/ru_full",
     "write_textgrid": true,
     "write_srt": true,
     "write_csv": true,

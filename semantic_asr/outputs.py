@@ -110,7 +110,7 @@ def write_all_outputs(
             name,
             result["dur_s"],
             result["sentences"],
-            result.get("words"),
+            None,
         )
     if write_srt_output:
         outputs["srt"] = write_srt(os.path.join(outdir, "asr_srt"), name, result["sentences"])

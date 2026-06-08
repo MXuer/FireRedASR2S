@@ -26,6 +26,9 @@ class PipelineConfig:
     vad_max_merge_gap_s: float = 3.0
     output_vad_min_silence_merge_s: float = 0.2
     output_vad_pad_s: float = 0.2
+    final_sentence_merge_max_gap_s: float = 2.0
+    final_sentence_merge_max_duration_s: float = 15.0
+    preserve_sentence_gaps: bool = False
     sentence_boundary_fusion: SentenceBoundaryFusionConfig | dict | None = None
 
 
@@ -105,8 +108,15 @@ class SemanticAsrPipeline:
                 raw_vad_result.get("frame_speech_probs"),
             )
         output_vad_segments = self._format_output_vad_segments(raw_vad_result["timestamps"], dur_s)
-        sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
+        if not self.config.preserve_sentence_gaps:
+            sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
         sentences = remove_sentence_overlaps(sentences)
+        if not self.config.preserve_sentence_gaps:
+            sentences = merge_final_sentences_by_gap(
+                sentences,
+                max_gap_s=self.config.final_sentence_merge_max_gap_s,
+                max_duration_s=self.config.final_sentence_merge_max_duration_s,
+            )
 
         text = "".join(s["text"] for s in sentences)
         text = re.sub(r"([.,!?])\s*([a-zA-Z])", r"\1 \2", text)
@@ -202,9 +212,12 @@ class SemanticAsrPipeline:
 
             for asr_result in batch_asr_results:
                 text = asr_result.get("text", "").strip()
+                text = re.sub('<.*?>', '', text).strip()
+                text = text.replace('*', '').replace('–', '')
                 if not text or re.search(r"(<blank>)|(<sil>)", text):
                     continue
-                text = re.sub('<.*?>', '', text).replace('*', '').replace('–', '')
+                if not re.sub('[,.?!，。？！]', '', text):
+                    continue
                 asr_result['text'] = text
                 asr_results.append(asr_result)
                 asr_segments.append(self._find_segment(asr_result["uttid"], batch_segments))
@@ -335,11 +348,21 @@ class SemanticAsrPipeline:
     def _sentence_boundary_fusion_config(self) -> SentenceBoundaryFusionConfig:
         config = self.config.sentence_boundary_fusion
         if config is None:
-            return SentenceBoundaryFusionConfig()
+            boundary_config = SentenceBoundaryFusionConfig()
+            boundary_config.preserve_sentence_gaps = self.config.preserve_sentence_gaps
+            return boundary_config
         if isinstance(config, SentenceBoundaryFusionConfig):
-            return config
+            boundary_config = config
+            boundary_config.preserve_sentence_gaps = (
+                boundary_config.preserve_sentence_gaps or self.config.preserve_sentence_gaps
+            )
+            return boundary_config
         if isinstance(config, dict):
-            return SentenceBoundaryFusionConfig(**config)
+            boundary_config = SentenceBoundaryFusionConfig(**config)
+            boundary_config.preserve_sentence_gaps = (
+                boundary_config.preserve_sentence_gaps or self.config.preserve_sentence_gaps
+            )
+            return boundary_config
         raise TypeError("sentence_boundary_fusion must be a mapping or SentenceBoundaryFusionConfig")
 
 
@@ -463,6 +486,50 @@ def remove_sentence_overlaps(sentences: Sequence[dict]) -> list[dict]:
         previous["end_ms"] = max(previous["start_ms"], boundary_ms)
         current["start_ms"] = min(current["end_ms"], boundary_ms)
     return adjusted
+
+
+def merge_final_sentences_by_gap(
+    sentences: Sequence[dict],
+    max_gap_s: float = 2.0,
+    max_duration_s: float = 15.0,
+) -> list[dict]:
+    if not sentences:
+        return []
+    if max_gap_s <= 0 or max_duration_s <= 0:
+        return [dict(sentence) for sentence in sentences]
+
+    max_gap_ms = int(max_gap_s * 1000)
+    max_duration_ms = int(max_duration_s * 1000)
+    merged = [dict(sentences[0])]
+    for sentence_source in sentences[1:]:
+        previous = merged[-1]
+        current = dict(sentence_source)
+        gap_ms = current["start_ms"] - previous["end_ms"]
+        combined_duration_ms = current["end_ms"] - previous["start_ms"]
+        if gap_ms < max_gap_ms and combined_duration_ms <= max_duration_ms:
+            previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
+            previous["text"] = _join_final_sentence_text(previous["text"], current["text"])
+            previous["asr_confidence"] = min(
+                previous.get("asr_confidence", 0),
+                current.get("asr_confidence", 0),
+            )
+            continue
+        merged.append(current)
+    return merged
+
+
+def _join_final_sentence_text(previous: str, current: str) -> str:
+    previous = previous.rstrip()
+    current = current.lstrip()
+    if not previous:
+        return current
+    if not current:
+        return previous
+    separator = "" if _CJK_BOUNDARY.search(previous[-1]) and _CJK_BOUNDARY.search(current[0]) else " "
+    return previous + separator + current
+
+
+_CJK_BOUNDARY = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
 
 
 SentenceAsrPipeline = SemanticAsrPipeline

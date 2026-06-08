@@ -109,6 +109,37 @@ multilingual reference fixtures before enabling the policy more broadly.
 `max_sentence_s` is also soft: it encourages earlier supported boundaries but
 does not force a split through active speech.
 
+## Preserving Sentence Gaps
+
+Set top-level pipeline config `preserve_sentence_gaps: true` when final
+sentence intervals should leave inter-sentence silence unassigned. In this mode:
+
+- kept raw-VAD-silence boundaries use the raw VAD silence edges instead of a
+  single midpoint;
+- kept probability/acoustic-valley boundaries use the neighboring token gap
+  when available;
+- output VAD sentence expansion is skipped;
+- final short-gap sentence merging is skipped.
+
+This mode is intended for audio cutting. The default midpoint behavior remains
+useful for continuous annotation views such as SRT/TextGrid where contiguous
+sentence intervals are easier to inspect.
+
+## Final Short-Gap Merge
+
+After sentence-boundary fusion, output VAD alignment and overlap removal, the
+pipeline applies one final configurable merge pass over the final `sentences`.
+Adjacent final sentences merge when:
+
+- the silence gap between them is below `final_sentence_merge_max_gap_s`
+  (`2.0s` by default);
+- the merged sentence duration would not exceed
+  `final_sentence_merge_max_duration_s` (`15.0s` by default).
+
+This pass is intentionally later than boundary fusion. It smooths short final
+sentence gaps without changing ASR/MMS alignment inputs or the boundary-decision
+debug trail.
+
 ## Portuguese Raw-Align Example
 
 For `data/test/short/pt_br-short.wav`, raw-VAD ASR/MMS alignment originally

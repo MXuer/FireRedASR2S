@@ -62,6 +62,63 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(decisions[0]["reason"], "vad_silence")
         self.assertEqual(decisions[0]["vad_silence_ms"], [7180, 7440])
 
+    def test_preserve_sentence_gaps_keeps_vad_silence_unassigned(self):
+        config = SentenceBoundaryFusionConfig(enabled=True, preserve_sentence_gaps=True)
+        sentences = [
+            {"start_ms": 1000, "end_ms": 7396, "text": "first.", "asr_confidence": 0.8},
+            {"start_ms": 7496, "end_ms": 9000, "text": "second.", "asr_confidence": 0.7},
+        ]
+        words = [
+            {"start_ms": 7000, "end_ms": 7396, "text": "first"},
+            {"start_ms": 7496, "end_ms": 7800, "text": "second"},
+        ]
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(500, 7180), (7440, 10000)],
+            self.wav,
+            16000,
+            config,
+        )
+
+        self.assertEqual(len(fused), 2)
+        self.assertEqual(fused[0]["end_ms"], 7180)
+        self.assertEqual(fused[1]["start_ms"], 7440)
+        self.assertEqual(decisions[0]["preserved_gap_ms"], 260)
+
+    def test_preserve_sentence_gaps_uses_token_gap_without_vad_silence(self):
+        config = SentenceBoundaryFusionConfig(enabled=True, preserve_sentence_gaps=True)
+        sentences = [
+            {"start_ms": 1000, "end_ms": 5000, "text": "first.", "asr_confidence": 0.8},
+            {"start_ms": 5200, "end_ms": 9000, "text": "second.", "asr_confidence": 0.7},
+        ]
+        words = [
+            {"start_ms": 4500, "end_ms": 5000, "text": "first"},
+            {"start_ms": 5200, "end_ms": 5600, "text": "second"},
+        ]
+        frame_probs = {
+            "frame_shift_ms": 100,
+            "frame_length_ms": 100,
+            "probs": [0.9] * 50 + [0.05] + [0.9] * 50,
+        }
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(0, 10000)],
+            self.wav,
+            16000,
+            config,
+            frame_probs,
+        )
+
+        self.assertEqual(len(fused), 2)
+        self.assertEqual(fused[0]["end_ms"], 5000)
+        self.assertEqual(fused[1]["start_ms"], 5200)
+        self.assertEqual(decisions[0]["reason"], "vad_prob_valley")
+        self.assertEqual(decisions[0]["preserved_gap_ms"], 200)
+
     def test_max_duration_waits_for_silence_inside_active_speech(self):
         sentences = [
             {"start_ms": 0, "end_ms": 29500, "text": "first.", "asr_confidence": 0.8},

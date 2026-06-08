@@ -35,6 +35,7 @@ class MmsForcedAlignerTimestampProvider:
         results = []
         for asr_result, segment in zip(batch_asr_result, batch_segments):
             tokens = self._prepare_tokens(asr_result.get("text", ""))
+            alignment_tokens = self._prepare_alignment_tokens(tokens)
             names = [f"{asr_result['uttid']}_{i}" for i in range(len(tokens))]
             aligned = self.aligner.align(
                 tokens,
@@ -44,6 +45,7 @@ class MmsForcedAlignerTimestampProvider:
                 use_star=self.config.use_star,
                 language=model_language("mms_forced_aligner", self.config.language),
                 raw_transcripts=tokens,
+                alignment_transcripts=alignment_tokens,
             )
 
             timestamped = dict(asr_result)
@@ -53,6 +55,7 @@ class MmsForcedAlignerTimestampProvider:
 
     def _prepare_tokens(self, text: str) -> list[str]:
         text = str(text).strip()
+        text = re.sub('[#]', '', text)
         if self.config.normalize_text:
             text = self._normalize_text(text)
         if self.config.language.startswith("zh"):
@@ -62,6 +65,9 @@ class MmsForcedAlignerTimestampProvider:
         if self.config.language.startswith("ja"):
             text = re.sub(r"[\u3040-\u309f\u4E00-\u9FFF\u30a0-\u30ff]", lambda item: f" {item[0]} ", text)
         return [token for token in text.split() if token.strip()]
+
+    def _prepare_alignment_tokens(self, tokens: Sequence[str]) -> list[str]:
+        return ["<star>" if _is_numeric_alignment_token(token) else token for token in tokens]
 
     def _normalize_text(self, text: str) -> str:
         from semantic_asr.mms_runtime.text_normalize import LANG2TEXTNORMALIZER
@@ -77,3 +83,7 @@ class MmsForcedAlignerTimestampProvider:
             if token:
                 timestamps.append([token, float(item["start"]), float(item["end"])])
         return timestamps
+
+
+def _is_numeric_alignment_token(token: str) -> bool:
+    return re.fullmatch(r"(?=.*\d)[\d.,:/+\-]+", str(token).strip()) is not None

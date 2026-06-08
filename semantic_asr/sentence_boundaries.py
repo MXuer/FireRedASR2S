@@ -28,6 +28,7 @@ class SentenceBoundaryFusionConfig:
     speech_prob_active_threshold: float = 0.5
     speech_prob_window_s: float = 0.08
     speech_prob_search_window_s: float = 0.5
+    preserve_sentence_gaps: bool = False
 
 
 def fuse_sentence_boundaries(
@@ -132,9 +133,18 @@ def fuse_sentence_boundaries(
         action = "keep"
         reason = audio_reason or "semantic_boundary"
         if audio_safe and semantic_complete:
-            boundary_ms = snapped_boundary_ms
-            previous["end_ms"] = boundary_ms
-            current["start_ms"] = boundary_ms
+            if config.preserve_sentence_gaps:
+                previous["end_ms"], current["start_ms"] = _preserved_gap_boundary(
+                    previous,
+                    current,
+                    previous_end_ms,
+                    current_start_ms,
+                    vad_silence,
+                )
+            else:
+                boundary_ms = snapped_boundary_ms
+                previous["end_ms"] = boundary_ms
+                current["start_ms"] = boundary_ms
         elif audio_safe:
             action = "merge"
             reason = "merged_semantic_incomplete"
@@ -185,6 +195,7 @@ def fuse_sentence_boundaries(
             "speech_prob_boundary_ms": speech_stats["boundary_ms"],
             "speech_prob_supported_silence": prob_supported_silence,
             "combined_duration_ms": combined_duration_ms,
+            "preserved_gap_ms": max(current["start_ms"] - previous["end_ms"], 0) if action == "keep" else None,
         })
         if action == "keep":
             fused.append(current)
@@ -224,6 +235,25 @@ def _merge_sentence_into_previous(previous: dict, current: dict) -> None:
         previous.get("asr_confidence", 0),
         current.get("asr_confidence", 0),
     )
+
+
+def _preserved_gap_boundary(
+    previous: dict,
+    current: dict,
+    previous_end_ms: int,
+    current_start_ms: int,
+    vad_silence: tuple[int, int] | None,
+) -> tuple[int, int]:
+    if vad_silence is not None:
+        previous_boundary_ms = max(previous["start_ms"], min(int(vad_silence[0]), current["start_ms"]))
+        current_boundary_ms = min(current["end_ms"], max(int(vad_silence[1]), previous_boundary_ms))
+        return previous_boundary_ms, current_boundary_ms
+    if previous_end_ms <= current_start_ms:
+        previous_boundary_ms = max(previous["start_ms"], min(previous_end_ms, current["start_ms"]))
+        current_boundary_ms = min(current["end_ms"], max(current_start_ms, previous_boundary_ms))
+        return previous_boundary_ms, current_boundary_ms
+    boundary_ms = (previous_end_ms + current_start_ms) // 2
+    return max(previous["start_ms"], boundary_ms), min(current["end_ms"], boundary_ms)
 
 
 def _last_word_before(words: Sequence[dict], boundary_ms: int) -> dict | None:
