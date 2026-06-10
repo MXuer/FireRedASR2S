@@ -33,7 +33,11 @@ segments sent to ASR.
 
 ## Future Improvement
 
-Once reference transcripts and sentence boundaries are available, evaluate a
-Thai-specific text sentence-boundary model as an additional soft signal. It
-should be combined with timestamp pauses rather than replacing acoustic
-evidence.
+Qwen semantic-boundary prompting is now the preferred text-side experiment for
+Thai when no reliable punctuation model is available. The component returns
+only token end indexes, never rewritten text, and the pipeline reconstructs the
+final sentence text from original ASR timestamp tokens.
+
+The Qwen result must still be treated as a soft semantic signal. The final cut
+decision remains controlled by aligned token timestamps, raw VAD silence,
+frame-level VAD speech probability and duration limits.

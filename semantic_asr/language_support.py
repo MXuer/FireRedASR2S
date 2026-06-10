@@ -219,6 +219,17 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="punc",
+        name="qwen_semantic_boundary",
+        languages=(ANY_LANGUAGE,),
+        notes=(
+            "Uses Qwen3.6 text understanding to return index-only semantic "
+            "sentence boundaries. It does not rewrite ASR text and should be "
+            "validated per target language/domain."
+        ),
+        supports_batch=False,
+    ),
+    ModelLanguageSupport(
+        role="punc",
         name="naqta",
         languages=("ar",),
         aliases={"ar": ("arabic", "ar-sa", "ar-eg", "ar-ae")},

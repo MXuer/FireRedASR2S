@@ -1,5 +1,20 @@
 # Todo
 
+- [x] Current work: design Qwen semantic-boundary support as an index-only component that never rewrites ASR text.
+- [x] Current work: implement JSON/end-index parsing, validation, bounded retries and local-rule fallback behavior.
+- [x] Current work: wire the Qwen boundary result into existing sentence-boundary fusion without changing final text generation.
+- [x] Current work: add tests covering valid output, retry repair, malformed output fallback and multilingual text input.
+- [x] Current work: document the Qwen API contract, required thinking-disable option and language expectations.
+- [x] Current work: run focused/full validation and update progress.
+
+Review:
+- Added `qwen_semantic_boundary` as an index-only `punc` component backed by the local Qwen3.6 chat API.
+- The component asks for `{"token_count": N, "end_indices": [...]}` and reconstructs sentence text only from original timestamp tokens.
+- Added strict validation for JSON parsing, token count, monotonicity, no overlap, complete coverage and index bounds.
+- Added bounded retry with the validation error included in the next prompt; repeated failure falls back to duration-based candidate boundaries.
+- Registered the component, added language catalog support as `*`, added `configs/th_th_qwen_boundary.json`, and documented the API contract in `docs/models/qwen_semantic_boundary.md`.
+- Validation passed: `tests.test_qwen_semantic_boundary`, full unit discover, compileall, all config parse, `query_models.py language th_th --role punc`, `git diff --check`, and a real Thai Qwen adapter smoke on the existing timestamp sample.
+
 - [x] Current work: read `/data/duhu/FireRedASR2S/docs/qwen_api.md` and identify the local Qwen API contract.
 - [x] Current work: prepare a Thai token/text sample suitable for sentence-boundary testing.
 - [x] Current work: call Qwen with a JSON-only prompt for Thai semantic sentence spans.

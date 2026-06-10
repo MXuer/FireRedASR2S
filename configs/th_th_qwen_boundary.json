@@ -1,0 +1,34 @@
+{
+  "name": "th_th_qwen_boundary",
+  "language": "th_th",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "use_gpu": true
+      }
+    },
+    "asr": {
+      "name": "whisper_large"
+    },
+    "timestamp": {
+      "name": "whisper_native"
+    },
+    "punc": {
+      "name": "qwen_semantic_boundary",
+      "params": {
+        "base_url": "http://10.10.23.16:18000/v1",
+        "model": "Qwen3.6-27B",
+        "max_retries": 1,
+        "disable_thinking": true,
+        "fallback_max_span_s": 15.0
+      }
+    }
+  },
+  "pipeline": {
+    "strip_punctuation_before_punc": false
+  },
+  "output": {
+    "outdir": "output/experiments/th_th_qwen_boundary"
+  }
+}

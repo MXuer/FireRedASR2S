@@ -47,6 +47,12 @@ Current state:
   - registry name: `naqta`;
   - language support: Arabic profiles such as `ar_sa`;
   - docs, standalone skip-load test and `configs/ar_sa_naqta.json` were added.
+- Added Qwen semantic-boundary prompting as a `punc` component:
+  - adapter: `semantic_asr.adapters.qwen_semantic_boundary`;
+  - registry name: `qwen_semantic_boundary`;
+  - the component returns index-only sentence boundary candidates and never
+    rewrites ASR text;
+  - docs and `configs/th_th_qwen_boundary.json` were added.
 - Added MMS forced aligner as a `timestamp` component:
   - adapter: `semantic_asr.adapters.mms_forced_aligner`;
   - registry name: `mms_forced_aligner`;
@@ -95,6 +101,16 @@ Current state:
   boundary in sentence fusion. The default threshold is 1.0s.
 
 Recent validation:
+
+- Implemented the Qwen index-only semantic-boundary component with strict JSON
+  validation, bounded retry and duration-based fallback candidate boundaries.
+  The component sends `chat_template_kwargs={"enable_thinking": false}`, asks
+  for `{"token_count": N, "end_indices": [...]}`, and reconstructs text only
+  from original timestamp tokens.
+- Validation passed: `tests.test_qwen_semantic_boundary`, full unit discover
+  (100 tests), `compileall semantic_asr tests`, config parse for all 13 JSON
+  profiles, `query_models.py language th_th --role punc`, `git diff --check`,
+  and a real local-Qwen adapter smoke on the existing Thai timestamp sample.
 
 - Qwen3.6-27B local API smoke-tested for Thai semantic sentence-boundary use:
   `/v1/models` is reachable at `http://10.10.23.16:18000/v1` when run outside

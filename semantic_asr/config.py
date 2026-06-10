@@ -21,6 +21,9 @@ LANGUAGE_COMPONENTS = {
         "mms_forced_aligner",
         "qwen3_forced_aligner",
     },
+    "punc": {
+        "qwen_semantic_boundary",
+    },
 }
 
 
