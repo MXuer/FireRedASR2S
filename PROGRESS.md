@@ -16,7 +16,7 @@ Current state:
 - FireRed runtime code needed by the standalone project is vendored inside the pipeline package boundary.
 - Existing adapters include Silero VAD, Fun-ASR-Nano-2512, Whisper large, Qwen3-ForcedAligner and FireRed VAD/Punc runtime bridges.
 - Added language-specific profiles for `zh`, `en` and `ru`.
-- ASR VAD slicing uses semantic segment merge defaults: target at least 10s where possible, max 30s, and no merge across gaps above 3s.
+- ASR and timestamp providers now receive raw VAD speech segments directly; pre-ASR VAD merging was removed from the core pipeline.
 - Final output VAD formatting is separate from ASR slicing: short non-speech gaps can be merged, segments can be padded, and sentence boundaries are aligned to output VAD ranges.
 - Output writers support JSON, JSONL, CSV, SRT and TextGrid.
 - Added a registry/config composition layer:
@@ -24,11 +24,11 @@ Current state:
   - JSON/YAML pipeline profiles are validated and used to build `SemanticAsrPipeline`;
   - `run_pipeline.py` provides one config-driven CLI;
   - each run writes `resolved_config.json` by default.
-- Added config profiles for:
-  - Silero VAD + Fun-ASR-Nano native timestamps + FireRedPunc;
-  - Silero VAD + Whisper large native timestamps + ASR-native punctuation;
-  - FireRed VAD + Whisper large + Qwen3-ForcedAligner + ASR text punctuation for Russian.
-- Existing combination example scripts are compatibility wrappers around the config-driven runner.
+- Checked-in configs are language/scenario-named profiles under `configs/`.
+  The current set is `zh_cn`, `ar_sa`, `de_de`, `en_us`, `hakka`, `hi_in`,
+  `ja_jp`, `ko_kr`, `pt_br`, `ru_ru`, `th_th` and `vi_vn`.
+- Combination-specific example scripts and builder adapters were removed; use
+  `semantic_asr/run_pipeline.py` or `semantic_asr/run_batch.py`.
 - Fake registry/config smoke tests validate config parsing, component resolution and runner output writing.
 - Architecture diagram exists at `docs/architecture.drawio`.
 - Added model/language support metadata in `semantic_asr.language_support`.
@@ -90,6 +90,26 @@ Current state:
   short incomplete fragments still merge.
 
 Recent validation:
+
+- Simplified the public pipeline/config surface after pushing checkpoint
+  `04283fd` to `origin/red-asr`.
+- Removed legacy combination-specific configs, runner scripts and builder
+  adapters. The checked-in config set is now language/scenario named only:
+  `zh_cn`, `ar_sa`, `de_de`, `en_us`, `hakka`, `hi_in`, `ja_jp`, `ko_kr`,
+  `pt_br`, `ru_ru`, `th_th` and `vi_vn`.
+- Removed pre-ASR VAD merging from `SemanticAsrPipeline`; raw VAD speech
+  islands now feed ASR and timestamp providers directly.
+- Removed the final short-gap sentence merge pass. Boundary fusion is the
+  single sentence grouping stage.
+- Config files now rely on defaults for sentence-boundary fusion and output
+  flags. FireRed VAD/Punc config supports direct params such as `use_gpu` and
+  `extend_speech_frame`.
+- `semantic_asr.registry` and `semantic_asr.adapters` now import concrete model
+  adapters lazily, so parsing configs and querying the registry no longer loads
+  heavy model runtimes.
+- Cleanup validation passed: 90 unit tests, compileall, config parse for all 12
+  profiles, `query_models.py language ar_sa --role punc`, draw.io XML parse,
+  obsolete-field scan and `git diff --check`.
 
 - Removed RMS/waveform valley from the active sentence-boundary policy.
   Boundary fusion now uses raw VAD silence and frame-level speech probability

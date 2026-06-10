@@ -1,0 +1,31 @@
+{
+  "name": "zh_cn",
+  "language": "zh_cn",
+  "components": {
+    "vad": {
+      "name": "silero"
+    },
+    "asr": {
+      "name": "funasr_nano",
+      "params": {
+        "batch_size": 8
+      }
+    },
+    "timestamp": {
+      "name": "funasr_native"
+    },
+    "punc": {
+      "name": "firered_punc",
+      "params": {
+        "use_gpu": true
+      }
+    }
+  },
+  "pipeline": {
+    "asr_batch_size": 8,
+    "punc_batch_size": 8
+  },
+  "output": {
+    "outdir": "output/experiments/zh_cn"
+  }
+}

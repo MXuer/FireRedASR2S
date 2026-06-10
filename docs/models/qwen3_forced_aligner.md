@@ -49,9 +49,10 @@ older `torch.utils._pytree` API before importing Qwen/Transformers.
 
 ```bash
 CUDA_VISIBLE_DEVICES=4,5,6,7 conda run -n fireredasr2s \
-  python examples/run_fireredvad_whisper_qwenaligner_textpunc.py \
+  python semantic_asr/run_pipeline.py \
+  --config configs/ru_ru.json \
   --wav_path data/test/ru_ru.wav \
   --uttid ru_ru \
-  --device cuda:0 \
+  --outdir output/experiments/ru_ru \
   --max_seconds 60
 ```

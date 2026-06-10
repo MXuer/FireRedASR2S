@@ -76,10 +76,10 @@ Multilingual test-audio planning lives in
 
 ```bash
 python semantic_asr/run_pipeline.py \
-  --config configs/silero_funasr_fireredpunc.json \
+  --config configs/zh_cn.json \
   --wav_path data/test/short.wav \
   --uttid short \
-  --outdir output/experiments/silero_funasr_fireredpunc
+  --outdir output/experiments/zh_cn
 ```
 
 The runner writes:
@@ -109,15 +109,27 @@ and eight workers, each GPU gets two worker processes. If
 `CUDA_VISIBLE_DEVICES` is unset, the batch runner assumes eight device slots
 `0..7`.
 
-## Existing Profiles
+## Config Profiles
 
-- `configs/silero_funasr_fireredpunc.json`
-- `configs/silero_whisper_nativepunc.json`
-- `configs/fireredvad_whisper_qwenaligner_textpunc_ru.json`
-- `configs/tenvad_whisper_mms_nativepunc_pt_br.json`
+Profiles are named by language or project scenario. The current checked-in
+profiles are:
 
-The old example scripts in `examples/` are compatibility wrappers
-around the same config runner.
+- `configs/zh_cn.json`
+- `configs/ar_sa.json`
+- `configs/de_de.json`
+- `configs/en_us.json`
+- `configs/hakka.json`
+- `configs/hi_in.json`
+- `configs/ja_jp.json`
+- `configs/ko_kr.json`
+- `configs/pt_br.json`
+- `configs/ru_ru.json`
+- `configs/th_th.json`
+- `configs/vi_vn.json`
+
+Use `semantic_asr/run_pipeline.py` for single files and
+`semantic_asr/run_batch.py` for `wav.scp` batches. Old combination-specific
+runner scripts have been removed.
 
 ## Query Model Language Support
 

@@ -51,21 +51,11 @@ The final JSON records these as:
 
 ### 2. ASR Segment Selection
 
-Default behavior is raw-VAD ASR/timestamp processing:
+ASR and timestamp providers receive raw VAD speech islands directly. This is no
+longer configurable in the core pipeline.
 
-```json
-{
-  "pipeline": {
-    "merge_vad_segments": false
-  }
-}
-```
-
-Legacy merged-ASR context remains available with
-`pipeline.merge_vad_segments=true`. That path uses `vad_min_segment_s`,
-`vad_max_segment_s` and `vad_max_merge_gap_s`.
-
-The selected ASR inputs are stored as `asr_vad_segments_ms`.
+The selected ASR inputs are stored as `asr_vad_segments_ms`, which should match
+`raw_vad_segments_ms`.
 
 ### 3. ASR + Timestamp Provider
 
@@ -156,14 +146,11 @@ views.
 When `preserve_sentence_gaps=true`, kept gaps remain unassigned and this
 expansion is skipped.
 
-### 9. Final Short-Gap Merge
+### 9. Single Sentence Grouping Stage
 
-`merge_final_sentences_by_gap()` now runs only when sentence-boundary fusion is
-disabled.
-
-For fusion-enabled profiles, boundary fusion is the only sentence grouping
-stage. This avoids the previous failure mode where a late short-gap merge could
-undo a boundary that fusion had deliberately kept.
+Boundary fusion is the only sentence grouping stage. The old final short-gap
+merge pass was removed so post-processing cannot silently undo a boundary that
+fusion deliberately kept.
 
 ### 10. Cut Ranges And Exports
 
@@ -182,7 +169,8 @@ writer cannot represent, that is treated as a strategy bug.
 
 - Raw VAD, frame-level probability, token timestamps and punctuation are all
   visible in one decision trace.
-- Final short-gap merge no longer silently contradicts boundary fusion.
+- No final short-gap merge exists after boundary fusion, so grouping decisions
+  are traceable in one place.
 - High speech-probability boundaries are merged even when terminal punctuation
   exists.
 - `max_sentence_s` no longer forces a high-probability active-speech cut.
@@ -218,13 +206,12 @@ The flag currently affects:
 
 - boundary placement;
 - output VAD expansion;
-- final short-gap merge eligibility.
+- output VAD expansion.
 
 Cleaner future config names would be:
 
 - `preserve_annotation_gaps`
 - `align_annotations_to_output_vad`
-- `enable_legacy_final_gap_merge`
 
 ### 4. Annotation Times And Cut Times Are Easy To Confuse
 

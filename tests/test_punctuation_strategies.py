@@ -2,7 +2,6 @@ import unittest
 
 from semantic_asr.core import (
     add_sentence_cut_segments,
-    merge_final_sentences_by_gap,
     remove_sentence_cut_overlaps,
     remove_sentence_overlaps,
     SemanticAsrPipeline,
@@ -111,68 +110,6 @@ class PunctuationStrategyTest(unittest.TestCase):
 
         self.assertEqual(sentences[0]["end_ms"], 181972)
         self.assertEqual(sentences[1]["start_ms"], 181972)
-
-    def test_final_sentences_merge_incomplete_sentence_when_gap_is_short_and_duration_fits(self):
-        sentences = merge_final_sentences_by_gap([
-            {"start_ms": 0, "end_ms": 5000, "text": "first,", "asr_confidence": 0.8},
-            {"start_ms": 6500, "end_ms": 12000, "text": "second.", "asr_confidence": 0.7},
-        ])
-
-        self.assertEqual(len(sentences), 1)
-        self.assertEqual(sentences[0]["start_ms"], 0)
-        self.assertEqual(sentences[0]["end_ms"], 12000)
-        self.assertEqual(sentences[0]["text"], "first, second.")
-        self.assertEqual(sentences[0]["asr_confidence"], 0.7)
-
-    def test_final_sentences_do_not_merge_after_terminal_punctuation(self):
-        sentences = merge_final_sentences_by_gap([
-            {"start_ms": 17355, "end_ms": 25916, "text": "وما أدراك ما الحق؟", "asr_confidence": 0},
-            {"start_ms": 25916, "end_ms": 31935, "text": "كذبت ثمود وعاد بالقارعة", "asr_confidence": 0},
-        ])
-
-        self.assertEqual(len(sentences), 2)
-
-    def test_final_sentences_do_not_merge_when_combined_duration_exceeds_limit(self):
-        sentences = merge_final_sentences_by_gap([
-            {"start_ms": 0, "end_ms": 9000, "text": "first.", "asr_confidence": 0.8},
-            {"start_ms": 10000, "end_ms": 16000, "text": "second.", "asr_confidence": 0.7},
-        ])
-
-        self.assertEqual(len(sentences), 2)
-
-    def test_final_sentences_overlap_is_resolved_after_failed_duration_merge(self):
-        sentences = merge_final_sentences_by_gap(
-            [
-                {"start_ms": 71280, "end_ms": 82150, "text": "first.", "asr_confidence": 0.8},
-                {"start_ms": 82080, "end_ms": 92412, "text": "second.", "asr_confidence": 0.7},
-            ],
-            max_gap_s=2.0,
-            max_duration_s=15.0,
-        )
-        sentences = remove_sentence_overlaps(sentences)
-
-        self.assertEqual(len(sentences), 2)
-        self.assertEqual(sentences[0]["end_ms"], 82115)
-        self.assertEqual(sentences[1]["start_ms"], 82115)
-
-    def test_final_sentences_do_not_merge_when_gap_reaches_limit(self):
-        sentences = merge_final_sentences_by_gap([
-            {"start_ms": 0, "end_ms": 5000, "text": "first.", "asr_confidence": 0.8},
-            {"start_ms": 7000, "end_ms": 12000, "text": "second.", "asr_confidence": 0.7},
-        ])
-
-        self.assertEqual(len(sentences), 2)
-
-    def test_final_sentence_merge_can_be_disabled_with_nonpositive_gap(self):
-        sentences = merge_final_sentences_by_gap(
-            [
-                {"start_ms": 0, "end_ms": 5000, "text": "first.", "asr_confidence": 0.8},
-                {"start_ms": 5500, "end_ms": 9000, "text": "second.", "asr_confidence": 0.7},
-            ],
-            max_gap_s=0,
-        )
-
-        self.assertEqual(len(sentences), 2)
 
     def test_sentence_cut_segments_expand_to_overlapping_raw_vad_speech_islands(self):
         [sentence] = add_sentence_cut_segments(

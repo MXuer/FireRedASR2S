@@ -24,24 +24,10 @@ Most clips are 300 seconds. `ru_ru-short.wav` is 299.93 seconds and
 
 ## Config Change
 
-Every `configs/*.json` profile now enables:
-
-```json
-"sentence_boundary_fusion": {
-  "enabled": true,
-  "min_vad_silence_s": 0.2,
-  "max_vad_snap_gap_s": 1.0,
-  "merge_max_token_gap_s": 0.3,
-  "acoustic_window_s": 0.05,
-  "acoustic_context_s": 0.3,
-  "acoustic_valley_ratio": 0.25,
-  "target_sentence_s": 15.0,
-  "max_sentence_s": 30.0
-}
-```
-
-This includes the language-named profiles and the legacy combination profiles,
-so both entry styles use the same audio-safe sentence boundary policy.
+Sentence-boundary fusion is now the default pipeline policy, so language
+profiles do not need to repeat the default threshold block. Current checked-in
+profiles are language or scenario named; legacy combination profiles were
+removed after this experiment.
 
 ## Command
 
@@ -105,4 +91,3 @@ conda run -n fireredasr2s python -c '... verify all configs enable sentence_boun
 conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py'
 conda run -n fireredasr2s python -m compileall -q semantic_asr tests examples
 ```
-

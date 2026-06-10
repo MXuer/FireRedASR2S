@@ -1,10 +1,27 @@
 # Todo
 
-- [ ] Current work: checkpoint and push current `red-asr` state to GitHub before further simplification.
-- [ ] Current work: inspect configs and strategy code for historical compatibility clutter.
-- [ ] Current work: remove obsolete configs/options and simplify the public configuration surface.
-- [ ] Current work: run validation after simplification.
-- [ ] Current work: update docs/progress/TODO and commit the cleanup.
+- [x] Current work: checkpoint and push current `red-asr` state to GitHub before further simplification.
+- [x] Current work: inspect configs and strategy code for historical compatibility clutter.
+- [x] Current work: remove obsolete configs/options and simplify the public configuration surface.
+- [x] Current work: run validation after simplification.
+- [x] Current work: update docs/progress/TODO and commit the cleanup.
+
+Review:
+- First pushed checkpoint commit `04283fd` to `origin/red-asr`.
+- Removed legacy combination configs/scripts/builders and kept only language or
+  scenario named configs: `zh_cn`, `ar_sa`, `de_de`, `en_us`, `hakka`,
+  `hi_in`, `ja_jp`, `ko_kr`, `pt_br`, `ru_ru`, `th_th`, `vi_vn`.
+- Removed pre-ASR VAD merge and final short-gap sentence merge from the core
+  pipeline; raw VAD now feeds ASR/timestamp directly, and boundary fusion is
+  the single sentence grouping stage.
+- Simplified config files by relying on defaults and changed FireRed VAD/Punc
+  params to support direct fields such as `use_gpu` and
+  `extend_speech_frame`.
+- Made the registry and adapter package lightweight by lazy-importing concrete
+  model adapters only when components are built.
+- Validation passed: 90 full unit tests, compileall, config parse for all 12
+  profiles, `query_models.py language ar_sa --role punc`, draw.io XML parse,
+  obsolete-field scan and `git diff --check`.
 
 - [x] Current work: record implementation plan for speech-probability-first single-pass sentence grouping.
 - [x] Current work: remove RMS valley from boundary config, docs and config profiles.

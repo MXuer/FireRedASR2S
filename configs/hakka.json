@@ -5,11 +5,8 @@
     "vad": {
       "name": "firered_vad",
       "params": {
-        "model_dir": "pretrained_models/FireRedVAD/VAD",
-        "config": {
-          "use_gpu": true,
-          "extend_speech_frame": 20
-        }
+        "use_gpu": true,
+        "extend_speech_frame": 20
       }
     },
     "asr": {
@@ -20,37 +17,16 @@
       }
     },
     "timestamp": {
-      "name": "qwen3_forced_aligner",
-      "params": {
-        "model": "Qwen/Qwen3-ForcedAligner-0.6B",
-        "device_map": "cuda:0",
-        "batch_size": 4
-      }
+      "name": "qwen3_forced_aligner"
     },
     "punc": {
       "name": "asr_text"
     }
   },
   "pipeline": {
-    "asr_batch_size": 1,
-    "punc_batch_size": 1,
-    "strip_punctuation_before_punc": false,
-    "merge_vad_segments": false,
-    "preserve_sentence_gaps": false,
-    "sentence_boundary_fusion": {
-      "enabled": true,
-      "min_vad_silence_s": 0.2,
-      "max_vad_snap_gap_s": 1.0,
-      "merge_max_token_gap_s": 0.3,
-      "target_sentence_s": 15.0,
-      "max_sentence_s": 30.0
-    }
+    "strip_punctuation_before_punc": false
   },
   "output": {
-    "outdir": "output/experiments/hakka",
-    "write_textgrid": true,
-    "write_srt": true,
-    "write_csv": true,
-    "copy_resolved_config": true
+    "outdir": "output/experiments/hakka"
   }
 }

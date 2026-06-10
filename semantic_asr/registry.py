@@ -2,40 +2,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import fields, is_dataclass
 from typing import Any
 
-from semantic_asr.adapters.firered import build_firered_punc
-from semantic_asr.adapters.funasr_nano import (
-    FunAsrNano,
-    FunAsrNanoConfig,
-    FunAsrNanoTimestampProvider,
-)
-from semantic_asr.adapters.dolphin import DolphinAsr, DolphinAsrConfig
-from semantic_asr.adapters.qwen3_forced_aligner import (
-    Qwen3ForcedAlignerConfig,
-    Qwen3ForcedAlignerTimestampProvider,
-)
-from semantic_asr.adapters.mms_forced_aligner import (
-    MmsForcedAlignerConfig,
-    MmsForcedAlignerTimestampProvider,
-)
-from semantic_asr.adapters.naqta_punctuation import NaqtaPunctuation, NaqtaPunctuationConfig
-from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig
-from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
-from semantic_asr.adapters.silero import SileroVad, SileroVadConfig
-from semantic_asr.adapters.ten_vad import TenVadAdapter, TenVadConfig
-from semantic_asr.adapters.whisper_large import (
-    WhisperLarge,
-    WhisperLargeConfig,
-    WhisperLargeTimestampProvider,
-)
-from semantic_asr.adapters.xlm_roberta_punctuation import (
-    XlmRobertaPunctuation,
-    XlmRobertaPunctuationConfig,
-)
 from semantic_asr.core import AsrModel, PuncModel, TimestampProvider, VadModel
-from semantic_asr.firered_runtime.fireredpunc import FireRedPuncConfig
-from semantic_asr.firered_runtime.fireredvad import FireRedVad, FireRedVadConfig
-from semantic_asr.punctuation import AsrNativePunc, AsrTextPunc
-from semantic_asr.parallel_components import ParallelAsrModel, ParallelTimestampProvider
 
 Factory = Callable[[Mapping[str, Any]], Any]
 
@@ -84,37 +51,49 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("asr", "qwen3_asr_1_7b", _build_qwen3_asr)
     registry.register("asr", "dolphin", _build_dolphin)
     registry.register("asr", "seamless_m4t_v2_large", _build_seamless_m4t)
-    registry.register("timestamp", "funasr_native", lambda params: FunAsrNanoTimestampProvider())
-    registry.register("timestamp", "whisper_native", lambda params: WhisperLargeTimestampProvider())
+    registry.register("timestamp", "funasr_native", _build_funasr_native_timestamp)
+    registry.register("timestamp", "whisper_native", _build_whisper_native_timestamp)
     registry.register("timestamp", "qwen3_forced_aligner", _build_qwen3_forced_aligner)
     registry.register("timestamp", "mms_forced_aligner", _build_mms_forced_aligner)
     registry.register("punc", "firered_punc", _build_firered_punc)
-    registry.register("punc", "asr_native", lambda params: AsrNativePunc())
-    registry.register("punc", "asr_text", lambda params: AsrTextPunc())
+    registry.register("punc", "asr_native", _build_asr_native_punc)
+    registry.register("punc", "asr_text", _build_asr_text_punc)
     registry.register("punc", "naqta", _build_naqta_punctuation)
     registry.register("punc", "xlm_roberta_punctuation", _build_xlm_roberta_punctuation)
     return registry
 
 
 def _build_silero_vad(params: Mapping[str, Any]) -> VadModel:
+    from semantic_asr.adapters.silero import SileroVad, SileroVadConfig
+
     return SileroVad(_dataclass_from_mapping(SileroVadConfig, params))
 
 
 def _build_ten_vad(params: Mapping[str, Any]) -> VadModel:
+    from semantic_asr.adapters.ten_vad import TenVadAdapter, TenVadConfig
+
     return TenVadAdapter(_dataclass_from_mapping(TenVadConfig, params))
 
 
 def _build_firered_vad(params: Mapping[str, Any]) -> VadModel:
+    from semantic_asr.firered_runtime.fireredvad import FireRedVad, FireRedVadConfig
+
     model_dir = str(params.get("model_dir", "pretrained_models/FireRedVAD/VAD"))
-    config = _dataclass_from_mapping(FireRedVadConfig, params.get("config", {}))
+    config_params = _nested_or_direct_config(params, FireRedVadConfig)
+    config = _dataclass_from_mapping(FireRedVadConfig, config_params)
     return FireRedVad.from_pretrained(model_dir, config)
 
 
 def _build_funasr_nano(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.funasr_nano import FunAsrNano, FunAsrNanoConfig
+
     return FunAsrNano(_dataclass_from_mapping(FunAsrNanoConfig, params))
 
 
 def _build_whisper_large(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.whisper_large import WhisperLarge, WhisperLargeConfig
+    from semantic_asr.parallel_components import ParallelAsrModel
+
     config = _dataclass_from_mapping(WhisperLargeConfig, params)
     if config.num_workers > 1:
         return ParallelAsrModel(WhisperLarge, config, config.num_workers)
@@ -122,22 +101,51 @@ def _build_whisper_large(params: Mapping[str, Any]) -> AsrModel:
 
 
 def _build_qwen3_asr(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig
+
     return Qwen3Asr(_dataclass_from_mapping(Qwen3AsrConfig, params))
 
 
 def _build_dolphin(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.dolphin import DolphinAsr, DolphinAsrConfig
+
     return DolphinAsr(_dataclass_from_mapping(DolphinAsrConfig, params))
 
 
 def _build_seamless_m4t(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
+
     return SeamlessM4TAsr(_dataclass_from_mapping(SeamlessM4TConfig, params))
 
 
+def _build_funasr_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
+    from semantic_asr.adapters.funasr_nano import FunAsrNanoTimestampProvider
+
+    return FunAsrNanoTimestampProvider()
+
+
+def _build_whisper_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
+    from semantic_asr.adapters.whisper_large import WhisperLargeTimestampProvider
+
+    return WhisperLargeTimestampProvider()
+
+
 def _build_qwen3_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
+    from semantic_asr.adapters.qwen3_forced_aligner import (
+        Qwen3ForcedAlignerConfig,
+        Qwen3ForcedAlignerTimestampProvider,
+    )
+
     return Qwen3ForcedAlignerTimestampProvider(_dataclass_from_mapping(Qwen3ForcedAlignerConfig, params))
 
 
 def _build_mms_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
+    from semantic_asr.adapters.mms_forced_aligner import (
+        MmsForcedAlignerConfig,
+        MmsForcedAlignerTimestampProvider,
+    )
+    from semantic_asr.parallel_components import ParallelTimestampProvider
+
     config = _dataclass_from_mapping(MmsForcedAlignerConfig, params)
     if config.num_workers > 1:
         return ParallelTimestampProvider(MmsForcedAlignerTimestampProvider, config, config.num_workers)
@@ -145,16 +153,39 @@ def _build_mms_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
 
 
 def _build_firered_punc(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.adapters.firered import build_firered_punc
+    from semantic_asr.firered_runtime.fireredpunc import FireRedPuncConfig
+
     model_dir = str(params.get("model_dir", "pretrained_models/FireRedPunc"))
-    config = _dataclass_from_mapping(FireRedPuncConfig, params.get("config", {}))
+    config_params = _nested_or_direct_config(params, FireRedPuncConfig)
+    config = _dataclass_from_mapping(FireRedPuncConfig, config_params)
     return build_firered_punc(model_dir, config)
 
 
+def _build_asr_native_punc(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.punctuation import AsrNativePunc
+
+    return AsrNativePunc()
+
+
+def _build_asr_text_punc(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.punctuation import AsrTextPunc
+
+    return AsrTextPunc()
+
+
 def _build_xlm_roberta_punctuation(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.adapters.xlm_roberta_punctuation import (
+        XlmRobertaPunctuation,
+        XlmRobertaPunctuationConfig,
+    )
+
     return XlmRobertaPunctuation(_dataclass_from_mapping(XlmRobertaPunctuationConfig, params))
 
 
 def _build_naqta_punctuation(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.adapters.naqta_punctuation import NaqtaPunctuation, NaqtaPunctuationConfig
+
     return NaqtaPunctuation(_dataclass_from_mapping(NaqtaPunctuationConfig, params))
 
 
@@ -167,3 +198,17 @@ def _dataclass_from_mapping(cls, values: Mapping[str, Any]):
     if unknown:
         raise ValueError(f"Unknown fields for {cls.__name__}: {', '.join(unknown)}")
     return cls(**kwargs)
+
+
+def _nested_or_direct_config(params: Mapping[str, Any], config_cls) -> dict:
+    values = dict(params.get("config", {}))
+    config_fields = {field.name for field in fields(config_cls)}
+    direct_unknown = sorted(set(params) - {"model_dir", "config"} - config_fields)
+    if direct_unknown:
+        raise ValueError(f"Unknown fields for {config_cls.__name__}: {', '.join(direct_unknown)}")
+    for key, value in params.items():
+        if key in {"model_dir", "config"}:
+            continue
+        if key in config_fields:
+            values[key] = value
+    return values

@@ -1,6 +1,6 @@
 import re
 import logging
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from typing import Any, Protocol, Sequence
 
 import soundfile as sf
@@ -12,7 +12,6 @@ from semantic_asr.sentence_boundaries import (
 )
 
 logger = logging.getLogger("semantic_asr.core")
-_FINAL_TERMINAL_PUNCTUATION = re.compile(r"[。.!?！？؟]+[\s\"'”’)]*$")
 
 
 @dataclass
@@ -21,16 +20,12 @@ class PipelineConfig:
     punc_batch_size: int = 1
     sample_rate: int | None = None
     strip_punctuation_before_punc: bool = True
-    merge_vad_segments: bool = False
-    vad_min_segment_s: float = 10.0
-    vad_max_segment_s: float = 30.0
-    vad_max_merge_gap_s: float = 3.0
     output_vad_min_silence_merge_s: float = 0.2
     output_vad_pad_s: float = 0.2
-    final_sentence_merge_max_gap_s: float = 2.0
-    final_sentence_merge_max_duration_s: float = 15.0
     preserve_sentence_gaps: bool = False
-    sentence_boundary_fusion: SentenceBoundaryFusionConfig | dict | None = None
+    sentence_boundary_fusion: SentenceBoundaryFusionConfig | dict | None = field(
+        default_factory=lambda: SentenceBoundaryFusionConfig(enabled=True)
+    )
 
 
 @dataclass
@@ -84,8 +79,7 @@ class SemanticAsrPipeline:
             assert sample_rate == self.config.sample_rate
 
         raw_vad_result = self._detect(wav_path)
-        vad_result = self._postprocess_vad(raw_vad_result)
-        segments = self._build_segments(uttid, wav_np, sample_rate, vad_result["timestamps"])
+        segments = self._build_segments(uttid, wav_np, sample_rate, raw_vad_result["timestamps"])
         asr_results, asr_segments = self._transcribe(segments)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
         self._require_timestamps(asr_results)
@@ -112,13 +106,6 @@ class SemanticAsrPipeline:
         if not self.config.preserve_sentence_gaps:
             sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
         sentences = remove_sentence_overlaps(sentences)
-        if not self.config.preserve_sentence_gaps and not boundary_config.enabled:
-            sentences = merge_final_sentences_by_gap(
-                sentences,
-                max_gap_s=self.config.final_sentence_merge_max_gap_s,
-                max_duration_s=self.config.final_sentence_merge_max_duration_s,
-            )
-            sentences = remove_sentence_overlaps(sentences)
         sentences = add_sentence_cut_segments(sentences, self._segments_ms(raw_vad_result["timestamps"]))
 
         text = "".join(s["text"] for s in sentences)
@@ -132,7 +119,7 @@ class SemanticAsrPipeline:
             "raw_vad_segments_ms": [
                 (int(s * 1000), int(e * 1000)) for s, e in raw_vad_result["timestamps"]
             ],
-            "asr_vad_segments_ms": self._segments_ms(vad_result["timestamps"]),
+            "asr_vad_segments_ms": self._segments_ms(raw_vad_result["timestamps"]),
             "dur_s": dur_s,
             "words": words,
             "timestamp_segments": timestamp_segments,
@@ -150,23 +137,9 @@ class SemanticAsrPipeline:
         logger.info("VAD: %s", _compact_vad_for_log(vad_result))
         if not vad_result.get("timestamps"):
             raise ValueError("VAD must return non-empty timestamps")
+        vad_result = dict(vad_result)
+        vad_result["timestamps"] = _normalize_segments(vad_result["timestamps"])
         return vad_result
-
-    def _postprocess_vad(self, vad_result: dict) -> dict:
-        if self.config.merge_vad_segments:
-            segments = merge_vad_segments(
-                vad_result["timestamps"],
-                min_segment_s=self.config.vad_min_segment_s,
-                max_segment_s=self.config.vad_max_segment_s,
-                max_merge_gap_s=self.config.vad_max_merge_gap_s,
-            )
-        else:
-            segments = _normalize_segments(vad_result["timestamps"])
-        logger.info("VAD ASR segments: %s", segments)
-
-        result = dict(vad_result)
-        result["timestamps"] = segments
-        return result
 
     def _format_output_vad_segments(
         self,
@@ -400,31 +373,6 @@ def merge_close_vad_segments(
     return merged
 
 
-def merge_vad_segments(
-    timestamps: Sequence[tuple[float, float]],
-    min_segment_s: float = 10.0,
-    max_segment_s: float = 40.0,
-    max_merge_gap_s: float = 3.0,
-) -> list[tuple[float, float]]:
-    segments = _normalize_segments(timestamps)
-    if not segments:
-        return []
-
-    merged = []
-    cur_start, cur_end = segments[0]
-    for start, end in segments[1:]:
-        gap_s = start - cur_end
-        can_merge = gap_s <= max_merge_gap_s and (end - cur_start) <= max_segment_s
-        if can_merge:
-            cur_end = max(cur_end, end)
-            continue
-        merged.append((cur_start, cur_end))
-        cur_start, cur_end = start, end
-    merged.append((cur_start, cur_end))
-
-    return merged
-
-
 def pad_vad_segments(
     timestamps: Sequence[tuple[float, float]],
     dur_s: float,
@@ -502,44 +450,6 @@ def remove_sentence_overlaps(sentences: Sequence[dict]) -> list[dict]:
     return adjusted
 
 
-def merge_final_sentences_by_gap(
-    sentences: Sequence[dict],
-    max_gap_s: float = 2.0,
-    max_duration_s: float = 15.0,
-) -> list[dict]:
-    if not sentences:
-        return []
-    if max_gap_s <= 0 or max_duration_s <= 0:
-        return [dict(sentence) for sentence in sentences]
-
-    max_gap_ms = int(max_gap_s * 1000)
-    max_duration_ms = int(max_duration_s * 1000)
-    merged = [dict(sentences[0])]
-    for sentence_source in sentences[1:]:
-        previous = merged[-1]
-        current = dict(sentence_source)
-        gap_ms = current["start_ms"] - previous["end_ms"]
-        combined_duration_ms = current["end_ms"] - previous["start_ms"]
-        if (
-            gap_ms < max_gap_ms
-            and combined_duration_ms <= max_duration_ms
-            and not _has_final_terminal_punctuation(previous.get("text", ""))
-        ):
-            previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
-            previous["text"] = _join_final_sentence_text(previous["text"], current["text"])
-            previous["asr_confidence"] = min(
-                previous.get("asr_confidence", 0),
-                current.get("asr_confidence", 0),
-            )
-            continue
-        merged.append(current)
-    return merged
-
-
-def _has_final_terminal_punctuation(text: str) -> bool:
-    return bool(_FINAL_TERMINAL_PUNCTUATION.search(str(text).strip()))
-
-
 def add_sentence_cut_segments(
     sentences: Sequence[dict],
     raw_vad_segments_ms: Sequence[tuple[int, int]],
@@ -608,20 +518,6 @@ def _set_cut_end(sentence: dict, end_ms: int) -> None:
     if not sentence["cut_segments_ms"]:
         start_ms = int(sentence.get("cut_start_ms", sentence["start_ms"]))
         sentence["cut_segments_ms"] = [[start_ms, max(start_ms, sentence["cut_end_ms"])]]
-
-
-def _join_final_sentence_text(previous: str, current: str) -> str:
-    previous = previous.rstrip()
-    current = current.lstrip()
-    if not previous:
-        return current
-    if not current:
-        return previous
-    separator = "" if _CJK_BOUNDARY.search(previous[-1]) and _CJK_BOUNDARY.search(current[0]) else " "
-    return previous + separator + current
-
-
-_CJK_BOUNDARY = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
 
 
 SentenceAsrPipeline = SemanticAsrPipeline

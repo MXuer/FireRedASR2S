@@ -109,15 +109,13 @@ When enabled:
 - raw-VAD-silence boundaries use the two silence edges instead of one midpoint;
 - probability-supported boundaries use the token gap when available;
 - output VAD expansion is skipped;
-- final short-gap merging is skipped.
+- sentence grouping remains entirely inside boundary fusion.
 
-## Final Short-Gap Merge
+## Single Grouping Stage
 
-`merge_final_sentences_by_gap()` still exists for legacy/non-fusion profiles.
-
-When `sentence_boundary_fusion.enabled = true`, this final merge pass is
-disabled. Boundary fusion is the single sentence-grouping stage, so a later
-merge cannot silently undo a kept semantic/audio-safe boundary.
+Boundary fusion is the only sentence-grouping stage. There is no later
+short-gap sentence merge pass, so a kept semantic/audio-safe boundary cannot be
+silently undone by post-processing.
 
 ## Debug Fields
 

@@ -13,15 +13,15 @@
 - The punctuation stage is mandatory, but it may be either an external punctuation model or an ASR-native punctuation strategy.
 - External re-punctuation strips existing punctuation from token timestamps before calling the punctuation model.
 - FireRed runtime code needed by `semantic_asr` is vendored under `semantic_asr.firered_runtime` for future standalone maintenance.
-- Language-specific module combinations and parameters are represented as explicit profiles in `semantic_asr.language_configs`.
-- ASR VAD slicing is post-processed by default into longer semantic segments with target constraints: minimum 10s where possible, maximum 30s and no merge across gaps above 3s.
+- Language-specific module combinations and parameters are represented as explicit JSON/YAML profiles under top-level `configs/`.
+- ASR and timestamp providers receive raw VAD speech segments directly; pre-ASR VAD merging is removed from the core pipeline.
 - Final output VAD segments are formatted separately: adjacent speech separated by less than 500ms silence is merged, then output segments are padded by 100ms on both sides without crossing adjacent segment boundaries.
 - Sentence boundaries are aligned to final output VAD segment boundaries, so downstream JSON/TextGrid/SRT/CSV exports see the same merged and padded ranges.
-- Pipeline composition now has a registry/config path in addition to the existing combination builders.
+- Pipeline composition uses the registry/config path; old combination builders are removed.
 - Config profiles must declare all four roles explicitly: `vad`, `asr`, `timestamp`, and `punc`; no role is inferred or optional.
 - Component config files are JSON/YAML serializable and should capture model/device/language/batching/output policy for experiment provenance.
 - The config runner writes `resolved_config.json` into the output directory by default, so each experiment records the exact component names and params used.
-- Existing combination scripts remain temporarily, but the intended long-term entrypoint is one config-driven `run_pipeline.py`.
+- The long-term entrypoints are the config-driven `semantic_asr/run_pipeline.py` and `semantic_asr/run_batch.py`; combination-specific runner scripts are removed.
 - Model language support is tracked separately from pipeline profiles in `semantic_asr.language_support`.
 - Language queries return role-grouped options rather than a single recommended pipeline, because ASR-native timestamps and forced-aligner availability can change the valid combination.
 - New ASR adapters must record whether they provide native timestamps, native punctuation and batch inference in the language support catalog.

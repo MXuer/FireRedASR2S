@@ -1,7 +1,6 @@
 import unittest
 
 from semantic_asr.language_mapping import canonical_language_id, dolphin_language, model_language, require_canonical_language_id
-from semantic_asr.language_configs import resolve_language_profile
 
 
 class LanguageMappingTest(unittest.TestCase):
@@ -25,10 +24,6 @@ class LanguageMappingTest(unittest.TestCase):
     def test_rejects_unsupported_model_language(self):
         with self.assertRaisesRegex(ValueError, "funasr_nano does not support"):
             model_language("funasr_nano", "th_th")
-
-    def test_legacy_language_profile_resolver_uses_canonical_ids(self):
-        self.assertEqual(resolve_language_profile("zh").language, "zh_cn")
-        self.assertEqual(resolve_language_profile("ru-ru").language, "ru_ru")
 
 
 if __name__ == "__main__":

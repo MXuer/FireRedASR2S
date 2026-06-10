@@ -199,28 +199,9 @@ class ConfigRunnerTest(unittest.TestCase):
 
         result = pipeline.process(self._write_silence_wav(), "sample")
 
-        self.assertFalse(profile.pipeline.merge_vad_segments)
         self.assertEqual(fake_timestamp.segment_ranges, [(0.0, 0.4), (0.5, 1.0)])
         self.assertEqual(result["raw_vad_segments_ms"], [(0, 400), (500, 1000)])
         self.assertEqual(result["asr_vad_segments_ms"], [(0, 400), (500, 1000)])
-
-    def test_explicit_merge_vad_segments_keeps_legacy_asr_context_merge(self):
-        raw = fake_profile()
-        raw["pipeline"]["merge_vad_segments"] = True
-        raw["pipeline"]["vad_min_segment_s"] = 1.0
-        raw["pipeline"]["vad_max_segment_s"] = 2.0
-        profile = parse_pipeline_profile(raw)
-        fake_timestamp = FakeTimestampProvider()
-        pipeline = build_pipeline_from_profile(
-            profile,
-            registry=fake_registry_with_instances(FakeAsr(), fake_timestamp),
-        )
-
-        result = pipeline.process(self._write_silence_wav(), "sample")
-
-        self.assertEqual(fake_timestamp.segment_ranges, [(0.0, 1.0)])
-        self.assertEqual(result["raw_vad_segments_ms"], [(0, 400), (500, 1000)])
-        self.assertEqual(result["asr_vad_segments_ms"], [(0, 1000)])
 
     @staticmethod
     def _write_silence_wav() -> str:

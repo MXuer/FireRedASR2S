@@ -40,35 +40,22 @@ VAD -> ASR -> TimestampProvider -> Punc -> sentence output
 results and their matching VAD audio segments. A future Qwen3-ForcedAligner or
 MMS adapter should implement that method.
 
-## Language Profiles
+## Config Profiles
 
 Different languages can use different VAD, ASR, timestamp and punctuation
-combinations. `semantic_asr.language_configs` stores explicit language
-profiles, including module builder names and per-component parameters. For
-example, Russian can use FireRed VAD, Whisper ASR, Qwen3 forced alignment and
-Whisper text punctuation.
+combinations. Profiles live as JSON files under top-level `configs/`, and
+`semantic_asr.config` builds them through the component registry.
 
 ## ASR And Timestamp VAD Policy
 
-By default, ASR and timestamp providers receive the raw VAD speech segments.
+ASR and timestamp providers receive the raw VAD speech segments.
 For forced aligners such as MMS, this keeps alignment audio close to the
 detected speech and avoids assigning leading or trailing silence to the first
 or last token.
 
-The legacy ASR-context merge policy is still available by setting
-`pipeline.merge_vad_segments=true`. When enabled, it merges adjacent VAD
-segments into longer chunks:
-
-- target at least 10 seconds per segment
-- never exceed 30 seconds per merged segment by default
-- do not merge across a silence gap greater than 3 seconds
-
-If a segment is still shorter than 10 seconds because the surrounding gaps are
-too large, it is kept as-is.
-
 Semantic sentence merging happens after timestamps are available, using
 punctuation, token timestamps, raw VAD, frame-level VAD speech probabilities
-and acoustic evidence.
+and sentence-boundary fusion.
 
 ## Output VAD Segment Policy
 

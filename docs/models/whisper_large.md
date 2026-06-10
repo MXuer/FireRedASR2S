@@ -71,8 +71,9 @@ punctuation splitting.
 
 ```bash
 CUDA_VISIBLE_DEVICES=4,5,6,7 conda run -n fireredasr2s \
-  python examples/run_silero_whisper_nativepunc.py \
+  python semantic_asr/run_pipeline.py \
+  --config configs/en_us.json \
   --wav_path data/test/short.wav \
   --uttid short \
-  --device cuda:0
+  --outdir output/experiments/en_us
 ```

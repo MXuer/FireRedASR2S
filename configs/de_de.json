@@ -11,38 +11,20 @@
     "asr": {
       "name": "whisper_large",
       "params": {
-        "model_name": "large-v3",
-        "device": "cuda:0",
         "word_timestamps": false
       }
     },
     "timestamp": {
-      "name": "mms_forced_aligner",
-      "params": {}
+      "name": "mms_forced_aligner"
     },
     "punc": {
       "name": "asr_text"
     }
   },
   "pipeline": {
-    "asr_batch_size": 1,
-    "punc_batch_size": 1,
-    "strip_punctuation_before_punc": false,
-    "final_sentence_merge_max_duration_s": 30,
-    "sentence_boundary_fusion": {
-      "enabled": true,
-      "min_vad_silence_s": 0.2,
-      "max_vad_snap_gap_s": 1.0,
-      "merge_max_token_gap_s": 0.3,
-      "target_sentence_s": 15.0,
-      "max_sentence_s": 30.0
-    }
+    "strip_punctuation_before_punc": false
   },
   "output": {
-    "outdir": "output/experiments/multilingual_5min/de_de",
-    "write_textgrid": true,
-    "write_srt": true,
-    "write_csv": true,
-    "copy_resolved_config": true
+    "outdir": "output/experiments/de_de"
   }
 }

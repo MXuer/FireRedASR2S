@@ -104,7 +104,6 @@ Codex 多轮定位了 Arabic 和 Portuguese 的边界问题，并逐步演进了
   - `docs/test_audio_matrix.md`
   - `examples/run_multilingual_smoke_tests.py`
 - 记录真实实验结果：
-  - `docs/experiments/tenvad_whisper_mms_nativepunc_pt_br.md`
   - `docs/experiments/multilingual_smoke_20260604.md`
   - `docs/sentence_boundary_fusion.md`
 
@@ -145,7 +144,7 @@ Codex 多轮定位了 Arabic 和 Portuguese 的边界问题，并逐步演进了
   - `configs/ru_ru.json`
   - `configs/th_th.json`
   - `configs/vi_vn.json`
-  - `configs/tenvad_whisper_mms_nativepunc_pt_br.json`
+  - `configs/zh_cn.json`
 - 核心边界融合逻辑：
   - `semantic_asr/sentence_boundaries.py`
 - 输出格式支持：
@@ -170,10 +169,10 @@ Codex 多轮定位了 Arabic 和 Portuguese 的边界问题，并逐步演进了
 
 ### 最近真实实验结果
 
-Portuguese raw-align semantic-completeness retest：
+Portuguese raw-align semantic-completeness historical retest：
 
 ```text
-output/experiments/tenvad_whisper_mms_nativepunc_pt_br_semantic/pt_br_tenvad_semantic.json
+historical Portuguese semantic-completeness output JSON
 ```
 
 结果：

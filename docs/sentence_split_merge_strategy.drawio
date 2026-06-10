@@ -11,7 +11,7 @@
         <mxCell id="raw_vad" value="1. Raw VAD&#xa;timestamps + optional frame_speech_probs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="80" y="100" width="260" height="80" as="geometry"/>
         </mxCell>
-        <mxCell id="asr_segments" value="2. ASR Segment Selection&#xa;default: raw VAD&#xa;legacy: merge_vad_segments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="asr_segments" value="2. ASR Segment Selection&#xa;raw VAD speech islands only&#xa;asr_vad_segments_ms == raw_vad_segments_ms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="390" y="100" width="260" height="80" as="geometry"/>
         </mxCell>
         <mxCell id="asr_ts" value="3. ASR + Timestamp Provider&#xa;text + token timestamps" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
@@ -43,7 +43,7 @@
         <mxCell id="align" value="9. Align Sentences To Output VAD&#xa;if preserve_sentence_gaps = false&#xa;expand first/last sentence touching each VAD island" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="430" y="590" width="360" height="100" as="geometry"/>
         </mxCell>
-        <mxCell id="final_merge" value="10. Legacy Final Short-Gap Merge&#xa;runs only when sentence_boundary_fusion is disabled&#xa;fusion-enabled profiles use boundary fusion as the single grouping stage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="final_merge" value="10. Single Grouping Stage&#xa;no final sentence merge pass&#xa;boundary decisions live in sentence_boundary_decisions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="840" y="590" width="360" height="110" as="geometry"/>
         </mxCell>
         <mxCell id="cut_ranges" value="11. Cut Ranges&#xa;intersect sentence spans with raw VAD&#xa;add cut_segments_ms / cut_start_ms / cut_end_ms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
