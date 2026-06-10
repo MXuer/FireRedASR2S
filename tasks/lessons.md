@@ -16,3 +16,4 @@
 - Normalize final sentence intervals after output VAD alignment and before any output writer; all JSON, CSV, SRT and TextGrid outputs must receive the same monotonic, non-overlapping sentence list.
 - When snapping a sentence boundary to VAD silence, restrict the search to a nearby candidate-boundary gap; do not use a distant silence inside a large aligned-word gap because it can incorrectly expand sentence intervals.
 - Treat target duration as a pressure signal, but keep maximum duration bounded. When no audio-safe boundary exists after `max_sentence_s`, use a semantic-complete active-speech boundary as the least-bad cap; only semantic-incomplete active boundaries should keep waiting for silence.
+- Do not merge across long raw-VAD pauses. If the silence between adjacent speech islands reaches `max_merge_vad_silence_s` (default 1.0s), keep the boundary even when punctuation suggests a continuation.

@@ -16,6 +16,7 @@ _CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
 class SentenceBoundaryFusionConfig:
     enabled: bool = False
     min_vad_silence_s: float = 0.2
+    max_merge_vad_silence_s: float = 1.0
     max_vad_snap_gap_s: float = 1.0
     merge_max_token_gap_s: float = 0.3
     target_sentence_s: float = 15.0
@@ -38,6 +39,7 @@ class BoundaryCandidate:
     boundary_ms: int
     same_raw_vad: bool
     vad_silence: tuple[int, int] | None
+    long_vad_silence: bool
     speech_stats: dict
     prob_supported_silence: bool
     prob_active_boundary: bool
@@ -113,6 +115,7 @@ def fuse_sentence_boundaries(
             "semantic_complete": candidate.semantic_complete,
             "semantic_reason": candidate.semantic_reason,
             "vad_silence_ms": list(candidate.vad_silence) if candidate.vad_silence is not None else None,
+            "long_vad_silence": candidate.long_vad_silence,
             "speech_prob_min": _round_optional(candidate.speech_stats["min"]),
             "speech_prob_mean": _round_optional(candidate.speech_stats["mean"]),
             "speech_prob_max": _round_optional(candidate.speech_stats["max"]),
@@ -152,6 +155,13 @@ def _boundary_candidate(
             current["start_ms"],
             int(config.min_vad_silence_s * 1000),
         )
+    long_vad_silence = _supported_vad_silence(
+        raw_vad,
+        previous_end_ms,
+        current_start_ms,
+        int(config.max_merge_vad_silence_s * 1000),
+    )
+    vad_silence = vad_silence or long_vad_silence
 
     same_raw_vad = _same_raw_vad_segment(raw_vad, previous["end_ms"], current["start_ms"])
     boundary_ms = (previous_end_ms + current_start_ms) // 2
@@ -211,6 +221,7 @@ def _boundary_candidate(
         boundary_ms=boundary_ms,
         same_raw_vad=same_raw_vad,
         vad_silence=vad_silence,
+        long_vad_silence=long_vad_silence is not None,
         speech_stats=speech_stats,
         prob_supported_silence=prob_supported_silence,
         prob_active_boundary=prob_active_boundary,
@@ -228,6 +239,9 @@ def _decide_boundary(candidate: BoundaryCandidate, config: SentenceBoundaryFusio
     max_ms = int(config.max_sentence_s * 1000)
     over_max = candidate.combined_duration_ms > max_ms
     reached_target = candidate.combined_duration_ms >= target_ms
+
+    if candidate.long_vad_silence:
+        return "keep", "long_vad_silence"
 
     if over_max:
         if candidate.audio_safe and not candidate.semantic_complete:

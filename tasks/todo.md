@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: add a sentence-boundary rule that raw VAD silence gaps over 1s are not merged.
+- [x] Current work: expose the 1s threshold as boundary-fusion config with a conservative default.
+- [x] Current work: add regression tests for long raw-VAD silence overriding semantic-incomplete merge.
+- [x] Current work: update strategy docs/progress and run validation.
+- [x] Current work: commit and push the completed fix.
+
+Review:
+- Added `SentenceBoundaryFusionConfig.max_merge_vad_silence_s`, defaulting to 1.0s.
+- Boundary fusion now keeps `long_vad_silence` boundaries before semantic-incomplete merge logic, so raw VAD pauses of at least the configured threshold are not merged across.
+- Boundary decisions now include `long_vad_silence` for JSON/debug inspection.
+- Added regression tests for long-silence splitting and configurable threshold behavior.
+- Validation passed: `tests.test_sentence_boundaries` (20 tests), full unit discover (93 tests), `compileall semantic_asr tests`, config parse for all 12 JSON profiles, and `git diff --check`.
+
 - [x] Current work: investigate why `configs/ar_sa.json` outputs a single sentence for `05162293-323c-4c4c-8e2e-5c3d0b568b3d`.
 - [x] Current work: identify whether the collapse comes from punctuation, boundary fusion, timestamp gaps, or cleanup-time config changes.
 - [x] Current work: fix the Arabic config/logic so semantic candidates are preserved when audio-safe.

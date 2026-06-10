@@ -270,6 +270,39 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         sentences = [
             {
                 "start_ms": 0,
+                "end_ms": 7000,
+                "text": "first clause,",
+                "asr_confidence": 0.8,
+            },
+            {
+                "start_ms": 7800,
+                "end_ms": 12000,
+                "text": "second fragment",
+                "asr_confidence": 0.7,
+            },
+        ]
+        words = [
+            {"start_ms": 6500, "end_ms": 7000, "text": "clause"},
+            {"start_ms": 7800, "end_ms": 8300, "text": "second"},
+        ]
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(0, 7000), (7800, 12000)],
+            np.ones(16000 * 20, dtype=np.float32),
+            16000,
+            config,
+        )
+
+        self.assertEqual(len(fused), 1)
+        self.assertEqual(decisions[0]["action"], "merge")
+        self.assertEqual(decisions[0]["reason"], "merged_semantic_incomplete")
+
+    def test_long_vad_silence_keeps_boundary_even_when_semantic_incomplete(self):
+        sentences = [
+            {
+                "start_ms": 0,
                 "end_ms": 10000,
                 "text": "first clause,",
                 "asr_confidence": 0.8,
@@ -292,12 +325,39 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
             [(0, 10000), (11200, 18000)],
             np.ones(16000 * 20, dtype=np.float32),
             16000,
+            self.config,
+        )
+
+        self.assertEqual(len(fused), 2)
+        self.assertEqual(decisions[0]["action"], "keep")
+        self.assertEqual(decisions[0]["reason"], "long_vad_silence")
+        self.assertEqual(decisions[0]["vad_silence_ms"], [10000, 11200])
+        self.assertTrue(decisions[0]["long_vad_silence"])
+        self.assertEqual(decisions[0]["semantic_reason"], "previous_continuation_punctuation")
+
+    def test_configurable_long_vad_silence_threshold_can_allow_merge(self):
+        config = SentenceBoundaryFusionConfig(enabled=True, max_merge_vad_silence_s=2.0)
+        sentences = [
+            {"start_ms": 0, "end_ms": 10000, "text": "first clause,", "asr_confidence": 0.8},
+            {"start_ms": 11200, "end_ms": 18000, "text": "second fragment", "asr_confidence": 0.7},
+        ]
+        words = [
+            {"start_ms": 9500, "end_ms": 10000, "text": "clause"},
+            {"start_ms": 11200, "end_ms": 11700, "text": "second"},
+        ]
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(0, 10000), (11200, 18000)],
+            np.ones(16000 * 20, dtype=np.float32),
+            16000,
             config,
         )
 
         self.assertEqual(len(fused), 1)
-        self.assertEqual(decisions[0]["action"], "merge")
         self.assertEqual(decisions[0]["reason"], "merged_semantic_incomplete")
+        self.assertFalse(decisions[0]["long_vad_silence"])
 
     def test_active_speech_safety_overrides_target_duration_for_non_terminal_boundary(self):
         sentences = [

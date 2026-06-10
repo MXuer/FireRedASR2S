@@ -99,6 +99,7 @@ For every boundary it builds one `BoundaryCandidate`:
   - selected low-probability boundary time
 - semantic completeness reason
 - active-speech flag
+- whether raw VAD silence reaches `max_merge_vad_silence_s`
 - combined duration
 
 RMS/waveform valley is intentionally not used.
@@ -107,22 +108,24 @@ RMS/waveform valley is intentionally not used.
 
 The current decision order is:
 
-1. Over `max_sentence_s`:
+1. Raw VAD silence reaching `max_merge_vad_silence_s` is kept as
+   `long_vad_silence`, even if the semantic boundary is incomplete.
+2. Over `max_sentence_s`:
    - keep audio-safe boundaries;
    - keep semantic-complete active-speech boundaries as a max-duration cap;
    - merge active-speech boundaries and record `max_duration_wait_for_silence`
      only when they are semantic-incomplete;
    - keep `max_duration_forced_boundary` only when no probability/raw-VAD
      active-speech evidence is present.
-2. Merge active-speech boundaries.
-3. Keep audio-safe and semantic-complete boundaries.
-4. Keep audio-safe boundaries once the merged span reaches `target_sentence_s`.
-5. Merge audio-safe but semantic-incomplete boundaries.
-6. Keep terminal punctuation once the merged span reaches `target_sentence_s`.
-7. Keep semantic-complete boundaries across raw-VAD islands when the token gap is
+3. Merge active-speech boundaries.
+4. Keep audio-safe and semantic-complete boundaries.
+5. Keep audio-safe boundaries once the merged span reaches `target_sentence_s`.
+6. Merge audio-safe but semantic-incomplete boundaries.
+7. Keep terminal punctuation once the merged span reaches `target_sentence_s`.
+8. Keep semantic-complete boundaries across raw-VAD islands when the token gap is
    large enough.
-8. Merge boundaries inside the same raw VAD island.
-9. Merge everything else.
+9. Merge boundaries inside the same raw VAD island.
+10. Merge everything else.
 
 The result is:
 
@@ -176,6 +179,8 @@ writer cannot represent, that is treated as a strategy bug.
   are traceable in one place.
 - High speech-probability boundaries are merged even when terminal punctuation
   exists.
+- Raw VAD silence at or above `max_merge_vad_silence_s` is not merged across,
+  even when the semantic candidate is incomplete.
 - `max_sentence_s` no longer forces incomplete active-speech cuts, but complete
   semantic boundaries cap continuous high-probability runs.
 - The code has focused regressions for Arabic active-speech boundaries, Naqta

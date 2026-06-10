@@ -89,8 +89,19 @@ Current state:
   completeness. Raw VAD silence and low frame-level VAD probability windows
   mark a boundary as safe to cut, but comma/colon/semicolon continuations and
   short incomplete fragments still merge.
+- Raw VAD silence at or above `max_merge_vad_silence_s` is a hard no-merge
+  boundary in sentence fusion. The default threshold is 1.0s.
 
 Recent validation:
+
+- Added `SentenceBoundaryFusionConfig.max_merge_vad_silence_s`, defaulting to
+  1.0s. Boundary fusion now keeps `long_vad_silence` boundaries before
+  semantic-incomplete merge logic, so candidates are not merged across raw VAD
+  pauses of at least 1s.
+- Boundary decision JSON now includes `long_vad_silence`.
+- Validation passed: `tests.test_sentence_boundaries` (20 tests), full unit
+  discover (93 tests), `compileall semantic_asr tests`, config parse for all 12
+  JSON profiles and `git diff --check`.
 
 - Fixed the Arabic one-sentence collapse reported for
   `configs/ar_sa.json` on

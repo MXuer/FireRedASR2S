@@ -75,11 +75,20 @@ An active-speech boundary is one where:
 - both sides are in the same raw VAD speech island, token gap is below
   `merge_max_token_gap_s`, and there is no audio-safe evidence.
 
+Raw VAD silence has two thresholds:
+
+- `min_vad_silence_s`: the gap is long enough to be an audio-safe candidate.
+- `max_merge_vad_silence_s`: the gap is too long to merge across. The default
+  is 1.0s, so semantic-incomplete candidates are still split when the raw VAD
+  silence between speech islands reaches this threshold.
+
 ## Decision Table
 
 The current greedy decision table is:
 
-1. If the merged span would exceed `max_sentence_s`:
+1. If raw VAD silence reaches `max_merge_vad_silence_s`, keep as
+   `long_vad_silence`.
+2. If the merged span would exceed `max_sentence_s`:
    - keep the boundary if it is audio-safe;
    - keep a semantic-complete active-speech boundary as
      `max_duration_terminal_punctuation` or `max_duration_semantic_boundary`;
@@ -87,17 +96,17 @@ The current greedy decision table is:
      but semantic-incomplete;
    - otherwise keep as `max_duration_forced_boundary` as a no-probability
      fallback.
-2. If the boundary is active speech, merge.
-3. If the boundary is audio-safe and semantic-complete, keep.
-4. If the boundary is audio-safe and the merged span has reached
+3. If the boundary is active speech, merge.
+4. If the boundary is audio-safe and semantic-complete, keep.
+5. If the boundary is audio-safe and the merged span has reached
    `target_sentence_s`, keep.
-5. If the boundary is audio-safe but semantic-incomplete, merge.
-6. If terminal punctuation appears and the merged span has reached
+6. If the boundary is audio-safe but semantic-incomplete, merge.
+7. If terminal punctuation appears and the merged span has reached
    `target_sentence_s`, keep.
-7. If semantic-complete, not in the same raw VAD island, and the token gap is
+8. If semantic-complete, not in the same raw VAD island, and the token gap is
    large enough, keep.
-8. If both sides are in the same raw VAD island, merge.
-9. Otherwise merge.
+9. If both sides are in the same raw VAD island, merge.
+10. Otherwise merge.
 
 This keeps the logic readable: audio safety is checked first, duration prevents
 pathological long spans, and semantic completeness decides which non-safe
@@ -133,6 +142,7 @@ Every boundary decision records:
 - `semantic_complete`
 - `semantic_reason`
 - `vad_silence_ms`
+- `long_vad_silence`
 - `speech_prob_min`
 - `speech_prob_mean`
 - `speech_prob_max`
