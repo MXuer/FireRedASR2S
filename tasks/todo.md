@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: add OpenAI-compatible `response_format={"type":"json_object"}` to Qwen semantic-boundary requests.
+- [x] Current work: keep the setting configurable in case a backend does not support structured JSON mode.
+- [x] Current work: update tests/docs and verify the local Qwen endpoint accepts the request.
+- [x] Current work: run validation, update progress and commit.
+
+Review:
+- Qwen semantic-boundary requests now include `response_format={"type":"json_object"}` by default.
+- Added `response_format_json` config switch so incompatible OpenAI-compatible backends can disable the field.
+- Updated tests to assert the default request body and the opt-out path.
+- Updated `configs/th_th_qwen_boundary.json` and `docs/models/qwen_semantic_boundary.md`.
+- Validation passed: `tests.test_qwen_semantic_boundary`, full unit discover (101 tests), compileall, all config parse, `git diff --check`, and a real local-Qwen adapter smoke with `response_format` enabled.
+
 - [x] Current work: design Qwen semantic-boundary support as an index-only component that never rewrites ASR text.
 - [x] Current work: implement JSON/end-index parsing, validation, bounded retries and local-rule fallback behavior.
 - [x] Current work: wire the Qwen boundary result into existing sentence-boundary fusion without changing final text generation.

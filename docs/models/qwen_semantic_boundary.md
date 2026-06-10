@@ -21,6 +21,9 @@ The service must be called with:
 
 ```json
 {
+  "response_format": {
+    "type": "json_object"
+  },
   "chat_template_kwargs": {
     "enable_thinking": false
   }
@@ -29,6 +32,11 @@ The service must be called with:
 
 Plain prompts and `/no_think` were observed to emit visible thinking text, so
 they are not safe for programmatic JSON parsing.
+
+`response_format={"type":"json_object"}` is enabled by default as an additional
+OpenAI-compatible constraint. It improves the chance of parseable JSON, but it
+does not replace client-side validation. Set `response_format_json=false` only
+when a compatible backend rejects the field.
 
 ## Output Contract
 

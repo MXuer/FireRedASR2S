@@ -37,10 +37,26 @@ class QwenSemanticBoundaryTest(unittest.TestCase):
 
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0]["chat_template_kwargs"], {"enable_thinking": False})
+        self.assertEqual(calls[0]["response_format"], {"type": "json_object"})
         self.assertEqual(
             [item["punc_text"] for item in result["punc_sentences"]],
             ["วันนี้ฝนตก", "เจ้าหน้าที่เตือนภัย"],
         )
+
+    def test_response_format_json_can_be_disabled_for_incompatible_backends(self):
+        calls = []
+
+        def requester(body):
+            calls.append(body)
+            return json.dumps({"token_count": 1, "end_indices": [0]})
+
+        punc = QwenSemanticBoundaryPunc(
+            QwenSemanticBoundaryConfig(response_format_json=False),
+            requester=requester,
+        )
+        punc.process_with_timestamp([[["hello", 0.0, 0.2]]], ["utt"])
+
+        self.assertNotIn("response_format", calls[0])
 
     def test_invalid_first_response_retries_with_validation_error(self):
         responses = iter([

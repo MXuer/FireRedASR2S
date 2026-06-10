@@ -102,6 +102,15 @@ Current state:
 
 Recent validation:
 
+- Qwen semantic-boundary requests now include the OpenAI-compatible
+  `response_format={"type":"json_object"}` field by default, with
+  `response_format_json=false` available for incompatible backends. The local
+  Qwen endpoint accepted the field in a real Thai adapter smoke test.
+- Validation passed: `tests.test_qwen_semantic_boundary`, full unit discover
+  (101 tests), `compileall semantic_asr tests`, config parse for all 13 JSON
+  profiles, `git diff --check`, and a real local-Qwen adapter smoke with
+  `response_format` enabled.
+
 - Implemented the Qwen index-only semantic-boundary component with strict JSON
   validation, bounded retry and duration-based fallback candidate boundaries.
   The component sends `chat_template_kwargs={"enable_thinking": false}`, asks

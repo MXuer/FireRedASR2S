@@ -21,6 +21,7 @@
         "model": "Qwen3.6-27B",
         "max_retries": 1,
         "disable_thinking": true,
+        "response_format_json": true,
         "fallback_max_span_s": 15.0
       }
     }

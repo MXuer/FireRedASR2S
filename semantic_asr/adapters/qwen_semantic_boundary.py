@@ -23,6 +23,7 @@ class QwenSemanticBoundaryConfig:
     top_p: float = 1.0
     max_retries: int = 1
     disable_thinking: bool = True
+    response_format_json: bool = True
     fallback_max_span_s: float = 15.0
 
 
@@ -100,6 +101,8 @@ class QwenSemanticBoundaryPunc:
         }
         if self.config.disable_thinking:
             body["chat_template_kwargs"] = {"enable_thinking": False}
+        if self.config.response_format_json:
+            body["response_format"] = {"type": "json_object"}
         return body
 
     def _request_content(self, body: dict[str, Any]) -> str:
