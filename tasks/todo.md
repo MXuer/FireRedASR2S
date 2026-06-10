@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: read `/data/duhu/FireRedASR2S/docs/qwen_api.md` and identify the local Qwen API contract.
+- [x] Current work: prepare a Thai token/text sample suitable for sentence-boundary testing.
+- [x] Current work: call Qwen with a JSON-only prompt for Thai semantic sentence spans.
+- [x] Current work: validate whether the output is monotonic, non-overlapping, and usable for timestamp mapping.
+- [x] Current work: record the result and recommendation.
+
+Review:
+- Qwen API model listing works at `http://10.10.23.16:18000/v1/models`, but sandboxed network cannot reach it; API smoke calls need unrestricted execution.
+- Plain chat requests and `/no_think` prompts produced visible thinking text and are not safe for direct JSON parsing.
+- Adding `chat_template_kwargs={"enable_thinking": false}` produced clean parseable JSON.
+- Synthetic no-punctuation Thai chunks were split into 3 semantic spans covering chunks `0-5` continuously.
+- Existing real Thai ASR token sample from `output/experiments/multilingual_short_boundary_fusion/th_th/th_th.json` returned one span covering tokens `0-102`, mapping cleanly to `460-15660ms`.
+- Recommendation: Qwen is viable as a Thai semantic-boundary backend if the client disables thinking, validates monotonic coverage, ignores/freezes `reason` as debug-only, and falls back to acoustic/duration rules on malformed responses.
+
 - [x] Current work: implement rolling selector for over-`max_sentence_s` boundary choice.
 - [x] Current work: keep recent boundary candidates with speech-probability stats inside the current fused group.
 - [x] Current work: choose the lowest-probability semantic candidate instead of the first over-max candidate.

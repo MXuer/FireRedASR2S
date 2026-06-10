@@ -96,6 +96,15 @@ Current state:
 
 Recent validation:
 
+- Qwen3.6-27B local API smoke-tested for Thai semantic sentence-boundary use:
+  `/v1/models` is reachable at `http://10.10.23.16:18000/v1` when run outside
+  the sandbox. Plain prompts and `/no_think` still emitted visible thinking
+  text, so programmatic use must send
+  `chat_template_kwargs={"enable_thinking": false}`. With that option, a
+  no-punctuation Thai chunk sample returned 3 monotonic JSON spans, and the
+  existing real Thai ASR token sample returned one valid span covering tokens
+  `0-102` and mapping to `460-15660ms`.
+
 - Implemented rolling over-max boundary selection. Instead of cutting at the
   first terminal-punctuation boundary after `max_sentence_s`, fusion keeps
   recent semantic-complete candidates inside the current group and selects the
