@@ -234,6 +234,11 @@ def _decide_boundary(candidate: BoundaryCandidate, config: SentenceBoundaryFusio
             return "keep", "max_duration_audio_safe"
         if candidate.audio_safe:
             return "keep", candidate.audio_reason or "max_duration_audio_safe"
+        if candidate.active_speech and candidate.semantic_complete:
+            if candidate.semantic_reason == "terminal_punctuation":
+                return "keep", "max_duration_terminal_punctuation"
+            if candidate.token_gap_ms >= 0:
+                return "keep", "max_duration_semantic_boundary"
         if candidate.active_speech:
             return "merge", "max_duration_wait_for_silence"
         return "keep", "max_duration_forced_boundary"

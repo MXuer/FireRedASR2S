@@ -12,9 +12,10 @@ The project target is:
 2. Keep output segments near configurable duration limits.
 3. Preserve semantic sentence boundaries when they do not violate audio safety.
 
-This means a sentence may exceed `max_sentence_s` when every nearby candidate
-boundary still looks like active speech. In that case the decision reason should
-make the wait explicit, instead of hiding an unsafe cut.
+This means a sentence may exceed `max_sentence_s` while fusion is waiting for a
+better boundary, but it should not grow without bound. If no audio-safe boundary
+exists after max duration, fusion keeps the next semantic-complete boundary as
+the least-bad fallback and records that reason explicitly.
 
 ## Current Timing Layers
 
@@ -108,7 +109,9 @@ The current decision order is:
 
 1. Over `max_sentence_s`:
    - keep audio-safe boundaries;
-   - merge active-speech boundaries and record `max_duration_wait_for_silence`;
+   - keep semantic-complete active-speech boundaries as a max-duration cap;
+   - merge active-speech boundaries and record `max_duration_wait_for_silence`
+     only when they are semantic-incomplete;
    - keep `max_duration_forced_boundary` only when no probability/raw-VAD
      active-speech evidence is present.
 2. Merge active-speech boundaries.
@@ -173,7 +176,8 @@ writer cannot represent, that is treated as a strategy bug.
   are traceable in one place.
 - High speech-probability boundaries are merged even when terminal punctuation
   exists.
-- `max_sentence_s` no longer forces a high-probability active-speech cut.
+- `max_sentence_s` no longer forces incomplete active-speech cuts, but complete
+  semantic boundaries cap continuous high-probability runs.
 - The code has focused regressions for Arabic active-speech boundaries, Naqta
   terminal punctuation, German short terminal fragments, Portuguese semantic
   fragments and no-probability fallback behavior.
@@ -252,8 +256,8 @@ Recommended next version:
    evidence.
 4. If the group is near target, cut on audio-safe + semantic-complete evidence.
 5. If the group is over max, choose the best recent audio-safe boundary.
-6. If no safe boundary exists, keep waiting and emit
-   `max_duration_wait_for_silence`.
+6. If no safe boundary exists, choose the best recent semantic-complete boundary.
+7. If neither exists, keep waiting and emit `max_duration_wait_for_silence`.
 
 This preserves the project priority while making long-segment behavior easier
 to reason about.

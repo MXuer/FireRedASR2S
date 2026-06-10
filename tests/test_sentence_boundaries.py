@@ -119,9 +119,9 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(decisions[0]["reason"], "vad_prob_silence")
         self.assertEqual(decisions[0]["preserved_gap_ms"], 200)
 
-    def test_max_duration_waits_for_silence_at_active_boundary(self):
+    def test_max_duration_waits_for_silence_at_active_incomplete_boundary(self):
         sentences = [
-            {"start_ms": 0, "end_ms": 29500, "text": "first.", "asr_confidence": 0.8},
+            {"start_ms": 0, "end_ms": 29500, "text": "first,", "asr_confidence": 0.8},
             {"start_ms": 31000, "end_ms": 35000, "text": "second.", "asr_confidence": 0.7},
         ]
         words = [
@@ -201,7 +201,7 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertTrue(decisions[0]["speech_prob_supported_silence"])
         self.assertEqual(decisions[0]["speech_prob_boundary_ms"], 5050)
 
-    def test_high_probability_boundary_waits_when_past_max_duration(self):
+    def test_high_probability_terminal_boundary_caps_max_duration(self):
         sentences = [
             {"start_ms": 0, "end_ms": 29950, "text": "first.", "asr_confidence": 0.8},
             {"start_ms": 30050, "end_ms": 35000, "text": "second.", "asr_confidence": 0.7},
@@ -226,8 +226,8 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
             frame_probs,
         )
 
-        self.assertEqual(len(fused), 1)
-        self.assertEqual(decisions[0]["reason"], "max_duration_wait_for_silence")
+        self.assertEqual(len(fused), 2)
+        self.assertEqual(decisions[0]["reason"], "max_duration_terminal_punctuation")
         self.assertGreaterEqual(decisions[0]["speech_prob_mean"], 0.5)
 
     def test_audio_safe_boundary_over_max_duration_keeps_even_if_semantic_incomplete(self):
@@ -378,6 +378,41 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(decisions[0]["action"], "merge")
         self.assertEqual(decisions[0]["reason"], "merged_active_speech_prob")
         self.assertEqual(decisions[0]["semantic_reason"], "terminal_punctuation")
+
+    def test_over_max_terminal_boundary_breaks_continuous_active_speech_run(self):
+        sentences = [
+            {"start_ms": 0, "end_ms": 17360, "text": "بسم الله الرحمن الرحيم الحق ما الحق؟", "asr_confidence": 0},
+            {"start_ms": 17370, "end_ms": 25916, "text": "وما أدراك ما الحق؟", "asr_confidence": 0},
+            {"start_ms": 25916, "end_ms": 31940, "text": "كذبت ثمود وعاد بالقارعة", "asr_confidence": 0},
+        ]
+        words = [
+            {"start_ms": 16000, "end_ms": 17340, "text": "الحق"},
+            {"start_ms": 21033, "end_ms": 25916, "text": "الحق"},
+            {"start_ms": 25916, "end_ms": 26816, "text": "كذبت"},
+        ]
+        frame_probs = {
+            "frame_shift_ms": 10,
+            "frame_length_ms": 25,
+            "probs": [0.95] * 4000,
+        }
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(0, 31940)],
+            np.ones(16000 * 40, dtype=np.float32),
+            16000,
+            self.config,
+            frame_probs,
+        )
+
+        self.assertEqual(len(fused), 2)
+        self.assertEqual(decisions[0]["action"], "merge")
+        self.assertEqual(decisions[0]["reason"], "merged_active_speech_prob")
+        self.assertEqual(decisions[1]["action"], "keep")
+        self.assertEqual(decisions[1]["reason"], "max_duration_terminal_punctuation")
+        self.assertEqual(fused[0]["end_ms"], 25916)
+        self.assertEqual(fused[1]["start_ms"], 25916)
 
     def test_terminal_punctuation_boundary_uses_sentence_local_words(self):
         sentences = [

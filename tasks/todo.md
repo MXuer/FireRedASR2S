@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: investigate why `configs/ar_sa.json` outputs a single sentence for `05162293-323c-4c4c-8e2e-5c3d0b568b3d`.
+- [x] Current work: identify whether the collapse comes from punctuation, boundary fusion, timestamp gaps, or cleanup-time config changes.
+- [x] Current work: fix the Arabic config/logic so semantic candidates are preserved when audio-safe.
+- [x] Current work: validate with focused tests and existing output inspection.
+- [x] Current work: update progress/TODO and commit/push if code changes are needed.
+
+Review:
+- Root cause: Naqta/punctuation had produced 21 `semantic_sentences`, but boundary fusion treated every boundary as active speech and kept recording `max_duration_wait_for_silence`, so the 287.935s file collapsed into one final sentence.
+- Fixed over-max active-speech handling: audio-safe boundaries still win; semantic-complete active boundaries now cap an over-`max_sentence_s` run with `max_duration_terminal_punctuation` or `max_duration_semantic_boundary`; semantic-incomplete active boundaries still wait for silence.
+- Offline recomputation on `output/ar_sa_error-01/05162293-323c-4c4c-8e2e-5c3d0b568b3d.json` changes final fusion from 1 sentence to 13 sentences, with max duration 29.1s.
+- Validation passed: `tests.test_sentence_boundaries` (18 tests), full unit discover (91 tests), `compileall semantic_asr tests`, and `git diff --check`.
+
 - [x] Current work: checkpoint and push current `red-asr` state to GitHub before further simplification.
 - [x] Current work: inspect configs and strategy code for historical compatibility clutter.
 - [x] Current work: remove obsolete configs/options and simplify the public configuration surface.

@@ -34,3 +34,4 @@
 - Fun-ASR-Nano and its native timestamp provider are exposed only for Chinese, English and Japanese.
 - Pipeline profiles use one canonical lowercase language-region id such as `zh_cn`. Model adapters convert that value to model-native language names/codes internally; component-specific native language fields are not part of user configuration.
 - `PipelineProfileConfig.language` is injected into every language-aware ASR and timestamp component during pipeline construction.
+- Sentence-boundary fusion treats `max_sentence_s` as a bounded pressure signal: audio-safe boundaries are preferred, but if no safe boundary appears after max duration, a semantic-complete active-speech boundary is kept as the cap; semantic-incomplete active boundaries continue waiting.

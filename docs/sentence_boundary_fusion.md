@@ -13,9 +13,10 @@ Current priority:
 3. Preserve semantic sentence boundaries when they are compatible with audio
    safety and duration.
 
-`max_sentence_s` is therefore a pressure signal, not permission to cut a high
-speech-probability boundary. If a group is already over max duration but the
-next candidate boundary is still active speech, fusion keeps merging and records
+`max_sentence_s` is therefore a bounded pressure signal. Fusion first looks for
+an audio-safe boundary. If none is available and the group is already over max
+duration, a semantic-complete boundary is kept to prevent unbounded output
+segments. Active incomplete boundaries still merge and record
 `max_duration_wait_for_silence`.
 
 ## Timing Views
@@ -80,7 +81,10 @@ The current greedy decision table is:
 
 1. If the merged span would exceed `max_sentence_s`:
    - keep the boundary if it is audio-safe;
-   - merge and record `max_duration_wait_for_silence` if it is active speech;
+   - keep a semantic-complete active-speech boundary as
+     `max_duration_terminal_punctuation` or `max_duration_semantic_boundary`;
+   - merge and record `max_duration_wait_for_silence` if it is active speech
+     but semantic-incomplete;
    - otherwise keep as `max_duration_forced_boundary` as a no-probability
      fallback.
 2. If the boundary is active speech, merge.
@@ -95,9 +99,9 @@ The current greedy decision table is:
 8. If both sides are in the same raw VAD island, merge.
 9. Otherwise merge.
 
-This keeps the logic readable: audio safety is checked first, semantic
-completeness second, duration third unless duration is already beyond max and a
-safe boundary exists.
+This keeps the logic readable: audio safety is checked first, duration prevents
+pathological long spans, and semantic completeness decides which non-safe
+fallbacks are acceptable.
 
 ## Preserving Gaps
 

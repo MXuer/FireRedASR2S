@@ -78,8 +78,9 @@ Current state:
   VAD.
 - Sentence-boundary fusion uses frame-level VAD speech probability as the
   preferred speech-safety signal. High-probability active-speech boundaries
-  merge even when terminal punctuation or `max_sentence_s` duration pressure is
-  present; the decision records `max_duration_wait_for_silence`.
+  merge while the span is below `max_sentence_s`, but semantic-complete
+  boundaries can cap an over-max continuous speech run; semantic-incomplete
+  active boundaries still record `max_duration_wait_for_silence`.
 - ASR and MMS forced alignment now use raw VAD speech segments by default.
   Semantic sentence merging happens after token timestamps are available.
 - MMS forced aligner forces `use_star=False`; configs cannot override it back
@@ -90,6 +91,22 @@ Current state:
   short incomplete fragments still merge.
 
 Recent validation:
+
+- Fixed the Arabic one-sentence collapse reported for
+  `configs/ar_sa.json` on
+  `05162293-323c-4c4c-8e2e-5c3d0b568b3d.wav`.
+  Punctuation was not the problem: the existing JSON had 21
+  `semantic_sentences`, but boundary fusion merged every boundary because all
+  candidates were high speech probability and recorded
+  `max_duration_wait_for_silence`.
+- Over-max active-speech fusion now keeps semantic-complete boundaries as a
+  bounded fallback (`max_duration_terminal_punctuation` or
+  `max_duration_semantic_boundary`) while semantic-incomplete active boundaries
+  still wait for silence.
+- Offline recomputation of the reported JSON changes the final fusion from 1
+  sentence to 13 sentences, with max duration 29.1s.
+- Validation passed: `tests.test_sentence_boundaries` (18 tests), full unit
+  discover (91 tests), `compileall semantic_asr tests` and `git diff --check`.
 
 - Simplified the public pipeline/config surface after pushing checkpoint
   `04283fd` to `origin/red-asr`.
@@ -115,8 +132,10 @@ Recent validation:
   Boundary fusion now uses raw VAD silence and frame-level speech probability
   as audio-safety evidence, with probability silence requiring both low local
   minimum and low local mean.
-- High speech-probability active-speech boundaries now merge even when the
-  combined span is over `max_sentence_s`; the decision records
+- High speech-probability active-speech boundaries now merge below
+  `max_sentence_s`. Once the combined span is over max, semantic-complete
+  boundaries cap the run with `max_duration_terminal_punctuation` or
+  `max_duration_semantic_boundary`, while incomplete boundaries still record
   `max_duration_wait_for_silence`.
 - Sentence-boundary fusion is now the single grouping stage for fusion-enabled
   profiles. The legacy final short-gap merge runs only when
