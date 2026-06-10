@@ -22,6 +22,10 @@ from semantic_asr.adapters.mms_forced_aligner import (
     MmsForcedAlignerConfig,
     MmsForcedAlignerTimestampProvider,
 )
+from semantic_asr.adapters.naqta_punctuation import (
+    NaqtaPunctuation,
+    NaqtaPunctuationConfig,
+)
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig
 from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
 from semantic_asr.adapters.silero import SileroVad, SileroVadConfig
@@ -55,6 +59,8 @@ __all__ = [
     "FunAsrNanoTimestampProvider",
     "MmsForcedAlignerConfig",
     "MmsForcedAlignerTimestampProvider",
+    "NaqtaPunctuation",
+    "NaqtaPunctuationConfig",
     "Qwen3Asr",
     "Qwen3AsrConfig",
     "Qwen3ForcedAlignerConfig",

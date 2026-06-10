@@ -28,6 +28,46 @@ class MmsForcedAlignerTest(unittest.TestCase):
         self.assertEqual(tokens, ["1952", "년", "합", "포", "구", "에", "."])
         self.assertEqual(provider._prepare_alignment_tokens(tokens), ["<star>", "년", "합", "포", "구", "에", "."])
 
+    def test_prepare_alignment_items_groups_currency_percent_with_number(self):
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="zh_cn")
+        tokens = ["$", "100", "%", "涨"]
+
+        output_tokens, alignment_tokens = provider._prepare_alignment_items(tokens)
+
+        self.assertEqual(output_tokens, ["$100%", "涨"])
+        self.assertEqual(alignment_tokens, ["<star>", "涨"])
+
+    def test_prepare_alignment_items_groups_currency_code_and_units(self):
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        tokens = ["USD", "100", "and", "20", "kg"]
+
+        output_tokens, alignment_tokens = provider._prepare_alignment_items(tokens)
+
+        self.assertEqual(output_tokens, ["USD100", "and", "20kg"])
+        self.assertEqual(alignment_tokens, ["<star>", "and", "<star>"])
+
+    def test_prepare_alignment_items_groups_numeric_ranges_but_keeps_sentence_punctuation(self):
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        tokens = ["100", "-", "200", ".", "done"]
+
+        output_tokens, alignment_tokens = provider._prepare_alignment_items(tokens)
+
+        self.assertEqual(output_tokens, ["100-200", ".", "done"])
+        self.assertEqual(alignment_tokens, ["<star>", ".", "done"])
+
+    def test_prepare_alignment_items_does_not_absorb_terminal_math_symbol(self):
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        tokens = ["100", "-", "done"]
+
+        output_tokens, alignment_tokens = provider._prepare_alignment_items(tokens)
+
+        self.assertEqual(output_tokens, ["100", "-", "done"])
+        self.assertEqual(alignment_tokens, ["<star>", "-", "done"])
+
     def test_prepare_tokens_splits_japanese_kana_and_kanji(self):
         provider = object.__new__(MmsForcedAlignerTimestampProvider)
         provider.config = MmsForcedAlignerConfig(language="ja_jp")
@@ -76,6 +116,29 @@ class MmsForcedAlignerTest(unittest.TestCase):
         self.assertEqual(provider.aligner.raw_transcripts[0], "1952")
         self.assertEqual(provider.aligner.alignment_transcripts[0], "<star>")
         self.assertEqual(result["timestamp"][0][0], "1952")
+
+    def test_provider_passes_grouped_numeric_span_to_mms_runtime(self):
+        class FakeAligner:
+            def align(inner_self, transcripts, *args, **kwargs):
+                inner_self.transcripts = transcripts
+                inner_self.alignment_transcripts = kwargs["alignment_transcripts"]
+                inner_self.raw_transcripts = kwargs["raw_transcripts"]
+                return [
+                    {"text": token, "start": index * 0.1, "end": index * 0.1 + 0.05}
+                    for index, token in enumerate(kwargs["raw_transcripts"])
+                ]
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        segment = SpeechSegment("test", 0.0, 1.0, 16000, [0.0] * 16000)
+
+        [result] = provider.add_timestamps([{"uttid": "test", "text": "$ 100 % rose"}], [segment])
+
+        self.assertEqual(provider.aligner.transcripts, ["$100%", "rose"])
+        self.assertEqual(provider.aligner.raw_transcripts, ["$100%", "rose"])
+        self.assertEqual(provider.aligner.alignment_transcripts, ["<star>", "rose"])
+        self.assertEqual(result["timestamp"][0][0], "$100%")
 
     def test_provider_forces_use_star_false(self):
         class FakeAligner:

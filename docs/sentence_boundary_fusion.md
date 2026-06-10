@@ -1,158 +1,142 @@
 # Sentence Boundary Fusion
 
-## Problem
+## Goal
 
-Punctuation models propose semantic sentence boundaries from text, but a
-predicted sentence boundary can fall inside active speech. Such a boundary is
-useful as text structure but unsafe as an audio-slicing boundary.
+The pipeline should cut long-audio ASR results into useful semantic segments
+without cutting through active speech.
 
-Raw VAD segments, aligned token timestamps and the waveform provide acoustic
-evidence that should be fused with punctuation instead of treating any one
-signal as authoritative.
+Current priority:
 
-When available, frame-level VAD speech probability is the primary acoustic
-signal for audio-safe sentence boundaries. It is more direct than RMS energy
-and more robust across noise conditions and languages.
+1. Do not cut active speech when VAD probability or raw VAD says the boundary is
+   unsafe.
+2. Keep segments near the configured target and maximum duration.
+3. Preserve semantic sentence boundaries when they are compatible with audio
+   safety and duration.
 
-## Two Boundary Views
+`max_sentence_s` is therefore a pressure signal, not permission to cut a high
+speech-probability boundary. If a group is already over max duration but the
+next candidate boundary is still active speech, fusion keeps merging and records
+`max_duration_wait_for_silence`.
 
-Keep two related views:
+## Timing Views
 
-- `semantic_sentences`: punctuation/model-proposed text sentences. These may
-  have boundaries inside continuous speech.
-- `sentences`: audio-safe semantic sentences used by JSON, CSV, SRT and
-  TextGrid consumers that may slice audio.
+The pipeline keeps two related views:
 
-The initial implementation may expose only `sentences`, but the internal
-boundary decision should retain the semantic candidate and its decision
-metadata.
+- `semantic_sentences`: punctuation/model-proposed sentence candidates.
+- `sentences`: fused, audio-aware output sentences.
 
-## Recommended Decision Policy
+Final sentence objects also contain VAD-derived cut fields:
 
-For every boundary between the previous sentence's last aligned token and the
-next sentence's first aligned token, calculate:
+- `cut_start_ms`
+- `cut_end_ms`
+- `cut_segments_ms`
 
-- aligned-token gap duration;
-- whether both tokens belong to the same raw VAD speech segment;
-- whether a raw VAD non-speech interval exists between the tokens;
-- frame-level VAD speech probability around the candidate boundary;
-- optional minimum waveform energy around the candidate boundary;
-- resulting merged sentence duration.
+CSV, SRT and TextGrid exports use `cut_start_ms` / `cut_end_ms`. JSON keeps both
+annotation timing (`start_ms` / `end_ms`) and cut timing.
 
-Then apply these rules:
+## Evidence Used At Each Boundary
 
-1. Treat a raw VAD non-speech interval of at least `200ms` as evidence that a
-   boundary is audio-safe, and snap a kept boundary into that interval.
-2. Treat a local minimum VAD speech probability below the configured silence
-   threshold as evidence that a boundary is audio-safe, and snap a kept
-   boundary to that local minimum.
-3. Treat an RMS acoustic valley as secondary evidence that a boundary is
-   audio-safe when VAD probability is unavailable or inconclusive.
-4. Keep an audio-safe boundary only when the text on the left is semantically
-   complete. Continuation punctuation such as commas, colons and semicolons,
-   or a short/incomplete following fragment, should merge even across a safe
-   silence.
-5. Merge a punctuation-proposed boundary when frame-level speech probability is
-   high around the boundary, or when both neighboring tokens are in the same raw
-   VAD speech segment with a short token gap and no acoustic valley.
-6. Treat `target_sentence_s` and `max_sentence_s` as duration preferences, not
-   permission to cut active speech. If no VAD silence, VAD probability valley or
-   acoustic valley supports a boundary, continue merging and record that the
-   maximum duration is waiting for silence.
-7. Record boundary metadata such as `semantic_boundary`, `vad_silence`,
-   `vad_prob_valley`, `acoustic_valley`, `target_duration`,
-   `max_duration_wait_for_silence`, `merged_active_speech`,
-   `merged_active_speech_prob` and `merged_semantic_incomplete`.
+For every boundary between the previous fused sentence and the next semantic
+candidate, `fuse_sentence_boundaries()` builds one `BoundaryCandidate` with:
 
-Thresholds must be configurable and evaluated per VAD model/language. Raw VAD
-is a strong signal, but it is not perfect; frame-level VAD probability is the
-preferred acoustic signal, and waveform energy is a secondary check when VAD
-misses a short pause or creates a false split.
+- aligned-token gap in milliseconds;
+- whether both sides are inside the same raw VAD speech island;
+- whether raw VAD provides a supported silence gap;
+- frame-level VAD speech-probability stats near the boundary:
+  - `speech_prob_min`
+  - `speech_prob_mean`
+  - `speech_prob_max`
+  - `speech_prob_boundary_ms`
+- semantic completeness:
+  - terminal punctuation;
+  - continuation punctuation such as comma/colon/semicolon;
+  - short incomplete fragments;
+  - target-duration fallback.
 
-## Arabic Example
+RMS/waveform valley is no longer part of the boundary policy.
 
-For `data/test/ar_sa-short.wav`:
+## Audio-Safe Boundary Rules
 
-- The boundary `83.494s -> 83.634s` lies inside raw VAD speech segment
-  `82.040s -> 85.160s`. The local waveform energy is high. This boundary
-  should be merged for audio-safe output.
-- The boundary `87.396s -> 87.496s` is supported by the raw VAD silence
-  interval `87.180s -> 87.440s`. It should be kept and may be snapped into that
-  silence interval.
+A boundary is audio-safe when either condition is true:
 
-This demonstrates why rejecting punctuation boundaries unsupported by acoustic
-evidence is better than punctuation-only slicing. It still needs duration
-limits and acoustic fallback so that long continuous speech is not merged
-without bound.
+1. Raw VAD has a silence interval of at least `min_vad_silence_s` around the
+   candidate.
+2. Frame-level VAD probability has a local low-probability window where:
+   - `speech_prob_min <= speech_prob_silence_threshold`
+   - `speech_prob_mean <= speech_prob_silence_mean_threshold`
 
-## Implementation Order
+When a probability-supported boundary is kept, it snaps to the lowest local
+speech-probability window center, then clamps to the token gap when possible.
 
-The first implementation is available in `semantic_asr.sentence_boundaries`
-and is enabled only by profiles that set `pipeline.sentence_boundary_fusion`.
-It:
+An active-speech boundary is one where:
 
-1. Keeps the punctuation-proposed candidates as `semantic_sentences`.
-2. Treats active-speech safety as the first priority: boundaries inside high
-   speech probability are merged even when the merged sentence exceeds
-   `max_sentence_s`.
-3. Treats raw VAD silence, local frame-level VAD probability valleys and RMS
-   valleys as audio-safe evidence, not as mandatory splits.
-4. Keeps an audio-safe boundary only when semantic completeness also supports
-   it; comma/colon/semicolon continuations and short incomplete fragments merge.
-5. Writes each candidate decision to `sentence_boundary_decisions`, including
-   `audio_safe`, `audio_reason`, `semantic_complete` and `semantic_reason`.
+- local probability mean is at least `speech_prob_active_threshold`; or
+- both sides are in the same raw VAD speech island, token gap is below
+  `merge_max_token_gap_s`, and there is no audio-safe evidence.
 
-The Arabic profile is the first enabled profile. Evaluate proposed merges on
-multilingual reference fixtures before enabling the policy more broadly.
+## Decision Table
 
-`target_sentence_s` is a soft preference for ambiguous boundaries.
-`max_sentence_s` is also soft: it encourages earlier supported boundaries but
-does not force a split through active speech.
+The current greedy decision table is:
 
-## Preserving Sentence Gaps
+1. If the merged span would exceed `max_sentence_s`:
+   - keep the boundary if it is audio-safe;
+   - merge and record `max_duration_wait_for_silence` if it is active speech;
+   - otherwise keep as `max_duration_forced_boundary` as a no-probability
+     fallback.
+2. If the boundary is active speech, merge.
+3. If the boundary is audio-safe and semantic-complete, keep.
+4. If the boundary is audio-safe and the merged span has reached
+   `target_sentence_s`, keep.
+5. If the boundary is audio-safe but semantic-incomplete, merge.
+6. If terminal punctuation appears and the merged span has reached
+   `target_sentence_s`, keep.
+7. If semantic-complete, not in the same raw VAD island, and the token gap is
+   large enough, keep.
+8. If both sides are in the same raw VAD island, merge.
+9. Otherwise merge.
 
-Set top-level pipeline config `preserve_sentence_gaps: true` when final
-sentence intervals should leave inter-sentence silence unassigned. In this mode:
+This keeps the logic readable: audio safety is checked first, semantic
+completeness second, duration third unless duration is already beyond max and a
+safe boundary exists.
 
-- kept raw-VAD-silence boundaries use the raw VAD silence edges instead of a
-  single midpoint;
-- kept probability/acoustic-valley boundaries use the neighboring token gap
-  when available;
-- output VAD sentence expansion is skipped;
-- final short-gap sentence merging is skipped.
+## Preserving Gaps
 
-This mode is intended for audio cutting. The default midpoint behavior remains
-useful for continuous annotation views such as SRT/TextGrid where contiguous
-sentence intervals are easier to inspect.
+Set top-level `preserve_sentence_gaps: true` when kept boundaries should leave
+the inter-sentence silence unassigned.
+
+When enabled:
+
+- raw-VAD-silence boundaries use the two silence edges instead of one midpoint;
+- probability-supported boundaries use the token gap when available;
+- output VAD expansion is skipped;
+- final short-gap merging is skipped.
 
 ## Final Short-Gap Merge
 
-After sentence-boundary fusion, output VAD alignment and overlap removal, the
-pipeline applies one final configurable merge pass over the final `sentences`.
-Adjacent final sentences merge when:
+`merge_final_sentences_by_gap()` still exists for legacy/non-fusion profiles.
 
-- the silence gap between them is below `final_sentence_merge_max_gap_s`
-  (`2.0s` by default);
-- the merged sentence duration would not exceed
-  `final_sentence_merge_max_duration_s` (`15.0s` by default).
+When `sentence_boundary_fusion.enabled = true`, this final merge pass is
+disabled. Boundary fusion is the single sentence-grouping stage, so a later
+merge cannot silently undo a kept semantic/audio-safe boundary.
 
-This pass is intentionally later than boundary fusion. It smooths short final
-sentence gaps without changing ASR/MMS alignment inputs or the boundary-decision
-debug trail.
+## Debug Fields
 
-## Portuguese Raw-Align Example
+Every boundary decision records:
 
-For `data/test/short/pt_br-short.wav`, raw-VAD ASR/MMS alignment originally
-kept the following three candidates as separate final sentences because VAD
-silence or an acoustic valley existed between them:
+- `action`
+- `reason`
+- `audio_safe`
+- `audio_reason`
+- `active_speech`
+- `semantic_complete`
+- `semantic_reason`
+- `vad_silence_ms`
+- `speech_prob_min`
+- `speech_prob_mean`
+- `speech_prob_max`
+- `speech_prob_boundary_ms`
+- `speech_prob_supported_silence`
+- `combined_duration_ms`
 
-```text
-47.895s-53.200s: O primeiro ponto ... negócios,
-53.200s-55.408s: as empresas podem criar
-55.600s-58.600s: uma conexão harmoniosa entre diferentes setores.
-```
-
-After semantic-completeness gating, the first two boundaries merge because the
-left text ends in a comma and then lacks terminal punctuation. The final output
-keeps one sentence from `47.895s` to `58.600s`, and then keeps the next
-VAD-supported boundary after `setores.`.
+These fields are the first place to inspect when a segment is too long, too
+short, or appears to cut speech.

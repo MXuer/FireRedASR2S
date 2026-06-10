@@ -1,0 +1,108 @@
+<mxfile host="app.diagrams.net" modified="2026-06-10T00:00:00.000Z" agent="Codex" version="24.7.17">
+  <diagram id="sentence-split-merge" name="Sentence Split Merge Strategy">
+    <mxGraphModel dx="1600" dy="1000" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1200" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="title" value="Semantic ASR Sentence Split / Merge Strategy" style="text;html=1;strokeColor=none;fillColor=none;fontSize=24;fontStyle=1;align=center;" vertex="1" parent="1">
+          <mxGeometry x="360" y="20" width="850" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="raw_vad" value="1. Raw VAD&#xa;timestamps + optional frame_speech_probs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="260" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="asr_segments" value="2. ASR Segment Selection&#xa;default: raw VAD&#xa;legacy: merge_vad_segments" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="100" width="260" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="asr_ts" value="3. ASR + Timestamp Provider&#xa;text + token timestamps" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="700" y="100" width="260" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="punc" value="4. Punctuation Strategy&#xa;ASR-native / ASR-text / external punc" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="100" width="280" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="semantic_candidates" value="5. Semantic Candidates&#xa;punc_sentences -> absolute start_ms/end_ms&#xa;words -> global token timestamps" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="100" width="260" height="90" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fusion" value="6. Boundary Fusion&#xa;greedy left-to-right grouping" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="560" y="280" width="360" height="70" as="geometry"/>
+        </mxCell>
+        <mxCell id="evidence" value="Boundary Evidence&#xa;token gap&#xa;raw VAD silence&#xa;same raw VAD island&#xa;frame speech prob min/mean/max&#xa;semantic punctuation/duration" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="80" y="250" width="330" height="160" as="geometry"/>
+        </mxCell>
+        <mxCell id="decision" value="Current Decision Priority&#xa;1 over max + audio-safe -> keep&#xa;2 over max + active speech -> merge / wait&#xa;3 active speech -> merge&#xa;4 audio-safe + semantic -> keep&#xa;5 audio-safe + target -> keep&#xa;6 audio-safe + incomplete -> merge&#xa;7 terminal + target -> keep&#xa;8 semantic + raw-VAD gap -> keep&#xa;9 otherwise merge" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="1010" y="230" width="390" height="230" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fused" value="7. Fused Sentences&#xa;start_ms / end_ms&#xa;+ sentence_boundary_decisions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="450" width="280" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="output_vad" value="8. Output VAD Formatting&#xa;merge close raw VAD gaps&#xa;pad left/right" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="590" width="300" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="align" value="9. Align Sentences To Output VAD&#xa;if preserve_sentence_gaps = false&#xa;expand first/last sentence touching each VAD island" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="430" y="590" width="360" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="final_merge" value="10. Legacy Final Short-Gap Merge&#xa;runs only when sentence_boundary_fusion is disabled&#xa;fusion-enabled profiles use boundary fusion as the single grouping stage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="590" width="360" height="110" as="geometry"/>
+        </mxCell>
+        <mxCell id="cut_ranges" value="11. Cut Ranges&#xa;intersect sentence spans with raw VAD&#xa;add cut_segments_ms / cut_start_ms / cut_end_ms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1250" y="590" width="310" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="outputs" value="12. Outputs&#xa;JSON stores both sentence and cut times&#xa;CSV/SRT/TextGrid use cut_start_ms / cut_end_ms" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="790" width="420" height="100" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="risk1" value="Main Remaining Complexity&#xa;Greedy fusion has no lookback. It cannot choose the best safe boundary from a recent window." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="80" y="800" width="360" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="simplify" value="Simplification Direction&#xa;Keep one grouping stage.&#xa;Add rolling recent-boundary buffer.&#xa;When over max, choose best audio-safe boundary.&#xa;If none exists, wait for silence." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="780" width="420" height="120" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="e1" edge="1" parent="1" source="raw_vad" target="asr_segments" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" edge="1" parent="1" source="asr_segments" target="asr_ts" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" edge="1" parent="1" source="asr_ts" target="punc" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e4" edge="1" parent="1" source="punc" target="semantic_candidates" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e5" edge="1" parent="1" source="semantic_candidates" target="fusion" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e6" edge="1" parent="1" source="evidence" target="fusion" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e7" edge="1" parent="1" source="fusion" target="decision" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e8" edge="1" parent="1" source="fusion" target="fused" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e9" edge="1" parent="1" source="raw_vad" target="output_vad" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e10" edge="1" parent="1" source="fused" target="align" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e11" edge="1" parent="1" source="output_vad" target="align" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="align" target="final_merge" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e13" edge="1" parent="1" source="final_merge" target="cut_ranges" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e14" edge="1" parent="1" source="cut_ranges" target="outputs" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;endArrow=block;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

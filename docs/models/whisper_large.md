@@ -26,8 +26,33 @@ The local model file is available at:
 - ASR text: yes
 - Word-level timestamp: yes, with `word_timestamps=True`
 - Native punctuation: yes
-- Batch inference: no native batch API in `openai-whisper`; the adapter accepts
-  a batch from the pipeline but runs items sequentially.
+- Batch inference: no native batch API in `openai-whisper`; set `num_workers`
+  to run multiple segment-level worker processes on the same visible GPU.
+
+## Parallel Segment Workers
+
+For long audio with many VAD segments, configure:
+
+```json
+{
+  "components": {
+    "asr": {
+      "name": "whisper_large",
+      "params": {
+        "device": "cuda:0",
+        "num_workers": 2
+      }
+    }
+  },
+  "pipeline": {
+    "asr_batch_size": 8
+  }
+}
+```
+
+Each worker process loads one Whisper model instance. This can improve
+throughput on a large GPU, but GPU memory usage increases roughly with
+`num_workers`.
 
 ## Standalone Output Test
 
@@ -51,4 +76,3 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 conda run -n fireredasr2s \
   --uttid short \
   --device cuda:0
 ```
-

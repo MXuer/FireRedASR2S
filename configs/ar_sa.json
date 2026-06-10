@@ -5,21 +5,21 @@
     "vad": {
       "name": "firered_vad",
       "params": {
-        "model_dir": "pretrained_models/FireRedVAD/VAD",
-        "config": {
-          "use_gpu": true
-        }
+        "use_gpu": true,
+        "extend_speech_frame": 5
       }
     },
     "asr": {
-      "name": "seamless_m4t_v2_large"
+      "name": "whisper_large",
+      "params": {
+        "word_timestamps": false
+      }
     },
     "timestamp": {
-      "name": "mms_forced_aligner",
-      "params": {}
+      "name": "mms_forced_aligner"
     },
     "punc": {
-      "name": "xlm_roberta_punctuation"
+      "name": "asr_text"
     }
   },
   "pipeline": {
@@ -31,9 +31,6 @@
       "min_vad_silence_s": 0.2,
       "max_vad_snap_gap_s": 1.0,
       "merge_max_token_gap_s": 0.3,
-      "acoustic_window_s": 0.05,
-      "acoustic_context_s": 0.3,
-      "acoustic_valley_ratio": 0.25,
       "target_sentence_s": 15.0,
       "max_sentence_s": 30.0
     }

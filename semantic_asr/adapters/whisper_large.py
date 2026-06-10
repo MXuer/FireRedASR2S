@@ -19,6 +19,7 @@ class WhisperLargeConfig:
     fp16: bool = True
     condition_on_previous_text: bool = False
     word_timestamps: bool = True
+    num_workers: int = 1
 
 
 class WhisperLarge:

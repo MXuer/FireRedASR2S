@@ -1,4 +1,3 @@
-import math
 import re
 from dataclasses import dataclass
 from typing import Any, Sequence
@@ -6,8 +5,8 @@ from typing import Any, Sequence
 import numpy as np
 
 
-_TRAILING_SENTENCE_PUNCTUATION = re.compile(r"[。.!?！？]+\s*$")
-_TERMINAL_SENTENCE_PUNCTUATION = re.compile(r"[。.!?！？]+[\s\"'”’)]*$")
+_TRAILING_SENTENCE_PUNCTUATION = re.compile(r"[。.!?！？؟]+\s*$")
+_TERMINAL_SENTENCE_PUNCTUATION = re.compile(r"[。.!?！？؟]+[\s\"'”’)]*$")
 _TRAILING_CONTINUATION_PUNCTUATION = re.compile(r"[,،，、؛;:：]+[\s\"'”’)]*$")
 _LEADING_BOUNDARY_PUNCTUATION = re.compile(r"^[\s,،，。.!?！？؛;:：]+")
 _CJK = re.compile(r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff]")
@@ -19,16 +18,35 @@ class SentenceBoundaryFusionConfig:
     min_vad_silence_s: float = 0.2
     max_vad_snap_gap_s: float = 1.0
     merge_max_token_gap_s: float = 0.3
-    acoustic_window_s: float = 0.05
-    acoustic_context_s: float = 0.3
-    acoustic_valley_ratio: float = 0.25
     target_sentence_s: float = 15.0
     max_sentence_s: float = 30.0
     speech_prob_silence_threshold: float = 0.2
+    speech_prob_silence_mean_threshold: float = 0.2
     speech_prob_active_threshold: float = 0.5
     speech_prob_window_s: float = 0.08
     speech_prob_search_window_s: float = 0.5
     preserve_sentence_gaps: bool = False
+
+
+@dataclass
+class BoundaryCandidate:
+    candidate_index: int
+    previous_end_ms: int
+    current_start_ms: int
+    token_gap_ms: int
+    combined_duration_ms: int
+    boundary_ms: int
+    same_raw_vad: bool
+    vad_silence: tuple[int, int] | None
+    speech_stats: dict
+    prob_supported_silence: bool
+    prob_active_boundary: bool
+    audio_safe: bool
+    audio_reason: str | None
+    semantic_complete: bool
+    semantic_reason: str
+    active_speech: bool
+    snapped_boundary_ms: int
 
 
 def fuse_sentence_boundaries(
@@ -51,156 +69,202 @@ def fuse_sentence_boundaries(
     for candidate_index, current_source in enumerate(sentences[1:], start=1):
         previous = fused[-1]
         current = dict(current_source)
-        previous_word = _last_word_before(sorted_words, previous["end_ms"])
-        current_word = _first_word_after(sorted_words, current["start_ms"])
-        previous_end_ms = previous_word["end_ms"] if previous_word else previous["end_ms"]
-        current_start_ms = current_word["start_ms"] if current_word else current["start_ms"]
-        token_gap_ms = current_start_ms - previous_end_ms
-        combined_duration_ms = current["end_ms"] - previous["start_ms"]
-
-        candidate_gap_ms = current["start_ms"] - previous["end_ms"]
-        vad_silence = None
-        if candidate_gap_ms <= int(config.max_vad_snap_gap_s * 1000):
-            vad_silence = _supported_vad_silence(
-                raw_vad,
-                previous["end_ms"],
-                current["start_ms"],
-                int(config.min_vad_silence_s * 1000),
-            )
-        same_raw_vad = _same_raw_vad_segment(raw_vad, previous["end_ms"], current["start_ms"])
-        boundary_ms = (previous_end_ms + current_start_ms) // 2
-        valley_ratio = _acoustic_valley_ratio(
-            wav,
-            sample_rate,
-            boundary_ms,
-            config.acoustic_window_s,
-            config.acoustic_context_s,
-        )
-        speech_stats = _speech_prob_stats(
-            vad_frame_speech_probs,
-            boundary_ms,
-            config.speech_prob_window_s,
-            config.speech_prob_search_window_s,
-        )
-        prob_supported_silence = (
-            speech_stats["min"] is not None
-            and speech_stats["min"] <= config.speech_prob_silence_threshold
-        )
-        prob_active_boundary = (
-            speech_stats["mean"] is not None
-            and speech_stats["mean"] >= config.speech_prob_active_threshold
-        )
-
-        audio_safe = False
-        audio_reason = None
-        snapped_boundary_ms = boundary_ms
-        if vad_silence is not None:
-            audio_safe = True
-            audio_reason = "vad_silence"
-            snapped_boundary_ms = _snap_to_supported_silence(
-                vad_silence,
-                previous["end_ms"],
-                current["start_ms"],
-            )
-        elif prob_supported_silence:
-            audio_safe = True
-            audio_reason = "vad_prob_valley"
-            snapped_boundary_ms = _snap_to_boundary_gap(
-                speech_stats["boundary_ms"],
-                previous["end_ms"],
-                current["start_ms"],
-            )
-        elif valley_ratio <= config.acoustic_valley_ratio:
-            audio_safe = True
-            audio_reason = "acoustic_valley"
-
-        semantic_complete, semantic_reason = _semantic_boundary(
-            previous["text"],
-            current["text"],
-            current["end_ms"] - current["start_ms"],
-            combined_duration_ms,
+        candidate = _boundary_candidate(
+            candidate_index,
+            previous,
+            current,
+            sorted_words,
+            raw_vad,
             config,
-        )
-        active_speech = (
-            prob_active_boundary
-            or (
-                same_raw_vad
-                and token_gap_ms < int(config.merge_max_token_gap_s * 1000)
-                and not audio_safe
-            )
+            vad_frame_speech_probs,
         )
 
-        action = "keep"
-        reason = audio_reason or "semantic_boundary"
-        if audio_safe and semantic_complete:
+        action, reason = _decide_boundary(candidate, config)
+
+        boundary_ms = candidate.snapped_boundary_ms
+        if action == "keep":
             if config.preserve_sentence_gaps:
                 previous["end_ms"], current["start_ms"] = _preserved_gap_boundary(
                     previous,
                     current,
-                    previous_end_ms,
-                    current_start_ms,
-                    vad_silence,
+                    candidate.previous_end_ms,
+                    candidate.current_start_ms,
+                    candidate.vad_silence,
                 )
             else:
-                boundary_ms = snapped_boundary_ms
                 previous["end_ms"] = boundary_ms
                 current["start_ms"] = boundary_ms
-        elif audio_safe:
-            action = "merge"
-            reason = "merged_semantic_incomplete"
-            _merge_sentence_into_previous(previous, current)
-        elif active_speech:
-            action = "merge"
-            reason = "merged_active_speech_prob" if prob_active_boundary else "merged_active_speech"
-            _merge_sentence_into_previous(previous, current)
-        elif same_raw_vad:
-            action = "merge"
-            reason = (
-                "max_duration_wait_for_silence"
-                if combined_duration_ms > int(config.max_sentence_s * 1000)
-                else "merged_active_speech"
-            )
-            _merge_sentence_into_previous(previous, current)
-        elif semantic_complete and combined_duration_ms > int(config.target_sentence_s * 1000):
-            reason = "target_duration"
-        elif semantic_complete and not same_raw_vad and token_gap_ms >= int(config.merge_max_token_gap_s * 1000):
-            reason = "semantic_boundary"
         else:
-            action = "merge"
-            reason = (
-                "max_duration_wait_for_silence"
-                if combined_duration_ms > int(config.max_sentence_s * 1000)
-                else "merged_semantic_incomplete"
-            )
+            boundary_ms = candidate.boundary_ms
             _merge_sentence_into_previous(previous, current)
 
         decisions.append({
-            "candidate_index": candidate_index,
+            "candidate_index": candidate.candidate_index,
             "action": action,
             "reason": reason,
-            "previous_end_ms": previous_end_ms,
-            "current_start_ms": current_start_ms,
-            "token_gap_ms": token_gap_ms,
+            "previous_end_ms": candidate.previous_end_ms,
+            "current_start_ms": candidate.current_start_ms,
+            "token_gap_ms": candidate.token_gap_ms,
             "boundary_ms": boundary_ms,
-            "same_raw_vad": same_raw_vad,
-            "audio_safe": audio_safe,
-            "audio_reason": audio_reason,
-            "semantic_complete": semantic_complete,
-            "semantic_reason": semantic_reason,
-            "vad_silence_ms": list(vad_silence) if vad_silence is not None else None,
-            "acoustic_valley_ratio": round(valley_ratio, 4),
-            "speech_prob_min": _round_optional(speech_stats["min"]),
-            "speech_prob_mean": _round_optional(speech_stats["mean"]),
-            "speech_prob_max": _round_optional(speech_stats["max"]),
-            "speech_prob_boundary_ms": speech_stats["boundary_ms"],
-            "speech_prob_supported_silence": prob_supported_silence,
-            "combined_duration_ms": combined_duration_ms,
+            "same_raw_vad": candidate.same_raw_vad,
+            "audio_safe": candidate.audio_safe,
+            "audio_reason": candidate.audio_reason,
+            "active_speech": candidate.active_speech,
+            "semantic_complete": candidate.semantic_complete,
+            "semantic_reason": candidate.semantic_reason,
+            "vad_silence_ms": list(candidate.vad_silence) if candidate.vad_silence is not None else None,
+            "speech_prob_min": _round_optional(candidate.speech_stats["min"]),
+            "speech_prob_mean": _round_optional(candidate.speech_stats["mean"]),
+            "speech_prob_max": _round_optional(candidate.speech_stats["max"]),
+            "speech_prob_boundary_ms": candidate.speech_stats["boundary_ms"],
+            "speech_prob_supported_silence": candidate.prob_supported_silence,
+            "combined_duration_ms": candidate.combined_duration_ms,
             "preserved_gap_ms": max(current["start_ms"] - previous["end_ms"], 0) if action == "keep" else None,
         })
         if action == "keep":
             fused.append(current)
 
     return fused, decisions
+
+
+def _boundary_candidate(
+    candidate_index: int,
+    previous: dict,
+    current: dict,
+    sorted_words: Sequence[dict],
+    raw_vad: Sequence[tuple[int, int]],
+    config: SentenceBoundaryFusionConfig,
+    vad_frame_speech_probs: dict | None,
+) -> BoundaryCandidate:
+    previous_word = _last_word_in_sentence(sorted_words, previous)
+    current_word = _first_word_in_sentence(sorted_words, current)
+    previous_end_ms = previous_word["end_ms"] if previous_word else previous["end_ms"]
+    current_start_ms = current_word["start_ms"] if current_word else current["start_ms"]
+    token_gap_ms = current_start_ms - previous_end_ms
+    combined_duration_ms = current["end_ms"] - previous["start_ms"]
+
+    candidate_gap_ms = current["start_ms"] - previous["end_ms"]
+    vad_silence = None
+    if candidate_gap_ms <= int(config.max_vad_snap_gap_s * 1000):
+        vad_silence = _supported_vad_silence(
+            raw_vad,
+            previous["end_ms"],
+            current["start_ms"],
+            int(config.min_vad_silence_s * 1000),
+        )
+
+    same_raw_vad = _same_raw_vad_segment(raw_vad, previous["end_ms"], current["start_ms"])
+    boundary_ms = (previous_end_ms + current_start_ms) // 2
+    speech_stats = _speech_prob_stats(
+        vad_frame_speech_probs,
+        boundary_ms,
+        config.speech_prob_window_s,
+        config.speech_prob_search_window_s,
+    )
+    prob_supported_silence = _probability_supported_silence(speech_stats, config)
+    prob_active_boundary = (
+        speech_stats["mean"] is not None
+        and speech_stats["mean"] >= config.speech_prob_active_threshold
+    )
+
+    audio_safe = False
+    audio_reason = None
+    snapped_boundary_ms = boundary_ms
+    if vad_silence is not None:
+        audio_safe = True
+        audio_reason = "vad_silence"
+        snapped_boundary_ms = _snap_to_supported_silence(
+            vad_silence,
+            previous["end_ms"],
+            current["start_ms"],
+        )
+    elif prob_supported_silence:
+        audio_safe = True
+        audio_reason = "vad_prob_silence"
+        snapped_boundary_ms = _snap_to_boundary_gap(
+            speech_stats["boundary_ms"],
+            previous["end_ms"],
+            current["start_ms"],
+        )
+
+    semantic_complete, semantic_reason = _semantic_boundary(
+        previous["text"],
+        current["text"],
+        current["end_ms"] - current["start_ms"],
+        combined_duration_ms,
+        config,
+    )
+    active_speech = (
+        prob_active_boundary
+        or (
+            same_raw_vad
+            and token_gap_ms < int(config.merge_max_token_gap_s * 1000)
+            and not audio_safe
+        )
+    )
+    return BoundaryCandidate(
+        candidate_index=candidate_index,
+        previous_end_ms=previous_end_ms,
+        current_start_ms=current_start_ms,
+        token_gap_ms=token_gap_ms,
+        combined_duration_ms=combined_duration_ms,
+        boundary_ms=boundary_ms,
+        same_raw_vad=same_raw_vad,
+        vad_silence=vad_silence,
+        speech_stats=speech_stats,
+        prob_supported_silence=prob_supported_silence,
+        prob_active_boundary=prob_active_boundary,
+        audio_safe=audio_safe,
+        audio_reason=audio_reason,
+        semantic_complete=semantic_complete,
+        semantic_reason=semantic_reason,
+        active_speech=active_speech,
+        snapped_boundary_ms=snapped_boundary_ms,
+    )
+
+
+def _decide_boundary(candidate: BoundaryCandidate, config: SentenceBoundaryFusionConfig) -> tuple[str, str]:
+    target_ms = int(config.target_sentence_s * 1000)
+    max_ms = int(config.max_sentence_s * 1000)
+    over_max = candidate.combined_duration_ms > max_ms
+    reached_target = candidate.combined_duration_ms >= target_ms
+
+    if over_max:
+        if candidate.audio_safe and not candidate.semantic_complete:
+            return "keep", "max_duration_audio_safe"
+        if candidate.audio_safe:
+            return "keep", candidate.audio_reason or "max_duration_audio_safe"
+        if candidate.active_speech:
+            return "merge", "max_duration_wait_for_silence"
+        return "keep", "max_duration_forced_boundary"
+
+    if candidate.active_speech:
+        reason = "merged_active_speech_prob" if candidate.prob_active_boundary else "merged_active_speech"
+        return "merge", reason
+
+    if candidate.audio_safe and candidate.semantic_complete:
+        return "keep", candidate.audio_reason or "semantic_boundary"
+
+    if candidate.audio_safe and reached_target:
+        return "keep", candidate.audio_reason or "target_duration_audio_safe"
+
+    if candidate.audio_safe:
+        return "merge", "merged_semantic_incomplete"
+
+    if candidate.semantic_reason == "terminal_punctuation" and candidate.token_gap_ms >= 0 and reached_target:
+        return "keep", "terminal_punctuation"
+
+    if (
+        candidate.semantic_complete
+        and not candidate.same_raw_vad
+        and candidate.token_gap_ms >= int(config.merge_max_token_gap_s * 1000)
+    ):
+        return "keep", "semantic_boundary"
+
+    if candidate.same_raw_vad:
+        return "merge", "merged_active_speech"
+
+    return "merge", "merged_semantic_incomplete"
 
 
 def _semantic_boundary(
@@ -256,13 +320,22 @@ def _preserved_gap_boundary(
     return max(previous["start_ms"], boundary_ms), min(current["end_ms"], boundary_ms)
 
 
-def _last_word_before(words: Sequence[dict], boundary_ms: int) -> dict | None:
-    candidates = [word for word in words if word["start_ms"] <= boundary_ms]
+def _last_word_in_sentence(words: Sequence[dict], sentence: dict) -> dict | None:
+    candidates = [
+        word for word in words
+        if word["start_ms"] < sentence["end_ms"] and word["end_ms"] > sentence["start_ms"]
+    ]
     return candidates[-1] if candidates else None
 
 
-def _first_word_after(words: Sequence[dict], boundary_ms: int) -> dict | None:
-    return next((word for word in words if word["end_ms"] >= boundary_ms), None)
+def _first_word_in_sentence(words: Sequence[dict], sentence: dict) -> dict | None:
+    return next(
+        (
+            word for word in words
+            if word["end_ms"] > sentence["start_ms"] and word["start_ms"] < sentence["end_ms"]
+        ),
+        None,
+    )
 
 
 def _same_raw_vad_segment(
@@ -310,25 +383,6 @@ def _snap_to_boundary_gap(boundary_ms: int, previous_end_ms: int, current_start_
     return (previous_end_ms + current_start_ms) // 2
 
 
-def _acoustic_valley_ratio(
-    wav: Any,
-    sample_rate: int,
-    boundary_ms: int,
-    window_s: float,
-    context_s: float,
-) -> float:
-    if sample_rate <= 0 or window_s <= 0 or context_s <= window_s:
-        return 1.0
-    center = int(boundary_ms / 1000 * sample_rate)
-    window = max(int(window_s * sample_rate), 1)
-    context = max(int(context_s * sample_rate), window + 1)
-    local_rms = _rms(wav[max(0, center - window):center + window])
-    context_rms = _rms(wav[max(0, center - context):center + context])
-    if context_rms <= 0:
-        return 0.0
-    return local_rms / context_rms
-
-
 def _speech_prob_stats(
     frame_speech_probs: dict | None,
     boundary_ms: int,
@@ -359,27 +413,44 @@ def _speech_prob_stats(
     ]
     if not search_frames:
         return {"min": None, "mean": None, "max": None, "boundary_ms": boundary_ms}
-    min_center_ms, min_prob = min(search_frames, key=lambda item: item[1])
-    window_frames = [
-        prob
-        for center_ms, prob in frames
-        if abs(center_ms - min_center_ms) <= window_ms
-    ]
-    if not window_frames:
-        window_frames = [min_prob]
+    candidates = []
+    for candidate_center_ms, _ in search_frames:
+        window_frames = [
+            prob
+            for center_ms, prob in frames
+            if abs(center_ms - candidate_center_ms) <= window_ms
+        ]
+        if not window_frames:
+            continue
+        candidates.append((
+            float(np.mean(window_frames)),
+            float(np.max(window_frames)),
+            abs(candidate_center_ms - boundary_ms),
+            candidate_center_ms,
+            float(np.min(window_frames)),
+            window_frames,
+        ))
+    if not candidates:
+        return {"min": None, "mean": None, "max": None, "boundary_ms": boundary_ms}
+    mean_prob, max_prob, _, best_center_ms, min_prob, _ = min(candidates)
     return {
         "min": min_prob,
-        "mean": float(np.mean(window_frames)),
-        "max": float(np.max(window_frames)),
-        "boundary_ms": min_center_ms,
+        "mean": mean_prob,
+        "max": max_prob,
+        "boundary_ms": best_center_ms,
     }
 
 
-def _rms(samples: Any) -> float:
-    values = np.asarray(samples, dtype=np.float64)
-    if values.size == 0:
-        return 0.0
-    return math.sqrt(float(np.mean(values * values)))
+def _probability_supported_silence(
+    speech_stats: dict,
+    config: SentenceBoundaryFusionConfig,
+) -> bool:
+    return (
+        speech_stats["min"] is not None
+        and speech_stats["mean"] is not None
+        and speech_stats["min"] <= config.speech_prob_silence_threshold
+        and speech_stats["mean"] <= config.speech_prob_silence_mean_threshold
+    )
 
 
 def _round_optional(value: float | None) -> float | None:
@@ -387,7 +458,7 @@ def _round_optional(value: float | None) -> float | None:
 
 
 def _merge_text(previous: str, current: str) -> str:
-    previous = _TRAILING_SENTENCE_PUNCTUATION.sub("", previous).rstrip()
+    previous = previous.rstrip()
     current = _LEADING_BOUNDARY_PUNCTUATION.sub("", current).lstrip()
     if not previous:
         return current

@@ -71,6 +71,21 @@ def run_profile(
 ) -> dict:
     output_dir = outdir or profile.output.outdir
     resolved_uttid = uttid or os.path.splitext(os.path.basename(wav_path))[0]
+    os.makedirs(output_dir, exist_ok=True)
+    json_path = result_json_path(output_dir, resolved_uttid)
+
+    if os.path.exists(json_path):
+        with open(json_path, encoding="utf-8") as fin:
+            result = json.load(fin)
+        outputs = write_missing_outputs(output_dir, resolved_uttid, result, profile)
+        outputs["json"] = json_path
+        if profile.output.copy_resolved_config:
+            resolved_config_path = os.path.join(output_dir, "resolved_config.json")
+            if os.path.exists(resolved_config_path):
+                outputs["resolved_config"] = resolved_config_path
+            else:
+                outputs["resolved_config"] = write_resolved_config(output_dir, profile)
+        return outputs
 
     input_wav_path = _maybe_truncate_wav(wav_path, max_seconds)
     try:
@@ -80,22 +95,63 @@ def run_profile(
         if input_wav_path != wav_path:
             os.unlink(input_wav_path)
 
-    os.makedirs(output_dir, exist_ok=True)
-    json_path = os.path.join(output_dir, f"{resolved_uttid}.json")
     with open(json_path, "w", encoding="utf-8") as fout:
         json.dump(result, fout, ensure_ascii=False, indent=2)
 
-    outputs = write_all_outputs(
-        output_dir,
-        resolved_uttid,
-        result,
-        write_textgrid_output=profile.output.write_textgrid,
-        write_srt_output=profile.output.write_srt,
-        write_csv_output=profile.output.write_csv,
-    )
+    outputs = write_missing_outputs(output_dir, resolved_uttid, result, profile, write_jsonl=True)
     outputs["json"] = json_path
     if profile.output.copy_resolved_config:
         outputs["resolved_config"] = write_resolved_config(output_dir, profile)
+    return outputs
+
+
+def result_json_path(outdir: str, uttid: str) -> str:
+    return os.path.join(outdir, f"{uttid}.json")
+
+
+def expected_output_paths(outdir: str, uttid: str, profile: PipelineProfileConfig) -> dict:
+    paths = {"json": result_json_path(outdir, uttid)}
+    if profile.output.write_textgrid:
+        paths["textgrid"] = os.path.join(outdir, "asr_tg", f"{uttid}.TextGrid")
+    if profile.output.write_srt:
+        paths["srt"] = os.path.join(outdir, "asr_srt", f"{uttid}.srt")
+    if profile.output.write_csv:
+        paths["csv"] = os.path.join(outdir, "asr_csv", f"{uttid}.csv")
+    return paths
+
+
+def output_artifacts_complete(outdir: str, uttid: str, profile: PipelineProfileConfig) -> bool:
+    return all(os.path.exists(path) for path in expected_output_paths(outdir, uttid, profile).values())
+
+
+def write_missing_outputs(
+    outdir: str,
+    uttid: str,
+    result: dict,
+    profile: PipelineProfileConfig,
+    write_jsonl: bool = False,
+) -> dict:
+    paths = expected_output_paths(outdir, uttid, profile)
+    outputs = {"jsonl": os.path.join(outdir, "result.jsonl")}
+
+    write_textgrid_output = profile.output.write_textgrid and not os.path.exists(paths.get("textgrid", ""))
+    write_srt_output = profile.output.write_srt and not os.path.exists(paths.get("srt", ""))
+    write_csv_output = profile.output.write_csv and not os.path.exists(paths.get("csv", ""))
+    if write_jsonl or write_textgrid_output or write_srt_output or write_csv_output:
+        outputs.update(
+            write_all_outputs(
+                outdir,
+                uttid,
+                result,
+                write_textgrid_output=write_textgrid_output,
+                write_srt_output=write_srt_output,
+                write_csv_output=write_csv_output,
+            )
+        )
+
+    for key, path in paths.items():
+        if key != "json" and os.path.exists(path):
+            outputs[key] = path
     return outputs
 
 

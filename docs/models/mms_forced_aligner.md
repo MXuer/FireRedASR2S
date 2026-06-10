@@ -56,6 +56,28 @@ The current environment needs `torch` and `torchaudio`. The adapter aligns the
 in-memory `SpeechSegment.wav` audio directly and does not write temporary
 segment wav files.
 
+## Parallel Segment Workers
+
+MMS alignment does not expose a native batch API in this adapter. For long audio
+with many raw VAD segments, configure segment-level worker processes:
+
+```json
+{
+  "components": {
+    "timestamp": {
+      "name": "mms_forced_aligner",
+      "params": {
+        "device": "cuda:0",
+        "num_workers": 2
+      }
+    }
+  }
+}
+```
+
+Each worker process loads one MMS aligner instance. This improves throughput
+when GPU memory allows multiple model copies.
+
 ## Language Support
 
 Configure the canonical pipeline language id. The adapter maps it through
@@ -66,11 +88,17 @@ For Chinese, Korean and Japanese, the adapter automatically inserts spaces
 around no-space script characters before alignment.
 
 MMS alignment does not handle numeric-form tokens reliably. The adapter keeps a
-separate alignment-token stream for MMS: numeric tokens such as `1952` are
-temporarily aligned as `<star>`, while the original token is preserved in the
-returned timestamp. This placeholder is distinct from the optional `use_star`
-noise tokens inserted by MMS; inserted stars are filtered, numeric placeholder
-stars are restored to their original text.
+separate alignment-token stream for MMS: numeric spans are temporarily aligned
+as `<star>`, while the original surface text is preserved in the returned
+timestamp. Numeric spans include standalone numbers such as `1952`, currency
+and percent expressions such as `$ 100 %`, common currency codes such as
+`USD 100`, units such as `20 kg`, and ranges such as `100 - 200`. These are
+grouped into one timestamp token before alignment so MMS only sees one
+placeholder for the unsupported expression.
+
+This placeholder is distinct from the optional `use_star` noise tokens inserted
+by MMS; inserted stars are filtered, numeric placeholder stars are restored to
+their original text.
 
 ## Standalone Test
 

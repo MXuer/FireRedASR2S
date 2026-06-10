@@ -3,8 +3,8 @@ from typing import Sequence
 
 _PUNCT_ONLY = re.compile(r"^[^\w\u4e00-\u9fff]+$")
 _EDGE_PUNCT = re.compile(r"(^[^\w\u4e00-\u9fff]+)|([^\w\u4e00-\u9fff]+$)")
-_SENTENCE_END = re.compile(r"[。.!?！？]+$")
-_SENTENCE_SPLIT = re.compile(r"[^。.!?！？]+[。.!?！？]*")
+_SENTENCE_END = re.compile(r"[。.!?！？؟]+$")
+_SENTENCE_SPLIT = re.compile(r"[^。.!?！？؟]+[。.!?！？؟]*")
 _ASCII_WORD = re.compile(r"[a-zA-Z0-9#]")
 
 
@@ -47,7 +47,7 @@ class AsrTextPunc:
 
 
 def split_text_by_punctuation(text: str, timestamp: Sequence[Sequence]) -> list[dict]:
-    sentence_texts = [m.group(0).strip() for m in _SENTENCE_SPLIT.finditer(text) if m.group(0).strip()]
+    sentence_texts = _split_punctuated_sentence_texts(text)
     if not sentence_texts:
         sentence_texts = [text.strip()] if text.strip() else []
 
@@ -56,6 +56,10 @@ def split_text_by_punctuation(text: str, timestamp: Sequence[Sequence]) -> list[
     sentences = []
     for i, sentence_text in enumerate(sentence_texts):
         token_count = len(strip_timestamp_punctuation([[tok, 0, 0] for tok in sentence_text.split()]))
+        if token_count == 0:
+            if sentences:
+                sentences[-1]["punc_text"] += sentence_text
+            continue
         if i == len(sentence_texts) - 1:
             token_count = max(token_count, len(timestamps) - cursor)
         selected = timestamps[cursor:cursor + token_count] if token_count > 0 else []
@@ -72,6 +76,18 @@ def split_text_by_punctuation(text: str, timestamp: Sequence[Sequence]) -> list[
             end_s = 0.0
         sentences.append(_sentence(start_s, end_s, [sentence_text]))
     return sentences
+
+
+def _split_punctuated_sentence_texts(text: str) -> list[str]:
+    sentence_texts = []
+    for match in _SENTENCE_SPLIT.finditer(text):
+        sentence_text = match.group(0).strip()
+        if not sentence_text:
+            continue
+        if _PUNCT_ONLY.fullmatch(sentence_text):
+            continue
+        sentence_texts.append(sentence_text)
+    return sentence_texts
 
 
 def split_timestamp_by_native_punctuation(timestamp: Sequence[Sequence]) -> list[dict]:

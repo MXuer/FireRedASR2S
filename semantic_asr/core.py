@@ -1,6 +1,6 @@
-import logging
 import re
-from dataclasses import dataclass
+import logging
+from dataclasses import dataclass, fields
 from typing import Any, Protocol, Sequence
 
 import soundfile as sf
@@ -12,6 +12,7 @@ from semantic_asr.sentence_boundaries import (
 )
 
 logger = logging.getLogger("semantic_asr.core")
+_FINAL_TERMINAL_PUNCTUATION = re.compile(r"[。.!?！？؟]+[\s\"'”’)]*$")
 
 
 @dataclass
@@ -111,12 +112,14 @@ class SemanticAsrPipeline:
         if not self.config.preserve_sentence_gaps:
             sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
         sentences = remove_sentence_overlaps(sentences)
-        if not self.config.preserve_sentence_gaps:
+        if not self.config.preserve_sentence_gaps and not boundary_config.enabled:
             sentences = merge_final_sentences_by_gap(
                 sentences,
                 max_gap_s=self.config.final_sentence_merge_max_gap_s,
                 max_duration_s=self.config.final_sentence_merge_max_duration_s,
             )
+            sentences = remove_sentence_overlaps(sentences)
+        sentences = add_sentence_cut_segments(sentences, self._segments_ms(raw_vad_result["timestamps"]))
 
         text = "".join(s["text"] for s in sentences)
         text = re.sub(r"([.,!?])\s*([a-zA-Z])", r"\1 \2", text)
@@ -199,10 +202,14 @@ class SemanticAsrPipeline:
         asr_results = []
         asr_segments = []
         batch_segments = []
+        asr_batch_size = max(
+            int(self.config.asr_batch_size),
+            int(getattr(self.asr, "recommended_batch_size", 1)),
+        )
 
         for i, segment in enumerate(segments):
             batch_segments.append(segment)
-            if len(batch_segments) < self.config.asr_batch_size and i != len(segments) - 1:
+            if len(batch_segments) < asr_batch_size and i != len(segments) - 1:
                 continue
 
             batch_uttid = [s.uttid for s in batch_segments]
@@ -216,8 +223,9 @@ class SemanticAsrPipeline:
                 text = text.replace('*', '').replace('–', '')
                 if not text or re.search(r"(<blank>)|(<sil>)", text):
                     continue
-                if not re.sub('[,.?!，。？！]', '', text):
+                if not re.sub('[,.?!，。‑？！]', '', text):
                     continue
+                text = re.sub(r'(?<=[\u4e00-\u9fff])\s+(?=[\u4e00-\u9fff])', '', text)
                 asr_result['text'] = text
                 asr_results.append(asr_result)
                 asr_segments.append(self._find_segment(asr_result["uttid"], batch_segments))
@@ -285,13 +293,16 @@ class SemanticAsrPipeline:
 
             punc_sentences = punc_result["punc_sentences"]
             for i, punc_sentence in enumerate(punc_sentences):
+                punc_text = str(punc_sentence.get("punc_text", "")).strip()
+                if not punc_text or not re.search(r"[\w\u4e00-\u9fff]", punc_text):
+                    continue
                 start_ms = segment_start_ms + int(punc_sentence["start_s"] * 1000)
                 end_ms = segment_start_ms + int(punc_sentence["end_s"] * 1000)
                 if i == 0:
                     start_ms = segment_start_ms
                 if i == len(punc_sentences) - 1:
                     end_ms = segment_end_ms
-                sentences.append(self._sentence(start_ms, end_ms, punc_sentence["punc_text"], asr_result))
+                sentences.append(self._sentence(start_ms, end_ms, punc_text, asr_result))
 
             for token, start_s, end_s in asr_result.get("timestamp", []):
                 words.append({
@@ -358,7 +369,10 @@ class SemanticAsrPipeline:
             )
             return boundary_config
         if isinstance(config, dict):
-            boundary_config = SentenceBoundaryFusionConfig(**config)
+            allowed = {field.name for field in fields(SentenceBoundaryFusionConfig)}
+            boundary_config = SentenceBoundaryFusionConfig(**{
+                key: value for key, value in config.items() if key in allowed
+            })
             boundary_config.preserve_sentence_gaps = (
                 boundary_config.preserve_sentence_gaps or self.config.preserve_sentence_gaps
             )
@@ -506,7 +520,11 @@ def merge_final_sentences_by_gap(
         current = dict(sentence_source)
         gap_ms = current["start_ms"] - previous["end_ms"]
         combined_duration_ms = current["end_ms"] - previous["start_ms"]
-        if gap_ms < max_gap_ms and combined_duration_ms <= max_duration_ms:
+        if (
+            gap_ms < max_gap_ms
+            and combined_duration_ms <= max_duration_ms
+            and not _has_final_terminal_punctuation(previous.get("text", ""))
+        ):
             previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
             previous["text"] = _join_final_sentence_text(previous["text"], current["text"])
             previous["asr_confidence"] = min(
@@ -516,6 +534,80 @@ def merge_final_sentences_by_gap(
             continue
         merged.append(current)
     return merged
+
+
+def _has_final_terminal_punctuation(text: str) -> bool:
+    return bool(_FINAL_TERMINAL_PUNCTUATION.search(str(text).strip()))
+
+
+def add_sentence_cut_segments(
+    sentences: Sequence[dict],
+    raw_vad_segments_ms: Sequence[tuple[int, int]],
+) -> list[dict]:
+    raw_vad = [(int(start), int(end)) for start, end in raw_vad_segments_ms if int(end) > int(start)]
+    enriched = []
+    for sentence_source in sentences:
+        sentence = dict(sentence_source)
+        cut_segments = [
+            [max(vad_start_ms, int(sentence["start_ms"])), min(vad_end_ms, int(sentence["end_ms"]))]
+            for vad_start_ms, vad_end_ms in raw_vad
+            if vad_start_ms < sentence["end_ms"] and vad_end_ms > sentence["start_ms"]
+        ]
+        cut_segments = [segment for segment in cut_segments if segment[1] > segment[0]]
+        if not cut_segments:
+            cut_segments = [[int(sentence["start_ms"]), int(sentence["end_ms"])]]
+        sentence["cut_segments_ms"] = cut_segments
+        sentence["cut_start_ms"] = cut_segments[0][0]
+        sentence["cut_end_ms"] = cut_segments[-1][1]
+        enriched.append(sentence)
+    return remove_sentence_cut_overlaps(enriched)
+
+
+def remove_sentence_cut_overlaps(sentences: Sequence[dict]) -> list[dict]:
+    adjusted = [dict(sentence) for sentence in sentences]
+    for sentence in adjusted:
+        sentence["cut_segments_ms"] = [list(segment) for segment in sentence.get("cut_segments_ms", [])]
+
+    for index in range(1, len(adjusted)):
+        previous = adjusted[index - 1]
+        current = adjusted[index]
+        if current.get("cut_start_ms", current["start_ms"]) >= previous.get("cut_end_ms", previous["end_ms"]):
+            continue
+
+        previous_end = int(previous.get("cut_end_ms", previous["end_ms"]))
+        current_start = int(current.get("cut_start_ms", current["start_ms"]))
+        boundary_ms = (previous_end + current_start) // 2
+        _set_cut_end(previous, boundary_ms)
+        _set_cut_start(current, boundary_ms)
+    return adjusted
+
+
+def _set_cut_start(sentence: dict, start_ms: int) -> None:
+    cut_end_ms = int(sentence.get("cut_end_ms", sentence["end_ms"]))
+    sentence["cut_start_ms"] = min(int(start_ms), cut_end_ms)
+    segments = sentence.get("cut_segments_ms") or []
+    if not segments:
+        sentence["cut_segments_ms"] = [[sentence["cut_start_ms"], int(sentence.get("cut_end_ms", sentence["end_ms"]))]]
+        return
+    segments[0][0] = max(int(segments[0][0]), sentence["cut_start_ms"])
+    sentence["cut_segments_ms"] = [segment for segment in segments if int(segment[1]) > int(segment[0])]
+    if not sentence["cut_segments_ms"]:
+        end_ms = int(sentence.get("cut_end_ms", sentence["end_ms"]))
+        sentence["cut_segments_ms"] = [[sentence["cut_start_ms"], max(sentence["cut_start_ms"], end_ms)]]
+
+
+def _set_cut_end(sentence: dict, end_ms: int) -> None:
+    cut_start_ms = int(sentence.get("cut_start_ms", sentence["start_ms"]))
+    sentence["cut_end_ms"] = max(int(end_ms), cut_start_ms)
+    segments = sentence.get("cut_segments_ms") or []
+    if not segments:
+        sentence["cut_segments_ms"] = [[int(sentence.get("cut_start_ms", sentence["start_ms"])), sentence["cut_end_ms"]]]
+        return
+    segments[-1][1] = min(int(segments[-1][1]), sentence["cut_end_ms"])
+    sentence["cut_segments_ms"] = [segment for segment in segments if int(segment[1]) > int(segment[0])]
+    if not sentence["cut_segments_ms"]:
+        start_ms = int(sentence.get("cut_start_ms", sentence["start_ms"]))
+        sentence["cut_segments_ms"] = [[start_ms, max(start_ms, sentence["cut_end_ms"])]]
 
 
 def _join_final_sentence_text(previous: str, current: str) -> str:

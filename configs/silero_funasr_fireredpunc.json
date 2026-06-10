@@ -36,9 +36,6 @@
       "min_vad_silence_s": 0.2,
       "max_vad_snap_gap_s": 1.0,
       "merge_max_token_gap_s": 0.3,
-      "acoustic_window_s": 0.05,
-      "acoustic_context_s": 0.3,
-      "acoustic_valley_ratio": 0.25,
       "target_sentence_s": 15.0,
       "max_sentence_s": 30.0
     }

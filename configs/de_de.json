@@ -1,14 +1,11 @@
 {
-  "name": "pt_br",
-  "language": "pt_br",
+  "name": "de_de",
+  "language": "de_de",
   "components": {
     "vad": {
-      "name": "firered_vad",
+      "name": "ten_vad",
       "params": {
-        "model_dir": "pretrained_models/FireRedVAD/VAD",
-        "config": {
-          "use_gpu": true
-        }
+        "speech_pad_ms": 200
       }
     },
     "asr": {
@@ -16,7 +13,7 @@
       "params": {
         "model_name": "large-v3",
         "device": "cuda:0",
-        "word_timestamps": true
+        "word_timestamps": false
       }
     },
     "timestamp": {
@@ -24,14 +21,14 @@
       "params": {}
     },
     "punc": {
-      "name": "asr_native",
-      "params": {}
+      "name": "asr_text"
     }
   },
   "pipeline": {
     "asr_batch_size": 1,
     "punc_batch_size": 1,
     "strip_punctuation_before_punc": false,
+    "final_sentence_merge_max_duration_s": 30,
     "sentence_boundary_fusion": {
       "enabled": true,
       "min_vad_silence_s": 0.2,
@@ -42,7 +39,7 @@
     }
   },
   "output": {
-    "outdir": "output/experiments/multilingual_5min/pt_br2",
+    "outdir": "output/experiments/multilingual_5min/de_de",
     "write_textgrid": true,
     "write_srt": true,
     "write_csv": true,

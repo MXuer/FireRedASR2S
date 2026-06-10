@@ -17,6 +17,7 @@ from semantic_asr.adapters.mms_forced_aligner import (
     MmsForcedAlignerConfig,
     MmsForcedAlignerTimestampProvider,
 )
+from semantic_asr.adapters.naqta_punctuation import NaqtaPunctuation, NaqtaPunctuationConfig
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig
 from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
 from semantic_asr.adapters.silero import SileroVad, SileroVadConfig
@@ -34,6 +35,7 @@ from semantic_asr.core import AsrModel, PuncModel, TimestampProvider, VadModel
 from semantic_asr.firered_runtime.fireredpunc import FireRedPuncConfig
 from semantic_asr.firered_runtime.fireredvad import FireRedVad, FireRedVadConfig
 from semantic_asr.punctuation import AsrNativePunc, AsrTextPunc
+from semantic_asr.parallel_components import ParallelAsrModel, ParallelTimestampProvider
 
 Factory = Callable[[Mapping[str, Any]], Any]
 
@@ -89,6 +91,7 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("punc", "firered_punc", _build_firered_punc)
     registry.register("punc", "asr_native", lambda params: AsrNativePunc())
     registry.register("punc", "asr_text", lambda params: AsrTextPunc())
+    registry.register("punc", "naqta", _build_naqta_punctuation)
     registry.register("punc", "xlm_roberta_punctuation", _build_xlm_roberta_punctuation)
     return registry
 
@@ -112,7 +115,10 @@ def _build_funasr_nano(params: Mapping[str, Any]) -> AsrModel:
 
 
 def _build_whisper_large(params: Mapping[str, Any]) -> AsrModel:
-    return WhisperLarge(_dataclass_from_mapping(WhisperLargeConfig, params))
+    config = _dataclass_from_mapping(WhisperLargeConfig, params)
+    if config.num_workers > 1:
+        return ParallelAsrModel(WhisperLarge, config, config.num_workers)
+    return WhisperLarge(config)
 
 
 def _build_qwen3_asr(params: Mapping[str, Any]) -> AsrModel:
@@ -132,7 +138,10 @@ def _build_qwen3_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
 
 
 def _build_mms_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
-    return MmsForcedAlignerTimestampProvider(_dataclass_from_mapping(MmsForcedAlignerConfig, params))
+    config = _dataclass_from_mapping(MmsForcedAlignerConfig, params)
+    if config.num_workers > 1:
+        return ParallelTimestampProvider(MmsForcedAlignerTimestampProvider, config, config.num_workers)
+    return MmsForcedAlignerTimestampProvider(config)
 
 
 def _build_firered_punc(params: Mapping[str, Any]) -> PuncModel:
@@ -143,6 +152,10 @@ def _build_firered_punc(params: Mapping[str, Any]) -> PuncModel:
 
 def _build_xlm_roberta_punctuation(params: Mapping[str, Any]) -> PuncModel:
     return XlmRobertaPunctuation(_dataclass_from_mapping(XlmRobertaPunctuationConfig, params))
+
+
+def _build_naqta_punctuation(params: Mapping[str, Any]) -> PuncModel:
+    return NaqtaPunctuation(_dataclass_from_mapping(NaqtaPunctuationConfig, params))
 
 
 def _dataclass_from_mapping(cls, values: Mapping[str, Any]):

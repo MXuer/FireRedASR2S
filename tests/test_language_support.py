@@ -75,6 +75,14 @@ class LanguageSupportTest(unittest.TestCase):
         names = set(registry.names("punc"))
 
         self.assertIn("xlm_roberta_punctuation", names)
+        self.assertIn("naqta", names)
+
+    def test_naqta_punctuation_is_arabic_only(self):
+        ar_result = list_models_by_language("ar_sa", role="punc")
+        en_result = list_models_by_language("en_us", role="punc")
+
+        self.assertIn("naqta", {item["name"] for item in ar_result["punc"]})
+        self.assertNotIn("naqta", {item["name"] for item in en_result["punc"]})
 
     def test_mms_forced_aligner_is_registered_for_timestamp(self):
         registry = create_default_registry()

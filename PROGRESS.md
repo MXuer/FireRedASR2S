@@ -42,6 +42,11 @@ Current state:
   - adapter: `semantic_asr.adapters.xlm_roberta_punctuation`;
   - registry name: `xlm_roberta_punctuation`;
   - docs and standalone skip-load test were added.
+- Added Naqta Arabic punctuation model as a `punc` component:
+  - adapter: `semantic_asr.adapters.naqta_punctuation`;
+  - registry name: `naqta`;
+  - language support: Arabic profiles such as `ar_sa`;
+  - docs, standalone skip-load test and `configs/ar_sa_naqta.json` were added.
 - Added MMS forced aligner as a `timestamp` component:
   - adapter: `semantic_asr.adapters.mms_forced_aligner`;
   - registry name: `mms_forced_aligner`;
@@ -72,18 +77,37 @@ Current state:
   `frame_speech_probs`; current support covers FireRed VAD, Silero VAD and TEN
   VAD.
 - Sentence-boundary fusion uses frame-level VAD speech probability as the
-  preferred acoustic signal. `max_sentence_s` is a soft preference and no
-  longer forces a split through high-probability active speech.
+  preferred speech-safety signal. High-probability active-speech boundaries
+  merge even when terminal punctuation or `max_sentence_s` duration pressure is
+  present; the decision records `max_duration_wait_for_silence`.
 - ASR and MMS forced alignment now use raw VAD speech segments by default.
   Semantic sentence merging happens after token timestamps are available.
 - MMS forced aligner forces `use_star=False`; configs cannot override it back
   to true.
 - Sentence-boundary fusion now separates audio safety from semantic
-  completeness. Raw VAD silence, frame-level VAD probability valleys and RMS
-  valleys mark a boundary as safe to cut, but comma/colon/semicolon
-  continuations and short incomplete fragments still merge.
+  completeness. Raw VAD silence and low frame-level VAD probability windows
+  mark a boundary as safe to cut, but comma/colon/semicolon continuations and
+  short incomplete fragments still merge.
 
 Recent validation:
+
+- Removed RMS/waveform valley from the active sentence-boundary policy.
+  Boundary fusion now uses raw VAD silence and frame-level speech probability
+  as audio-safety evidence, with probability silence requiring both low local
+  minimum and low local mean.
+- High speech-probability active-speech boundaries now merge even when the
+  combined span is over `max_sentence_s`; the decision records
+  `max_duration_wait_for_silence`.
+- Sentence-boundary fusion is now the single grouping stage for fusion-enabled
+  profiles. The legacy final short-gap merge runs only when
+  `sentence_boundary_fusion.enabled=false`.
+- Updated current strategy docs and diagram:
+  `docs/sentence_boundary_fusion.md`,
+  `docs/sentence_split_merge_strategy_audit.md` and
+  `docs/sentence_split_merge_strategy.drawio`.
+- Validation passed: `tests.test_sentence_boundaries` (17 tests), full unit
+  discover (98 tests), `compileall`, draw.io XML parse, checked-in config scan
+  for obsolete `acoustic_*` keys and `git diff --check`.
 
 - Fixed the `pt_br` raw-align semantic fragmentation around `47.895s-58.600s`.
   The reported three candidates:
@@ -115,7 +139,7 @@ Recent validation:
 - Boundary decisions now include `speech_prob_min`, `speech_prob_mean`,
   `speech_prob_max`, `speech_prob_boundary_ms` and
   `speech_prob_supported_silence`.
-- Boundary-fusion reasons now include `vad_prob_valley`,
+- Boundary-fusion reasons now include `vad_prob_silence`,
   `merged_active_speech_prob` and `max_duration_wait_for_silence`.
 - Real `pt_br` smoke passed with TEN VAD + Whisper + MMS + ASR-native
   punctuation under
@@ -130,6 +154,39 @@ Recent validation:
   frames with 32ms metadata.
 - Validation after frame-level VAD probability integration passed: 45 tests,
   package/tests/examples compile and all configs parse.
+
+- Naqta Arabic punctuation integration passed lightweight validation without
+  loading the still-downloading checkpoint: targeted punctuation/language/config
+  tests, `examples/test_naqta_punctuation.py --skip_model_load 1`,
+  `query_models.py language ar_sa --role punc`, and the full unit suite
+  passed with 93 tests.
+- Fixed the Naqta Arabic semantic-cut regression from `output/ar_sa_error-6`.
+  Naqta had produced 21 semantic candidates, but boundary fusion did not treat
+  Arabic question mark `؟` as terminal punctuation, word-gap lookup crossed
+  candidate sentence ranges, and the final short-gap merge re-merged terminal
+  punctuation boundaries. Boundary fusion now recognizes Arabic terminal
+  punctuation, uses sentence-local word lookup and preserves terminal
+  punctuation token boundaries when word timestamps do not overlap. Final
+  short-gap merge skips previous sentences that already end with terminal
+  punctuation. The real rerun under `output/ar_sa_error-6_fix2` emits 19 final
+  sentences, keeps the `وما أدراك ما الحق؟` split, keeps the final
+  `المسكين.` split, and has a maximum sentence duration of 29.37s.
+- Refined the terminal-punctuation boundary rule after the German TEN-VAD case
+  under `output/de_de-tenvad-3`. Terminal punctuation is no longer an absolute
+  keep signal when the boundary has no audio-safe evidence. If adjacent
+  terminal-punctuation candidates are short, inside the same raw VAD speech
+  island, and separated by 0-20ms/high speech probability, they merge until the
+  span approaches `target_sentence_s` or the hard max-duration policy applies.
+  Merged text now preserves the original punctuation. Offline recomputation of
+  the reported `308s-328s` region reduces the five short segments to three
+  spans: `300.099-312.563`, `312.563-322.546`, and `322.546-327.688`.
+- Added a strategy audit document and draw.io diagram for the current
+  sentence split/merge logic:
+  - `docs/sentence_split_merge_strategy_audit.md`
+  - `docs/sentence_split_merge_strategy.drawio`
+  The audit explains current timing layers, boundary-fusion decision order,
+  output cut timing, known logical holes and the next simplification: keep one
+  grouping stage but add a rolling recent-boundary selector.
 
 - Added a TEN VAD adapter:
   - adapter: `semantic_asr.adapters.ten_vad.TenVadAdapter`;

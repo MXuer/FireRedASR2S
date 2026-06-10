@@ -1,5 +1,170 @@
 # Todo
 
+- [ ] Current work: checkpoint and push current `red-asr` state to GitHub before further simplification.
+- [ ] Current work: inspect configs and strategy code for historical compatibility clutter.
+- [ ] Current work: remove obsolete configs/options and simplify the public configuration surface.
+- [ ] Current work: run validation after simplification.
+- [ ] Current work: update docs/progress/TODO and commit the cleanup.
+
+- [x] Current work: record implementation plan for speech-probability-first single-pass sentence grouping.
+- [x] Current work: remove RMS valley from boundary config, docs and config profiles.
+- [x] Current work: refactor boundary fusion to build explicit boundary candidates and use one decision table.
+- [x] Current work: disable final short-gap merge when sentence boundary fusion is enabled.
+- [x] Current work: add regression tests for Arabic, German and no-probability fallback behavior.
+- [x] Current work: run targeted and full validation.
+- [x] Current work: update strategy docs and progress notes.
+
+Review:
+- Removed RMS/waveform valley from the active sentence-boundary policy and
+  cleaned checked-in configs of obsolete `acoustic_*` fields.
+- Boundary fusion now builds explicit `BoundaryCandidate` objects and uses a
+  single decision table based on raw VAD silence, frame-level speech
+  probability, semantic completeness and duration pressure.
+- High speech-probability active boundaries now merge even when the span is
+  over `max_sentence_s`; the decision records `max_duration_wait_for_silence`.
+- `merge_final_sentences_by_gap()` is disabled whenever
+  `sentence_boundary_fusion.enabled=true`, leaving fusion as the single
+  grouping stage.
+- Updated the current strategy docs and draw.io diagram. Validation passed:
+  17 targeted boundary tests, 98 full unit tests, compileall, draw.io XML parse,
+  config obsolete-key scan and `git diff --check`.
+
+- [x] Current work: record strategy redesign discussion: remove RMS valley and center on speech probability.
+- [x] Current work: restate the project objective as an explicit optimization problem.
+- [x] Current work: propose a simpler speech-probability-first segmentation strategy.
+- [x] Current work: compare the proposed strategy against current logic and recent Arabic/German cases.
+- [x] Current work: list implementation steps if we choose to migrate.
+
+Review:
+- Agreed conceptually that RMS valley should be removed from the core boundary policy because it is not robust under noise.
+- Reframed the target as one segmentation optimization problem: never cut active speech first, then prefer semantic completeness, then fit configurable duration.
+- Proposed a speech-probability-first boundary candidate strategy with a single grouping pass instead of boundary fusion plus final merge.
+
+- [x] Current work: record sentence split/merge strategy audit before reading code.
+- [x] Current work: inspect current strategy code paths in `core.py`, `sentence_boundaries.py`, punctuation and output timing helpers.
+- [x] Current work: summarize the current split/merge pipeline in a detailed but readable form.
+- [x] Current work: create a draw.io diagram for the current strategy.
+- [x] Current work: identify logical holes, priority conflicts and risky edge cases.
+- [x] Current work: propose a simpler strategy that preserves the current product goals.
+- [x] Current work: write the analysis into docs and report the key points.
+
+Review:
+- Added `docs/sentence_split_merge_strategy_audit.md` with the current split/merge execution flow, decision order, known logical holes, and simplification proposal.
+- Added `docs/sentence_split_merge_strategy.drawio` with a draw.io diagram of candidate generation, boundary fusion, output VAD alignment, final merge and cut-range export.
+- Verified the draw.io XML parses and `git diff --check` passes.
+
+- [x] Current work: record German TEN-VAD short-segment active-speech boundary regression before investigation.
+- [x] Current work: inspect `/data/duhu/FireRedASR2S/output/de_de-tenvad-3/848c4ebd-419a-4c42-a85a-2bb1ab52b121.json` around 308s-328s.
+- [x] Current work: identify whether boundary fusion, final merge, VAD alignment or cut segment generation preserved active-speech cuts.
+- [x] Current work: adjust strategy so short adjacent terminal-punctuation sentences merge when the acoustic boundary is not safe.
+- [x] Current work: add regression tests for short terminal sentences with no silence/high speech probability.
+- [x] Current work: run targeted and full validation.
+
+Review:
+- Root cause: the previous Naqta fix made terminal punctuation boundaries too strong. In the German case, all reported boundaries lived inside one raw TEN-VAD speech island with 0-20ms token gaps and high frame-level speech probability, but `terminal_punctuation` kept each 2-5s sentence.
+- Updated boundary fusion so terminal punctuation without audio-safe evidence is kept only once the merged span reaches `target_sentence_s`; otherwise adjacent short terminal sentences merge through active speech until the target duration or hard max policy intervenes.
+- Preserved sentence punctuation when merging active-speech terminal sentences, so merged German text keeps `Schienen. Und...` rather than losing periods.
+- Offline recomputation for the reported 308s-328s region now merges the five short segments into three spans: `300.099-312.563`, `312.563-322.546`, and `322.546-327.688`.
+- Validation passed: targeted boundary/punctuation tests, full unit discover, and `git diff --check`.
+
+- [x] Current work: record Naqta Arabic semantic-cut regression before investigation.
+- [x] Current work: inspect `output/ar_sa_error-6` JSON for semantic candidates, final sentences and boundary decisions.
+- [x] Current work: identify whether Naqta punctuation, timestamp mapping or boundary fusion caused the over-merged intervals.
+- [x] Current work: adjust sentence-boundary strategy so Arabic/Naqta semantic punctuation is respected under the 30s hard-duration policy.
+- [x] Current work: add a focused regression test for semantic punctuation boundaries surviving fusion.
+- [x] Current work: run targeted validation.
+
+Review:
+- Root cause: Naqta produced semantic candidates, but sentence-boundary fusion did not treat Arabic question mark `؟` as terminal punctuation; sentence-local word lookup also crossed candidate boundaries and produced negative token gaps; final short-gap merge then merged terminal punctuation boundaries again.
+- Fixed Arabic terminal punctuation recognition in punctuation splitting and boundary fusion.
+- Changed boundary fusion word lookup to use words inside each candidate sentence instead of global before/after boundary searches.
+- Kept terminal-punctuation token boundaries when word timestamps do not overlap, even if frame-level VAD probability is high.
+- Made final short-gap merge skip previous sentences that already end with terminal punctuation.
+- Real rerun `output/ar_sa_error-6_fix2` now has 19 final sentences from 21 semantic candidates; max duration is 29.37s and the reported `وما أدراك ما الحق؟` split is preserved.
+- Validation passed: targeted tests, full unit discover, `git diff --check`, and real GPU rerun with `configs/ar_sa_naqta.json`.
+
+- [x] Current work: record Naqta Arabic punctuation integration plan before coding.
+- [x] Current work: inspect existing punctuation component contracts and language catalog.
+- [x] Current work: add a Naqta punctuation adapter with configurable HF token-label mapping.
+- [x] Current work: register Naqta and expose Arabic language support/query results.
+- [x] Current work: add docs and focused tests without requiring the model download.
+- [x] Current work: run targeted validation.
+
+Review:
+- Added the Arabic-only `naqta` punctuation component with a configurable Hugging Face token-classification label-to-punctuation mapping.
+- Registered `naqta` in the default component registry and language-support catalog.
+- Added `docs/models/naqta.md`, `examples/test_naqta_punctuation.py`, and `configs/ar_sa_naqta.json`.
+- Extended punctuation sentence splitting to recognize Arabic question mark `؟`.
+- Validation passed: targeted unit tests, skip-load example, Arabic punc query, and full unit discover.
+
+- [x] Current work: record plan for single-GPU multi-process acceleration for non-batch Whisper and MMS alignment.
+- [x] Current work: inspect current ASR and timestamp provider batch contracts.
+- [x] Current work: design configurable process worker wrappers without changing model adapter semantics.
+- [x] Current work: wire parallel workers for Whisper ASR and MMS forced aligner.
+- [x] Current work: add focused tests and run validation.
+
+- [x] Current work: record priority change: audio-safe boundary first, 30s length second, semantic completeness third.
+- [x] Current work: inspect `output/ar_sa_error-2` for long merged Arabic sentences.
+- [x] Current work: update boundary fusion so over-30s spans choose the best audio-safe boundary before semantic completeness.
+- [x] Current work: add regression tests for long semantic-incomplete spans that have audio-safe candidates.
+- [x] Current work: run targeted and full validation.
+
+- [x] Current work: record investigation for Arabic long sentence segment `206.77s-287.935s`.
+- [x] Current work: inspect final sentence, semantic sentences, VAD segments and boundary decisions around the long span.
+- [x] Current work: identify which merge/keep decision created the long segment.
+- [x] Current work: summarize root cause and recommend a targeted fix.
+
+- [x] Current work: record decision to remove TextGrid overlap fallback.
+- [x] Current work: make TextGrid export fail on overlapping intervals instead of silently rewriting times.
+- [x] Current work: keep upstream pure-punctuation sentence fix as the real prevention.
+- [x] Current work: adjust output tests and run validation.
+
+- [x] Current work: record TextGrid overlap failure when rebuilding exports from existing JSON.
+- [x] Current work: inspect the Arabic overlap example to identify why sentence intervals overlap.
+- [x] Current work: make TextGrid sentence intervals non-overlapping even for old JSON files.
+- [x] Current work: add regression coverage for overlapping JSON-derived TextGrid intervals.
+- [x] Current work: run targeted and full validation.
+
+- [x] Current work: record rerun-skip/export-rebuild and batch-error handling plan before coding.
+- [x] Current work: inspect single-run and batch output naming rules.
+- [x] Current work: skip model inference when per-utt JSON already exists and rebuild missing CSV/SRT/TextGrid from JSON.
+- [x] Current work: skip an item entirely when JSON/CSV/SRT/TextGrid are all present.
+- [x] Current work: write per-item batch `error.json` with wav path and traceback when inference fails, then continue.
+- [x] Current work: add regression tests and run validation.
+
+- [x] Current work: record Russian TextGrid overlap failure before coding.
+- [x] Current work: inspect output interval generation and cut-time overlap handling.
+- [x] Current work: make final writer intervals non-overlapping while preserving sentence text.
+- [x] Current work: add regression coverage for overlapping cut times in TextGrid/exports.
+- [x] Current work: run targeted validation.
+
+- [x] Current work: record MMS numeric-like span placeholder expansion before coding.
+- [x] Current work: group currency, percent, units and numeric range markers with adjacent digits for MMS alignment.
+- [x] Current work: preserve restored surface tokens while aligning grouped numeric spans as `<star>`.
+- [x] Current work: add regression tests and update MMS docs.
+- [x] Current work: run targeted MMS validation.
+
+- [x] Current work: fix overlapping sentence cut ranges when adjacent sentences share one raw VAD segment.
+- [x] Current work: clip `cut_segments_ms` to sentence annotation bounds before SRT/CSV/TextGrid writing.
+- [x] Current work: add regression coverage for TextGrid output with shared raw VAD island.
+
+- [x] Current work: add `wav.scp` batch runner with configurable worker count.
+- [x] Current work: distribute workers across `CUDA_VISIBLE_DEVICES`, defaulting to 8 device slots when unset.
+- [x] Current work: write one JSON/CSV/SRT/TextGrid set per audio basename.
+- [x] Current work: add unit tests for wav.scp parsing and GPU assignment.
+- [x] Current work: run targeted validation.
+
+- [x] Current work: make SRT, CSV and TextGrid sentence outputs use `cut_start_ms`/`cut_end_ms`.
+- [x] Current work: add output writer regression tests with fallback to `start_ms`/`end_ms`.
+- [x] Current work: run targeted output validation.
+
+- [x] Current work: add VAD-derived `cut_start_ms`, `cut_end_ms` and `cut_segments_ms` to final sentences.
+- [x] Current work: make hakka use continuous sentence annotations while preserving VAD-based cut ranges.
+- [x] Current work: add regression tests for sentences spanning multiple raw VAD speech islands.
+- [x] Current work: run targeted validation.
+
+- [x] Current work: investigate hakka preserved-gap sentence cutting across multiple raw VAD segments.
+
 - [x] Current work: add `preserve_sentence_gaps` config for final sentence timing.
 - [x] Current work: preserve silence gaps when boundary fusion keeps an audio-safe boundary.
 - [x] Current work: skip output VAD sentence expansion and final short-gap merge when preserving gaps.

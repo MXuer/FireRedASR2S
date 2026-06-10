@@ -15,6 +15,7 @@ class MmsForcedAlignerConfig:
     use_star: bool = False
     normalize_text: bool = False
     uroman_path: str = "uroman/bin"
+    num_workers: int = 1
 
 
 class MmsForcedAlignerTimestampProvider:
@@ -35,7 +36,9 @@ class MmsForcedAlignerTimestampProvider:
         results = []
         for asr_result, segment in zip(batch_asr_result, batch_segments):
             tokens = self._prepare_tokens(asr_result.get("text", ""))
-            alignment_tokens = self._prepare_alignment_tokens(tokens)
+            print(asr_result)
+            print(tokens)
+            tokens, alignment_tokens = self._prepare_alignment_items(tokens)
             names = [f"{asr_result['uttid']}_{i}" for i in range(len(tokens))]
             aligned = self.aligner.align(
                 tokens,
@@ -67,7 +70,27 @@ class MmsForcedAlignerTimestampProvider:
         return [token for token in text.split() if token.strip()]
 
     def _prepare_alignment_tokens(self, tokens: Sequence[str]) -> list[str]:
-        return ["<star>" if _is_numeric_alignment_token(token) else token for token in tokens]
+        return self._prepare_alignment_items(tokens)[1]
+
+    def _prepare_alignment_items(self, tokens: Sequence[str]) -> tuple[list[str], list[str]]:
+        output_tokens = []
+        alignment_tokens = []
+        index = 0
+        while index < len(tokens):
+            span = _numeric_alignment_span(tokens, index)
+            if span is not None:
+                start, end = span
+                surface = "".join(str(token) for token in tokens[start:end])
+                output_tokens.append(surface)
+                alignment_tokens.append("<star>")
+                index = end
+                continue
+
+            token = str(tokens[index])
+            output_tokens.append(token)
+            alignment_tokens.append("<star>" if _is_numeric_alignment_token(token) else token)
+            index += 1
+        return output_tokens, alignment_tokens
 
     def _normalize_text(self, text: str) -> str:
         from semantic_asr.mms_runtime.text_normalize import LANG2TEXTNORMALIZER
@@ -85,5 +108,223 @@ class MmsForcedAlignerTimestampProvider:
         return timestamps
 
 
+_NUMERIC_PREFIX_WORDS = {
+    "aud",
+    "brl",
+    "cad",
+    "chf",
+    "cny",
+    "eur",
+    "gbp",
+    "hkd",
+    "idr",
+    "inr",
+    "jpy",
+    "krw",
+    "mop",
+    "mxn",
+    "myr",
+    "php",
+    "rmb",
+    "rub",
+    "sgd",
+    "thb",
+    "twd",
+    "usd",
+    "vnd",
+}
+
+_NUMERIC_SUFFIX_WORDS = _NUMERIC_PREFIX_WORDS | {
+    "a",
+    "b",
+    "bps",
+    "byte",
+    "bytes",
+    "c",
+    "cm",
+    "db",
+    "f",
+    "ft",
+    "g",
+    "gb",
+    "ghz",
+    "ha",
+    "hour",
+    "hours",
+    "hz",
+    "in",
+    "kb",
+    "kg",
+    "khz",
+    "km",
+    "km/h",
+    "kph",
+    "kwh",
+    "l",
+    "lb",
+    "lbs",
+    "m",
+    "m/s",
+    "mb",
+    "mbps",
+    "mg",
+    "mhz",
+    "min",
+    "mins",
+    "ml",
+    "mm",
+    "ms",
+    "pct",
+    "percent",
+    "s",
+    "sec",
+    "secs",
+    "sqm",
+    "v",
+    "w",
+}
+
+_NUMERIC_CURRENCY_SYMBOLS = {
+    "$",
+    "＄",
+    "€",
+    "£",
+    "¥",
+    "￥",
+    "₩",
+    "₫",
+    "₹",
+    "₽",
+    "₺",
+    "₴",
+    "฿",
+    "₱",
+    "₪",
+    "₦",
+    "₡",
+    "₲",
+    "₵",
+    "₭",
+    "₮",
+    "₨",
+    "﷼",
+}
+
+_NUMERIC_PREFIX_SYMBOLS = _NUMERIC_CURRENCY_SYMBOLS | {
+    "±",
+    "+",
+    "-",
+    "−",
+    "~",
+    "～",
+    "<",
+    ">",
+    "≤",
+    "≥",
+}
+
+_NUMERIC_SUFFIX_SYMBOLS = _NUMERIC_CURRENCY_SYMBOLS | {
+    "%",
+    "％",
+    "‰",
+    "‱",
+    "℃",
+    "℉",
+    "°",
+    "°c",
+    "°C",
+    "°f",
+    "°F",
+    "㎡",
+    "m²",
+    "m³",
+}
+
+_NUMERIC_INFIX_SYMBOLS = {
+    ",",
+    ".",
+    ":",
+    "/",
+    "\\",
+    "+",
+    "-",
+    "−",
+    "±",
+    "~",
+    "～",
+    "–",
+    "—",
+    "×",
+    "*",
+    "÷",
+    "=",
+    "<",
+    ">",
+    "≤",
+    "≥",
+}
+
+
 def _is_numeric_alignment_token(token: str) -> bool:
-    return re.fullmatch(r"(?=.*\d)[\d.,:/+\-]+", str(token).strip()) is not None
+    stripped = str(token).strip()
+    return bool(stripped) and _contains_digit(stripped)
+
+
+def _numeric_alignment_span(tokens: Sequence[str], index: int) -> tuple[int, int] | None:
+    if not _contains_digit(tokens[index]) and not _is_numeric_prefix_token(tokens[index]):
+        return None
+
+    start = index
+    end = index + 1
+    if not _contains_digit(tokens[index]):
+        end = _consume_numeric_tail(tokens, end, has_digit=False)
+    else:
+        while start > 0 and _is_numeric_prefix_token(tokens[start - 1]):
+            start -= 1
+        end = _consume_numeric_tail(tokens, end, has_digit=True)
+
+    span = tokens[start:end]
+    if not any(_contains_digit(token) for token in span):
+        return None
+    if start == index and end == index + 1 and _contains_digit(tokens[index]):
+        return (start, end)
+    return (start, end)
+
+
+def _consume_numeric_tail(tokens: Sequence[str], index: int, has_digit: bool) -> int:
+    end = index
+    while end < len(tokens):
+        token = tokens[end]
+        previous = tokens[end - 1] if end > 0 else ""
+        if _contains_digit(token):
+            if has_digit and not _is_numeric_bridge_token(previous):
+                break
+            has_digit = True
+            end += 1
+            continue
+        if _is_numeric_suffix_token(token):
+            end += 1
+            continue
+        if _is_numeric_bridge_token(token) and end + 1 < len(tokens) and _contains_digit(tokens[end + 1]):
+            end += 1
+            continue
+        break
+    return end
+
+
+def _contains_digit(token: str) -> bool:
+    return any(char.isdigit() for char in str(token))
+
+
+def _is_numeric_prefix_token(token: str) -> bool:
+    stripped = str(token).strip()
+    return stripped in _NUMERIC_PREFIX_SYMBOLS or stripped.lower() in _NUMERIC_PREFIX_WORDS
+
+
+def _is_numeric_suffix_token(token: str) -> bool:
+    stripped = str(token).strip()
+    return stripped in _NUMERIC_SUFFIX_SYMBOLS or stripped.lower() in _NUMERIC_SUFFIX_WORDS
+
+
+def _is_numeric_bridge_token(token: str) -> bool:
+    return str(token).strip() in _NUMERIC_INFIX_SYMBOLS

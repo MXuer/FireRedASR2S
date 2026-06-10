@@ -219,6 +219,13 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="punc",
+        name="naqta",
+        languages=("ar",),
+        aliases={"ar": ("arabic", "ar-sa", "ar-eg", "ar-ae")},
+        notes="Arabic punctuation restoration model MostafaMaroof/Naqta.",
+    ),
+    ModelLanguageSupport(
+        role="punc",
         name="xlm_roberta_punctuation",
         languages=(
             "af", "am", "ar", "bg", "bn", "de", "el", "en", "es", "et",

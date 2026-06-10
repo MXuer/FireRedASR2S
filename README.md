@@ -91,6 +91,24 @@ The runner writes:
 - `asr_tg/<uttid>.TextGrid`
 - `resolved_config.json`
 
+## Run A Batch
+
+`wav.scp` may contain one wav path per line. Output names use each audio
+basename.
+
+```bash
+CUDA_VISIBLE_DEVICES=4,5,6,7 python semantic_asr/run_batch.py \
+  --config configs/hakka.json \
+  --wav_scp data/test/wav.scp \
+  --outdir output/hakka \
+  --num_workers 8
+```
+
+Workers are assigned round-robin across visible GPUs. With four visible GPUs
+and eight workers, each GPU gets two worker processes. If
+`CUDA_VISIBLE_DEVICES` is unset, the batch runner assumes eight device slots
+`0..7`.
+
 ## Existing Profiles
 
 - `configs/silero_funasr_fireredpunc.json`
