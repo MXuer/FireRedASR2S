@@ -15,9 +15,9 @@ Current priority:
 
 `max_sentence_s` is therefore a bounded pressure signal. Fusion first looks for
 an audio-safe boundary. If none is available and the group is already over max
-duration, a semantic-complete boundary is kept to prevent unbounded output
-segments. Active incomplete boundaries still merge and record
-`max_duration_wait_for_silence`.
+duration, fusion looks back over recent semantic-complete candidates and keeps
+the one with the lowest local speech probability. Active incomplete boundaries
+still merge and record `max_duration_wait_for_silence`.
 
 ## Timing Views
 
@@ -90,8 +90,9 @@ The current greedy decision table is:
    `long_vad_silence`.
 2. If the merged span would exceed `max_sentence_s`:
    - keep the boundary if it is audio-safe;
-   - keep a semantic-complete active-speech boundary as
-     `max_duration_terminal_punctuation` or `max_duration_semantic_boundary`;
+   - choose the best recent semantic-complete boundary from the current group,
+     ranked by local speech probability, and keep it as
+     `max_duration_rolling_boundary`;
    - merge and record `max_duration_wait_for_silence` if it is active speech
      but semantic-incomplete;
    - otherwise keep as `max_duration_forced_boundary` as a no-probability
@@ -109,8 +110,9 @@ The current greedy decision table is:
 10. Otherwise merge.
 
 This keeps the logic readable: audio safety is checked first, duration prevents
-pathological long spans, and semantic completeness decides which non-safe
-fallbacks are acceptable.
+pathological long spans, and the rolling selector avoids cutting at the first
+over-max terminal punctuation when an earlier lower-probability boundary is
+available.
 
 ## Preserving Gaps
 
@@ -149,6 +151,9 @@ Every boundary decision records:
 - `speech_prob_boundary_ms`
 - `speech_prob_supported_silence`
 - `combined_duration_ms`
+- `rolling_selected_candidate_index`
+- `rolling_selected_boundary_ms`
+- `rolling_selected_speech_prob_mean`
 
 These fields are the first place to inspect when a segment is too long, too
 short, or appears to cut speech.

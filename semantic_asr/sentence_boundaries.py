@@ -1,5 +1,5 @@
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Sequence
 
 import numpy as np
@@ -21,6 +21,7 @@ class SentenceBoundaryFusionConfig:
     merge_max_token_gap_s: float = 0.3
     target_sentence_s: float = 15.0
     max_sentence_s: float = 30.0
+    rolling_boundary_max_candidates: int = 8
     speech_prob_silence_threshold: float = 0.2
     speech_prob_silence_mean_threshold: float = 0.2
     speech_prob_active_threshold: float = 0.5
@@ -63,14 +64,14 @@ def fuse_sentence_boundaries(
     if not sentences:
         return [], []
 
-    fused = [dict(sentences[0])]
+    fused = [_new_fusion_group(dict(sentences[0]), 0)]
     decisions = []
     raw_vad = sorted((int(start), int(end)) for start, end in raw_vad_segments_ms)
     sorted_words = sorted((dict(word) for word in words), key=lambda word: (word["start_ms"], word["end_ms"]))
 
     for candidate_index, current_source in enumerate(sentences[1:], start=1):
         previous = fused[-1]
-        current = dict(current_source)
+        current = _new_fusion_group(dict(current_source), candidate_index)
         candidate = _boundary_candidate(
             candidate_index,
             previous,
@@ -82,52 +83,253 @@ def fuse_sentence_boundaries(
         )
 
         action, reason = _decide_boundary(candidate, config)
+        rolling_candidate = None
+        if action == "keep" and reason in {"max_duration_terminal_punctuation", "max_duration_semantic_boundary"}:
+            rolling_candidate = _select_rolling_boundary(
+                previous.get("_fusion_boundaries", []) + [candidate],
+                config,
+            )
+            if rolling_candidate is not None:
+                reason = "max_duration_rolling_boundary"
 
-        boundary_ms = candidate.snapped_boundary_ms
-        if action == "keep":
-            if config.preserve_sentence_gaps:
-                previous["end_ms"], current["start_ms"] = _preserved_gap_boundary(
-                    previous,
-                    current,
-                    candidate.previous_end_ms,
-                    candidate.current_start_ms,
-                    candidate.vad_silence,
-                )
-            else:
-                previous["end_ms"] = boundary_ms
-                current["start_ms"] = boundary_ms
-        else:
+        if action == "keep" and rolling_candidate is not None and rolling_candidate.candidate_index != candidate.candidate_index:
+            left, right, boundary_ms, preserved_gap_ms = _split_group_at_boundary(
+                previous,
+                current,
+                candidate,
+                rolling_candidate,
+                config,
+            )
+            _mark_rolling_decision(
+                decisions,
+                rolling_candidate,
+                reason,
+                boundary_ms,
+                preserved_gap_ms,
+            )
+            fused[-1] = left
+            fused.append(right)
+            action = "merge"
+            reason = "merged_after_rolling_boundary"
             boundary_ms = candidate.boundary_ms
-            _merge_sentence_into_previous(previous, current)
+        else:
+            boundary_ms = (rolling_candidate or candidate).snapped_boundary_ms
+            if config.preserve_sentence_gaps:
+                if action == "keep":
+                    previous["end_ms"], current["start_ms"] = _preserved_gap_boundary(
+                        previous,
+                        current,
+                        candidate.previous_end_ms,
+                        candidate.current_start_ms,
+                        candidate.vad_silence,
+                    )
+                    boundary_ms = previous["end_ms"]
+            else:
+                if action == "keep":
+                    previous["end_ms"] = boundary_ms
+                    current["start_ms"] = boundary_ms
 
-        decisions.append({
-            "candidate_index": candidate.candidate_index,
-            "action": action,
-            "reason": reason,
-            "previous_end_ms": candidate.previous_end_ms,
-            "current_start_ms": candidate.current_start_ms,
-            "token_gap_ms": candidate.token_gap_ms,
-            "boundary_ms": boundary_ms,
-            "same_raw_vad": candidate.same_raw_vad,
-            "audio_safe": candidate.audio_safe,
-            "audio_reason": candidate.audio_reason,
-            "active_speech": candidate.active_speech,
-            "semantic_complete": candidate.semantic_complete,
-            "semantic_reason": candidate.semantic_reason,
-            "vad_silence_ms": list(candidate.vad_silence) if candidate.vad_silence is not None else None,
-            "long_vad_silence": candidate.long_vad_silence,
-            "speech_prob_min": _round_optional(candidate.speech_stats["min"]),
-            "speech_prob_mean": _round_optional(candidate.speech_stats["mean"]),
-            "speech_prob_max": _round_optional(candidate.speech_stats["max"]),
-            "speech_prob_boundary_ms": candidate.speech_stats["boundary_ms"],
-            "speech_prob_supported_silence": candidate.prob_supported_silence,
-            "combined_duration_ms": candidate.combined_duration_ms,
-            "preserved_gap_ms": max(current["start_ms"] - previous["end_ms"], 0) if action == "keep" else None,
-        })
+            if action == "merge":
+                boundary_ms = candidate.boundary_ms
+                _merge_sentence_into_previous(previous, current)
+                _append_fusion_parts(previous, current, candidate)
+
+            if action == "keep":
+                fused.append(current)
+
+        decision_candidate = rolling_candidate if action == "keep" and rolling_candidate is not None else candidate
+        decisions.append(_decision_record(
+            decision_candidate,
+            action,
+            reason,
+            boundary_ms,
+            max(current["start_ms"] - previous["end_ms"], 0) if action == "keep" else None,
+            rolling_candidate,
+        ))
         if action == "keep":
-            fused.append(current)
+            continue
 
-    return fused, decisions
+    return [_strip_fusion_metadata(sentence) for sentence in fused], decisions
+
+
+def _new_fusion_group(sentence: dict, start_index: int) -> dict:
+    group = dict(sentence)
+    group["_fusion_start_index"] = start_index
+    group["_fusion_parts"] = [_strip_fusion_metadata(sentence)]
+    group["_fusion_boundaries"] = []
+    return group
+
+
+def _append_fusion_parts(previous: dict, current: dict, candidate: BoundaryCandidate) -> None:
+    previous.setdefault("_fusion_parts", [_strip_fusion_metadata(previous)])
+    previous.setdefault("_fusion_boundaries", [])
+    previous["_fusion_parts"].extend(
+        _strip_fusion_metadata(part)
+        for part in current.get("_fusion_parts", [current])
+    )
+    previous["_fusion_boundaries"].append(candidate)
+
+
+def _strip_fusion_metadata(sentence: dict) -> dict:
+    return {key: value for key, value in sentence.items() if not key.startswith("_fusion_")}
+
+
+def _decision_record(
+    candidate: BoundaryCandidate,
+    action: str,
+    reason: str,
+    boundary_ms: int,
+    preserved_gap_ms: int | None,
+    rolling_candidate: BoundaryCandidate | None = None,
+) -> dict:
+    record = {
+        "candidate_index": candidate.candidate_index,
+        "action": action,
+        "reason": reason,
+        "previous_end_ms": candidate.previous_end_ms,
+        "current_start_ms": candidate.current_start_ms,
+        "token_gap_ms": candidate.token_gap_ms,
+        "boundary_ms": boundary_ms,
+        "same_raw_vad": candidate.same_raw_vad,
+        "audio_safe": candidate.audio_safe,
+        "audio_reason": candidate.audio_reason,
+        "active_speech": candidate.active_speech,
+        "semantic_complete": candidate.semantic_complete,
+        "semantic_reason": candidate.semantic_reason,
+        "vad_silence_ms": list(candidate.vad_silence) if candidate.vad_silence is not None else None,
+        "long_vad_silence": candidate.long_vad_silence,
+        "speech_prob_min": _round_optional(candidate.speech_stats["min"]),
+        "speech_prob_mean": _round_optional(candidate.speech_stats["mean"]),
+        "speech_prob_max": _round_optional(candidate.speech_stats["max"]),
+        "speech_prob_boundary_ms": candidate.speech_stats["boundary_ms"],
+        "speech_prob_supported_silence": candidate.prob_supported_silence,
+        "combined_duration_ms": candidate.combined_duration_ms,
+        "preserved_gap_ms": preserved_gap_ms,
+    }
+    if rolling_candidate is not None:
+        record["rolling_selected_candidate_index"] = rolling_candidate.candidate_index
+        record["rolling_selected_boundary_ms"] = rolling_candidate.snapped_boundary_ms
+        record["rolling_selected_speech_prob_mean"] = _round_optional(rolling_candidate.speech_stats["mean"])
+    return record
+
+
+def _mark_rolling_decision(
+    decisions: list[dict],
+    selected: BoundaryCandidate,
+    reason: str,
+    boundary_ms: int,
+    preserved_gap_ms: int | None,
+) -> None:
+    for decision in reversed(decisions):
+        if decision.get("candidate_index") != selected.candidate_index:
+            continue
+        decision.update(_decision_record(selected, "keep", reason, boundary_ms, preserved_gap_ms, selected))
+        return
+
+
+def _split_group_at_boundary(
+    previous: dict,
+    current: dict,
+    current_candidate: BoundaryCandidate,
+    selected: BoundaryCandidate,
+    config: SentenceBoundaryFusionConfig,
+) -> tuple[dict, dict, int, int | None]:
+    parts = previous.get("_fusion_parts", [_strip_fusion_metadata(previous)]) + current.get("_fusion_parts", [current])
+    boundaries = previous.get("_fusion_boundaries", []) + [current_candidate]
+    group_start_index = int(previous.get("_fusion_start_index", 0))
+    split_pos = selected.candidate_index - group_start_index
+    if split_pos <= 0 or split_pos >= len(parts):
+        raise ValueError(f"Invalid rolling boundary split: candidate_index={selected.candidate_index}")
+
+    left = _group_from_parts(
+        parts[:split_pos],
+        group_start_index,
+        [boundary for boundary in boundaries if boundary.candidate_index < selected.candidate_index],
+    )
+    right_parts = parts[split_pos:]
+    right_start_index = selected.candidate_index
+    right = _group_from_parts(
+        right_parts,
+        right_start_index,
+        _adjust_boundaries_for_group(
+            [boundary for boundary in boundaries if boundary.candidate_index > selected.candidate_index],
+            right_parts,
+            right_start_index,
+        ),
+    )
+    if config.preserve_sentence_gaps:
+        left_end_ms, right_start_ms = _preserved_gap_boundary(
+            left,
+            right,
+            selected.previous_end_ms,
+            selected.current_start_ms,
+            selected.vad_silence,
+        )
+        left["end_ms"] = left_end_ms
+        right["start_ms"] = right_start_ms
+        return left, right, left_end_ms, max(right_start_ms - left_end_ms, 0)
+
+    boundary_ms = selected.snapped_boundary_ms
+    left["end_ms"] = boundary_ms
+    right["start_ms"] = boundary_ms
+    return left, right, boundary_ms, max(right["start_ms"] - left["end_ms"], 0)
+
+
+def _group_from_parts(parts: Sequence[dict], start_index: int, boundaries: Sequence[BoundaryCandidate]) -> dict:
+    group = _new_fusion_group(_strip_fusion_metadata(parts[0]), start_index)
+    group["_fusion_boundaries"] = list(boundaries)
+    for part in parts[1:]:
+        _merge_sentence_into_previous(group, _strip_fusion_metadata(part))
+    group["_fusion_parts"] = [_strip_fusion_metadata(part) for part in parts]
+    return group
+
+
+def _adjust_boundaries_for_group(
+    boundaries: Sequence[BoundaryCandidate],
+    parts: Sequence[dict],
+    start_index: int,
+) -> list[BoundaryCandidate]:
+    adjusted = []
+    group_start_ms = int(parts[0]["start_ms"])
+    for boundary in boundaries:
+        part_index = boundary.candidate_index - start_index
+        if part_index < 0 or part_index >= len(parts):
+            continue
+        adjusted.append(replace(
+            boundary,
+            combined_duration_ms=int(parts[part_index]["end_ms"]) - group_start_ms,
+        ))
+    return adjusted
+
+
+def _select_rolling_boundary(
+    boundaries: Sequence[BoundaryCandidate],
+    config: SentenceBoundaryFusionConfig,
+) -> BoundaryCandidate | None:
+    target_ms = int(config.target_sentence_s * 1000)
+    candidates = [
+        boundary for boundary in boundaries
+        if boundary.semantic_complete
+        and boundary.token_gap_ms >= 0
+        and boundary.combined_duration_ms >= target_ms
+    ]
+    max_candidates = max(1, int(config.rolling_boundary_max_candidates))
+    candidates = candidates[-max_candidates:]
+    if not candidates:
+        return None
+    return min(candidates, key=_rolling_boundary_score)
+
+
+def _rolling_boundary_score(candidate: BoundaryCandidate) -> tuple[float, float, float, int]:
+    mean = candidate.speech_stats.get("mean")
+    max_prob = candidate.speech_stats.get("max")
+    min_prob = candidate.speech_stats.get("min")
+    return (
+        1.0 if mean is None else float(mean),
+        1.0 if max_prob is None else float(max_prob),
+        1.0 if min_prob is None else float(min_prob),
+        candidate.candidate_index,
+    )
 
 
 def _boundary_candidate(

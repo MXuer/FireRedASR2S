@@ -78,9 +78,11 @@ Current state:
   VAD.
 - Sentence-boundary fusion uses frame-level VAD speech probability as the
   preferred speech-safety signal. High-probability active-speech boundaries
-  merge while the span is below `max_sentence_s`, but semantic-complete
-  boundaries can cap an over-max continuous speech run; semantic-incomplete
-  active boundaries still record `max_duration_wait_for_silence`.
+  merge while the span is below `max_sentence_s`; when an over-max continuous
+  speech run needs a semantic cap, a rolling selector chooses the recent
+  semantic-complete boundary with the lowest local speech probability.
+  Semantic-incomplete active boundaries still record
+  `max_duration_wait_for_silence`.
 - ASR and MMS forced alignment now use raw VAD speech segments by default.
   Semantic sentence merging happens after token timestamps are available.
 - MMS forced aligner forces `use_star=False`; configs cannot override it back
@@ -93,6 +95,20 @@ Current state:
   boundary in sentence fusion. The default threshold is 1.0s.
 
 Recent validation:
+
+- Implemented rolling over-max boundary selection. Instead of cutting at the
+  first terminal-punctuation boundary after `max_sentence_s`, fusion keeps
+  recent semantic-complete candidates inside the current group and selects the
+  lowest local speech-probability boundary.
+- Offline recomputation for
+  `output/de_de/848c4ebd-419a-4c42-a85a-2bb1ab52b121.json` moves the reported
+  tail split from `318.745s` to `305.081s`; the selected boundary has
+  `speech_prob_mean=0.4548` versus `0.7208` at the previous trigger point.
+- Boundary decision JSON now records `rolling_selected_candidate_index`,
+  `rolling_selected_boundary_ms` and `rolling_selected_speech_prob_mean`.
+- Validation passed: `tests.test_sentence_boundaries` (21 tests), full unit
+  discover (94 tests), `compileall semantic_asr tests`, config parse for all 12
+  JSON profiles, `git diff --check` and offline German JSON recomputation.
 
 - Added `SentenceBoundaryFusionConfig.max_merge_vad_silence_s`, defaulting to
   1.0s. Boundary fusion now keeps `long_vad_silence` boundaries before

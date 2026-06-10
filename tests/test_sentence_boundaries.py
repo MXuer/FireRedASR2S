@@ -227,7 +227,8 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         )
 
         self.assertEqual(len(fused), 2)
-        self.assertEqual(decisions[0]["reason"], "max_duration_terminal_punctuation")
+        self.assertEqual(decisions[0]["reason"], "max_duration_rolling_boundary")
+        self.assertEqual(decisions[0]["rolling_selected_candidate_index"], 1)
         self.assertGreaterEqual(decisions[0]["speech_prob_mean"], 0.5)
 
     def test_audio_safe_boundary_over_max_duration_keeps_even_if_semantic_incomplete(self):
@@ -467,12 +468,13 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         )
 
         self.assertEqual(len(fused), 2)
-        self.assertEqual(decisions[0]["action"], "merge")
-        self.assertEqual(decisions[0]["reason"], "merged_active_speech_prob")
-        self.assertEqual(decisions[1]["action"], "keep")
-        self.assertEqual(decisions[1]["reason"], "max_duration_terminal_punctuation")
-        self.assertEqual(fused[0]["end_ms"], 25916)
-        self.assertEqual(fused[1]["start_ms"], 25916)
+        self.assertEqual(decisions[0]["action"], "keep")
+        self.assertEqual(decisions[0]["reason"], "max_duration_rolling_boundary")
+        self.assertEqual(decisions[1]["action"], "merge")
+        self.assertEqual(decisions[1]["reason"], "merged_after_rolling_boundary")
+        self.assertEqual(decisions[1]["rolling_selected_candidate_index"], 1)
+        self.assertEqual(fused[0]["end_ms"], 19186)
+        self.assertEqual(fused[1]["start_ms"], 19186)
 
     def test_terminal_punctuation_boundary_uses_sentence_local_words(self):
         sentences = [
@@ -557,6 +559,107 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(decisions[1]["action"], "merge")
         self.assertEqual(decisions[2]["action"], "merge")
         self.assertEqual(decisions[2]["reason"], "merged_active_speech_prob")
+
+    def test_over_max_uses_lowest_probability_recent_semantic_boundary(self):
+        sentences = [
+            {
+                "start_ms": 289496,
+                "end_ms": 300099,
+                "text": "die Status Quo Situation, also die Situation, die im Moment der Abdrucknahme sozusagen vorhanden war, hin zum gewünschten Ergebnis.",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 300099,
+                "end_ms": 305081,
+                "text": "Du bekommst also dein erstes Set von diesen transparenten Schienen.",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 305081,
+                "end_ms": 308062,
+                "text": "Und diese Schiene trägst du zwei Wochen.",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 308062,
+                "end_ms": 312563,
+                "text": "Du solltest die 22 Stunden am Tag während der Korrekturphase tragen.",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 312563,
+                "end_ms": 316585,
+                "text": "Dadurch hast du zwei Stunden Zeit eben, um zu essen.",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 316605,
+                "end_ms": 318745,
+                "text": "Du solltest danach immer die Zähne putzen.",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 318745,
+                "end_ms": 322546,
+                "text": "Das ist natürlich, wenn du ganztägig unterwegs bist, ein bisschen tricky.",
+                "asr_confidence": 0,
+            },
+        ]
+        words = [
+            {"start_ms": 299400, "end_ms": 300099, "text": "Ergebnis"},
+            {"start_ms": 300099, "end_ms": 300500, "text": "Du"},
+            {"start_ms": 304000, "end_ms": 305081, "text": "Schienen"},
+            {"start_ms": 305081, "end_ms": 305500, "text": "Und"},
+            {"start_ms": 307500, "end_ms": 308062, "text": "Wochen"},
+            {"start_ms": 308062, "end_ms": 308600, "text": "Du"},
+            {"start_ms": 312000, "end_ms": 312563, "text": "tragen"},
+            {"start_ms": 312563, "end_ms": 313000, "text": "Dadurch"},
+            {"start_ms": 316264, "end_ms": 316585, "text": "essen"},
+            {"start_ms": 316605, "end_ms": 316665, "text": "Du"},
+            {"start_ms": 318205, "end_ms": 318745, "text": "putzen"},
+            {"start_ms": 318745, "end_ms": 318965, "text": "Das"},
+        ]
+        probs = [0.9] * 33000
+        for center_ms, prob in [
+            (300099, 0.56),
+            (305081, 0.45),
+            (308062, 0.49),
+            (312563, 0.77),
+            (316595, 0.67),
+            (318745, 0.72),
+        ]:
+            center = center_ms // 10
+            for index in range(max(0, center - 20), min(len(probs), center + 21)):
+                probs[index] = prob
+        frame_probs = {
+            "frame_shift_ms": 10,
+            "frame_length_ms": 16,
+            "probs": probs,
+        }
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(289496, 322546)],
+            np.ones(16000 * 330, dtype=np.float32),
+            16000,
+            self.config,
+            frame_probs,
+        )
+
+        self.assertEqual(len(fused), 2)
+        self.assertEqual(fused[0]["end_ms"], 305081)
+        self.assertEqual(fused[1]["start_ms"], 305081)
+        selected = next(decision for decision in decisions if decision["candidate_index"] == 2)
+        self.assertEqual(selected["action"], "keep")
+        self.assertEqual(selected["reason"], "max_duration_rolling_boundary")
+        self.assertEqual(selected["speech_prob_mean"], 0.45)
+        trigger = decisions[-1]
+        self.assertEqual(trigger["candidate_index"], 6)
+        self.assertEqual(trigger["reason"], "merged_after_rolling_boundary")
+        self.assertEqual(trigger["boundary_ms"], 318745)
+        self.assertEqual(trigger["rolling_selected_candidate_index"], 2)
+        self.assertEqual(trigger["rolling_selected_boundary_ms"], 305081)
 
     def test_vad_snap_does_not_use_distant_silence_inside_word_gap(self):
         sentences = [

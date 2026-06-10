@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: implement rolling selector for over-`max_sentence_s` boundary choice.
+- [x] Current work: keep recent boundary candidates with speech-probability stats inside the current fused group.
+- [x] Current work: choose the lowest-probability semantic candidate instead of the first over-max candidate.
+- [x] Current work: add regression coverage for the German tail case shape.
+- [x] Current work: update docs/progress, validate, commit and push.
+
+Review:
+- Added `rolling_boundary_max_candidates` to `SentenceBoundaryFusionConfig`, defaulting to 8 recent candidates.
+- Boundary fusion now keeps hidden current-group candidate history and, on over-max semantic caps, selects the recent semantic-complete boundary with the lowest local speech probability.
+- The reported German tail recomputation moves the split from `318.745s` to `305.081s`, choosing `speech_prob_mean=0.4548` instead of the over-max trigger at `0.7208`.
+- Boundary decisions now record `rolling_selected_candidate_index`, `rolling_selected_boundary_ms` and `rolling_selected_speech_prob_mean`.
+- Validation passed: `tests.test_sentence_boundaries` (21 tests), full unit discover (94 tests), `compileall semantic_asr tests`, config parse for all 12 JSON profiles and `git diff --check`.
+
 - [x] Current work: add a sentence-boundary rule that raw VAD silence gaps over 1s are not merged.
 - [x] Current work: expose the 1s threshold as boundary-fusion config with a conservative default.
 - [x] Current work: add regression tests for long raw-VAD silence overriding semantic-incomplete merge.

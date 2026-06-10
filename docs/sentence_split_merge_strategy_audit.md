@@ -112,7 +112,8 @@ The current decision order is:
    `long_vad_silence`, even if the semantic boundary is incomplete.
 2. Over `max_sentence_s`:
    - keep audio-safe boundaries;
-   - keep semantic-complete active-speech boundaries as a max-duration cap;
+   - choose the lowest-speech-probability recent semantic-complete boundary in
+     the current group and keep it as `max_duration_rolling_boundary`;
    - merge active-speech boundaries and record `max_duration_wait_for_silence`
      only when they are semantic-incomplete;
    - keep `max_duration_forced_boundary` only when no probability/raw-VAD
@@ -178,7 +179,8 @@ writer cannot represent, that is treated as a strategy bug.
 - No final short-gap merge exists after boundary fusion, so grouping decisions
   are traceable in one place.
 - High speech-probability boundaries are merged even when terminal punctuation
-  exists.
+  exists, and over-max groups use a rolling recent-boundary selector instead of
+  cutting at the first over-max terminal boundary.
 - Raw VAD silence at or above `max_merge_vad_silence_s` is not merged across,
   even when the semantic candidate is incomplete.
 - `max_sentence_s` no longer forces incomplete active-speech cuts, but complete
@@ -189,17 +191,20 @@ writer cannot represent, that is treated as a strategy bug.
 
 ## Remaining Risks
 
-### 1. Greedy Fusion Still Has No Lookback
+### 1. Rolling Fusion Is Still Local
 
-The algorithm decides at the current boundary. It does not choose the best safe
-boundary from a rolling window.
+The algorithm can now look back over recent boundaries inside the current fused
+group, but it is still a local greedy selector. It does not globally optimize
+the full recording.
 
-Better future behavior:
+Possible future behavior:
 
-- keep a small list of recent candidate boundaries inside the current group;
-- when duration pressure is high, choose the best recent audio-safe boundary;
+- keep a richer scored list of candidate boundaries across multiple future
+  candidates;
 - rank by audio safety, semantic completeness, distance to target and
-  probability strength.
+  probability strength;
+- optionally revise two adjacent boundaries together when a later choice makes
+  an earlier segment too short.
 
 ### 2. `max_duration_forced_boundary` Is A Fallback, Not A Guarantee
 
@@ -249,20 +254,15 @@ can still attach leading/trailing silence to text.
 
 ## Simplification Direction
 
-The current design is already closer to one grouping stage. The next useful
-simplification is not another merge pass; it is a better boundary selector
-inside boundary fusion.
+The current design is already one grouping stage with a rolling over-max
+selector. The next simplification is to make the scoring function explicit and
+small enough to tune from real cases:
 
-Recommended next version:
-
-1. Build all `BoundaryCandidate` objects for a current group.
-2. Maintain a rolling buffer of recent candidates.
-3. If the group is below target, cut only on very strong semantic + audio-safe
-   evidence.
-4. If the group is near target, cut on audio-safe + semantic-complete evidence.
-5. If the group is over max, choose the best recent audio-safe boundary.
-6. If no safe boundary exists, choose the best recent semantic-complete boundary.
-7. If neither exists, keep waiting and emit `max_duration_wait_for_silence`.
-
-This preserves the project priority while making long-segment behavior easier
-to reason about.
+1. Audio-safe boundaries win.
+2. Long raw-VAD silence is a hard no-merge boundary.
+3. Below target, merge active speech.
+4. Near target, keep strong semantic + audio-safe evidence.
+5. Over max, choose the lowest-speech-probability recent semantic-complete
+   boundary.
+6. If neither safe nor semantic-complete evidence exists, keep waiting and emit
+   `max_duration_wait_for_silence`.

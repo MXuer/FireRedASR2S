@@ -36,3 +36,4 @@
 - `PipelineProfileConfig.language` is injected into every language-aware ASR and timestamp component during pipeline construction.
 - Sentence-boundary fusion treats `max_sentence_s` as a bounded pressure signal: audio-safe boundaries are preferred, but if no safe boundary appears after max duration, a semantic-complete active-speech boundary is kept as the cap; semantic-incomplete active boundaries continue waiting.
 - Raw VAD silence at or above `max_merge_vad_silence_s` defaults to a hard sentence boundary. The default is 1.0s, so sentence-boundary fusion does not merge across long pauses even when punctuation marks the previous fragment as incomplete.
+- When an over-`max_sentence_s` active-speech group needs a semantic cap, sentence-boundary fusion uses a rolling recent-boundary selector and chooses the semantic-complete candidate with the lowest local speech probability instead of cutting at the first over-max candidate.
