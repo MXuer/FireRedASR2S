@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: inspect `output/de_de/848c4ebd-419a-4c42-a85a-2bb1ab52b121.json` for current German sentence/punctuation output.
+- [x] Current work: run a Qwen JSON-only experiment on the German timestamp tokens with boundary and punctuation suggestions.
+- [x] Current work: compare Qwen suggested spans/punctuation against the current output and manually judge German readability.
+- [x] Current work: record whether Qwen is useful for German punctuation/boundary repair.
+
+Review:
+- The existing German output has 799 words, 59 punctuation-derived semantic candidates and 21 final fused sentences.
+- Full-file Qwen punctuation over 799 stripped tokens timed out; 90-second window tests also timed out. This is too slow for regular whole-file punctuation.
+- A smaller `289s-328s` sentence-end-only test returned valid JSON for 89 tokens, but split the phrase "die Status Quo Situation ... hin zum gewünschten Ergebnis" incorrectly; current semantic candidates are better there.
+- A 25-token tail full-punctuation test returned, but produced an invalid/inconsistent sentence-end mark (`tricky,` as a sentence end) and missed useful German commas such as `natürlich, wenn ...`.
+- The retry prompt for that invalid punctuation output timed out. Recommendation: use Qwen for German only as an optional semantic-boundary fallback, not as a replacement for existing ASR punctuation or German comma restoration.
+
 - [x] Current work: add OpenAI-compatible `response_format={"type":"json_object"}` to Qwen semantic-boundary requests.
 - [x] Current work: keep the setting configurable in case a backend does not support structured JSON mode.
 - [x] Current work: update tests/docs and verify the local Qwen endpoint accepts the request.

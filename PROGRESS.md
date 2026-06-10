@@ -102,6 +102,17 @@ Current state:
 
 Recent validation:
 
+- Qwen German punctuation/boundary experiment on
+  `output/de_de/848c4ebd-419a-4c42-a85a-2bb1ab52b121.json`: full-file
+  punctuation over 799 stripped tokens timed out, and 90-second window tests
+  also timed out. A small `289s-328s` sentence-end-only test returned valid
+  JSON for 89 tokens, but made a worse semantic split than the existing German
+  candidates around "die Status Quo Situation ... hin zum gewünschten
+  Ergebnis". A 25-token comma/full-punctuation test returned inconsistent
+  sentence-end markup and missed natural German commas. Current recommendation:
+  do not replace existing German ASR punctuation with Qwen; keep Qwen as an
+  optional semantic-boundary fallback only.
+
 - Qwen semantic-boundary requests now include the OpenAI-compatible
   `response_format={"type":"json_object"}` field by default, with
   `response_format_json=false` available for incompatible backends. The local
