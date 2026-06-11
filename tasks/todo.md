@@ -1,5 +1,21 @@
 # Todo
 
+- [x] Current work: identify all Arabic batch errors whose MMS traceback contains `targets length is too long for CTC`.
+- [x] Current work: extract per-error CTC frame/target/repeat counts and recover ASR text where the stored logs allow it.
+- [x] Current work: group the failures by short-segment, token-density, numeric/symbol token and language/text-normalization patterns.
+- [x] Current work: inspect MMS adapter/runtime code paths to explain exactly where the CTC length constraint is triggered.
+- [x] Current work: summarize concrete root causes and candidate fixes before changing code.
+
+Review:
+- Found 30 Arabic batch errors with `targets length is too long for CTC` in `batch_4_output`.
+- The torchaudio error message names are misleading for our diagnosis: a small local forced-align check confirmed the first reported length corresponds to available emission frames and the second to target characters. CTC feasibility is effectively `frames >= target_chars + repeats`.
+- 27/30 failures are micro-segment cases. FireRed VAD produced 50-340ms raw speech islands, and those raw VAD islands were sent directly to ASR and then MMS; Whisper can hallucinate several Arabic words on such tiny audio snippets, leaving MMS with only 2-16 frames for roughly 14-16 uroman target characters.
+- The remaining stored CTC failures are text-density/repeat cases: e.g. original stale errors reported 66 frames vs 197 target chars and 263 frames vs 214 target chars plus 84 repeats. Current reruns did not reproduce those exact ASR texts, which indicates ASR output variability, but the CTC math still explains why those historical inputs failed.
+- The stored `*.error.json` files contain only traceback metadata, not the ASR text/tokens printed immediately before MMS alignment, so full per-error ASR text cannot be reconstructed offline from the old failures.
+- MMS code path: `semantic_asr/core.py` builds one ASR/MMS segment per raw VAD timestamp; `semantic_asr/adapters/mms_forced_aligner.py` tokenizes ASR text and forces `use_star=False`; `semantic_asr/mms_runtime/aligner.py` uromanizes alignment tokens and calls `torchaudio.functional.forced_align()`.
+- Numeric/currency `<star>` replacement is not the primary cause for these 30 CTC-length errors; it generally reduces target length. The dominant issue is segment duration versus ASR hallucinated/dense target text.
+- Candidate fixes should focus on pre-MMS feasibility: avoid sending raw VAD microsegments directly to ASR/MMS, attach/drop/merge tiny VAD islands for ASR slicing, and add an MMS guard that skips or merges impossible `frames < target_chars + repeats` alignments before calling `forced_align()`.
+
 - [x] Current work: add regression tests for punctuation-split token-like strings that previously created non-monotonic timestamp candidates.
 - [x] Current work: prevent `split_text_by_punctuation()` from falling back empty timestamp slices to the whole segment.
 - [x] Current work: make sentence-boundary fusion merge/reject invalid negative-gap keep boundaries before they can create reversed intervals.
