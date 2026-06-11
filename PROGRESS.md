@@ -3,6 +3,7 @@
 Current state:
 
 - The project is being reshaped from the original FireRedASR2S repository into a standalone multilingual semantic ASR pipeline project.
+- Current Arabic batch TextGrid boundary audit found that the three output-time TextGrid errors are caused by already-reversed JSON sentence intervals, not by the TextGrid writer itself. The common root cause is punctuation splitting inside code/URL/decimal tokens (`console.write`, `getlink.io`, `1.3400`) combined with whole-segment timestamp fallback and a boundary-fusion keep path that accepts negative-gap candidates.
 - Repository layout now keeps runtime package code under `semantic_asr/` and
   places configuration, documentation, tests and examples at top-level
   `configs/`, `docs/`, `tests/` and `examples/`.

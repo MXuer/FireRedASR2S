@@ -1,5 +1,20 @@
 # Todo
 
+- [x] Current work: analyze the three Arabic TextGrid error JSON files with reversed sentence intervals.
+- [x] Current work: trace each reversed final sentence back to nearby `semantic_sentences` and `sentence_boundary_decisions`.
+- [x] Current work: inspect nearby word/timestamp ordering to explain why start/end became non-monotonic.
+- [x] Current work: summarize concrete root cause per file and the minimal guard needed.
+
+Review:
+- The TextGrid failures are downstream symptoms. The JSON files already contain one reversed sentence interval each (`end_ms < start_ms`), and TextGrid raises once the reversed interval is skipped and the neighboring intervals overlap.
+- All three reversed cases share the same upstream pattern: punctuation splitting breaks inside token-like strings (`console.write`, `getlink.io`, decimals such as `1.3400`), then `split_text_by_punctuation()` creates a non-monotonic semantic candidate by falling back to the whole timestamp segment.
+- Boundary fusion then sees a negative token gap but can still keep the boundary as audio-safe (`vad_prob_silence`). In the non-preserved-gap path it writes `previous["end_ms"] = boundary_ms` without proving the boundary is after `previous["start_ms"]`, creating the reversed interval.
+- Concrete cases:
+  - `32147e84-8904-42fd-9274-c7bef22af88e`: `console.write` / `C sharp` split creates `sharp.` with segment-start fallback; candidate 74 keeps boundary `241745ms`, reversing previous `242606-245110ms` into `242606-241745ms`.
+  - `53f25da4-c944-43ef-9ab6-980f1c6779d4`: decimal tokens `1.33`, `3.330`, `1.3400` are split as sentence punctuation; candidate 37 keeps boundary `156135ms`, reversing previous `156876-163220ms`.
+  - `aa17261e-760f-439b-a343-1ebb3ec3488a`: URL token `getlink.io` is split at the period; candidate 5 keeps boundary `21220ms`, reversing previous `22982-29650ms`.
+- Minimal guard needed before code changes: punctuation mapping should never fall back an empty slice to the whole timestamp segment, and boundary fusion should never keep a boundary with negative token gap or a boundary outside `[previous.start_ms, current.end_ms]`.
+
 - [x] Current work: inspect `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/ar_sa/batch_4_output` error files.
 - [x] Current work: group Arabic batch errors by exception type, stage and root cause.
 - [x] Current work: inspect representative JSON outputs where needed to distinguish output-writer errors from pipeline strategy errors.
