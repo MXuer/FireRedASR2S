@@ -1,5 +1,22 @@
 # Todo
 
+- [x] Current work: add regression tests for punctuation-split token-like strings that previously created non-monotonic timestamp candidates.
+- [x] Current work: prevent `split_text_by_punctuation()` from falling back empty timestamp slices to the whole segment.
+- [x] Current work: make sentence-boundary fusion merge/reject invalid negative-gap keep boundaries before they can create reversed intervals.
+- [x] Current work: add a final sentence interval invariant before output writing so invalid JSON cannot silently reach TextGrid.
+- [x] Current work: run unit validation and rerun the three Arabic problem audios.
+
+Review:
+- `split_text_by_punctuation()` now keeps periods inside ASCII token-like strings such as `console.write`, `getlink.io` and decimal numbers such as `1.3400`, and empty timestamp slices are appended to the previous mapped sentence instead of falling back to the whole segment.
+- Boundary fusion now merges candidates with negative token gaps using reason `merged_non_monotonic_boundary`, preventing audio-safe keep paths from creating reversed sentence intervals.
+- Added `validate_sentence_intervals()` and call it before returning new pipeline JSON and before regenerating outputs from an existing JSON.
+- Added regression coverage for token-like period handling, empty timestamp slices, negative-gap fusion and reversed/overlapping final intervals.
+- Validation passed: focused punctuation/boundary/output tests, full unit discover, package compile, `git diff --check`, and real reruns of the three Arabic TextGrid-failing audios.
+- Real rerun outputs:
+  - `output/textgrid_boundary_fix/32147e84-8904-42fd-9274-c7bef22af88e`: 78 sentences, 0 invalid intervals, TextGrid written.
+  - `output/textgrid_boundary_fix/53f25da4-c944-43ef-9ab6-980f1c6779d4`: 34 sentences, 0 invalid intervals, TextGrid written.
+  - `output/textgrid_boundary_fix/aa17261e-760f-439b-a343-1ebb3ec3488a`: 58 sentences, 0 invalid intervals, TextGrid written.
+
 - [x] Current work: analyze the three Arabic TextGrid error JSON files with reversed sentence intervals.
 - [x] Current work: trace each reversed final sentence back to nearby `semantic_sentences` and `sentence_boundary_decisions`.
 - [x] Current work: inspect nearby word/timestamp ordering to explain why start/end became non-monotonic.

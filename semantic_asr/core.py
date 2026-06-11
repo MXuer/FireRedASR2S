@@ -107,6 +107,7 @@ class SemanticAsrPipeline:
             sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
         sentences = remove_sentence_overlaps(sentences)
         sentences = add_sentence_cut_segments(sentences, self._segments_ms(raw_vad_result["timestamps"]))
+        validate_sentence_intervals(sentences)
 
         text = "".join(s["text"] for s in sentences)
         text = re.sub(r"([.,!?])\s*([a-zA-Z])", r"\1 \2", text)
@@ -490,6 +491,48 @@ def remove_sentence_cut_overlaps(sentences: Sequence[dict]) -> list[dict]:
         _set_cut_end(previous, boundary_ms)
         _set_cut_start(current, boundary_ms)
     return adjusted
+
+
+def validate_sentence_intervals(sentences: Sequence[dict]) -> None:
+    previous_end_ms = None
+    previous_cut_end_ms = None
+    for index, sentence in enumerate(sentences):
+        start_ms = int(sentence["start_ms"])
+        end_ms = int(sentence["end_ms"])
+        if end_ms <= start_ms:
+            raise ValueError(f"Invalid sentence interval at index {index}: {start_ms}-{end_ms}")
+        if previous_end_ms is not None and start_ms < previous_end_ms:
+            raise ValueError(
+                f"Overlapping sentence interval at index {index}: "
+                f"previous_end_ms={previous_end_ms}, start_ms={start_ms}"
+            )
+        previous_end_ms = end_ms
+
+        cut_start_ms = int(sentence.get("cut_start_ms", start_ms))
+        cut_end_ms = int(sentence.get("cut_end_ms", end_ms))
+        if cut_end_ms <= cut_start_ms:
+            raise ValueError(f"Invalid sentence cut interval at index {index}: {cut_start_ms}-{cut_end_ms}")
+        if previous_cut_end_ms is not None and cut_start_ms < previous_cut_end_ms:
+            raise ValueError(
+                f"Overlapping sentence cut interval at index {index}: "
+                f"previous_cut_end_ms={previous_cut_end_ms}, cut_start_ms={cut_start_ms}"
+            )
+        previous_cut_end_ms = cut_end_ms
+
+        segment_end_ms = None
+        for segment_index, segment in enumerate(sentence.get("cut_segments_ms") or []):
+            segment_start_ms, segment_stop_ms = int(segment[0]), int(segment[1])
+            if segment_stop_ms <= segment_start_ms:
+                raise ValueError(
+                    f"Invalid cut segment at sentence {index}, segment {segment_index}: "
+                    f"{segment_start_ms}-{segment_stop_ms}"
+                )
+            if segment_end_ms is not None and segment_start_ms < segment_end_ms:
+                raise ValueError(
+                    f"Overlapping cut segment at sentence {index}, segment {segment_index}: "
+                    f"previous_end_ms={segment_end_ms}, start_ms={segment_start_ms}"
+                )
+            segment_end_ms = segment_stop_ms
 
 
 def _set_cut_start(sentence: dict, start_ms: int) -> None:

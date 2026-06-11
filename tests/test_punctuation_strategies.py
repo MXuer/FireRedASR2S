@@ -5,6 +5,7 @@ from semantic_asr.core import (
     remove_sentence_cut_overlaps,
     remove_sentence_overlaps,
     SemanticAsrPipeline,
+    validate_sentence_intervals,
 )
 from semantic_asr.adapters.naqta_punctuation import punctuate_tokens_from_labels
 from semantic_asr.punctuation import AsrNativePunc, AsrTextPunc, split_text_by_punctuation
@@ -67,6 +68,69 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(len(sentences), 2)
         self.assertEqual(sentences[0]["punc_text"], "كيف الحال؟")
         self.assertEqual(sentences[1]["punc_text"], "بخير.")
+
+    def test_text_punctuation_keeps_periods_inside_token_like_strings(self):
+        sentences = split_text_by_punctuation(
+            "يبقى console.write console.write ونخلي بالنا كويس قوي لإن C sharp.",
+            [
+                ["يبقى", 0.0, 0.2],
+                ["console.write", 0.2, 1.0],
+                ["console.write", 1.0, 1.7],
+                ["ونخلي", 1.7, 2.1],
+                ["بالنا", 2.1, 2.5],
+                ["كويس", 2.5, 2.9],
+                ["قوي", 2.9, 3.2],
+                ["لإن", 3.2, 3.5],
+                ["C", 3.5, 3.7],
+                ["sharp", 3.7, 4.0],
+            ],
+        )
+
+        self.assertEqual(len(sentences), 1)
+        self.assertEqual(sentences[0]["start_s"], 0.0)
+        self.assertEqual(sentences[0]["end_s"], 4.0)
+
+    def test_text_punctuation_keeps_decimal_and_url_periods_inside_tokens(self):
+        decimal_sentences = split_text_by_punctuation(
+            "منطقة الـ 1.33 أو 3.330 ثم منطقة الـ 1.3400.",
+            [
+                ["منطقة", 0.0, 0.2],
+                ["الـ", 0.2, 0.4],
+                ["1.33", 0.4, 0.7],
+                ["أو", 0.7, 0.8],
+                ["3.330", 0.8, 1.1],
+                ["ثم", 1.1, 1.3],
+                ["منطقة", 1.3, 1.5],
+                ["الـ", 1.5, 1.7],
+                ["1.3400", 1.7, 2.0],
+            ],
+        )
+        url_sentences = split_text_by_punctuation(
+            "الموقع اسمه getlink.io وهو سهل.",
+            [
+                ["الموقع", 0.0, 0.2],
+                ["اسمه", 0.2, 0.4],
+                ["getlink.io", 0.4, 1.0],
+                ["وهو", 1.0, 1.2],
+                ["سهل", 1.2, 1.5],
+            ],
+        )
+
+        self.assertEqual(len(decimal_sentences), 1)
+        self.assertEqual(decimal_sentences[0]["end_s"], 2.0)
+        self.assertEqual(len(url_sentences), 1)
+        self.assertEqual(url_sentences[0]["end_s"], 1.5)
+
+    def test_text_punctuation_does_not_fallback_empty_timestamp_slice_to_whole_segment(self):
+        sentences = split_text_by_punctuation(
+            "first. second. third.",
+            [["first", 0.0, 0.4]],
+        )
+
+        self.assertEqual(len(sentences), 1)
+        self.assertEqual(sentences[0]["start_s"], 0.0)
+        self.assertEqual(sentences[0]["end_s"], 0.4)
+        self.assertEqual(sentences[0]["punc_text"], "first. second. third.")
 
     def test_naqta_label_mapping_adds_arabic_punctuation(self):
         text = punctuate_tokens_from_labels(
@@ -170,6 +234,31 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(sentences[0]["cut_end_ms"], 82115)
         self.assertEqual(sentences[1]["cut_start_ms"], 82115)
         self.assertLessEqual(sentences[0]["cut_end_ms"], sentences[1]["cut_start_ms"])
+
+    def test_sentence_interval_validation_rejects_reversed_and_overlapping_times(self):
+        with self.assertRaisesRegex(ValueError, "Invalid sentence interval"):
+            validate_sentence_intervals([
+                {"start_ms": 242606, "end_ms": 241745, "text": "bad"},
+            ])
+        with self.assertRaisesRegex(ValueError, "Overlapping sentence cut interval"):
+            validate_sentence_intervals([
+                {
+                    "start_ms": 1000,
+                    "end_ms": 2000,
+                    "cut_start_ms": 1000,
+                    "cut_end_ms": 2200,
+                    "cut_segments_ms": [[1000, 2200]],
+                    "text": "a",
+                },
+                {
+                    "start_ms": 2000,
+                    "end_ms": 3000,
+                    "cut_start_ms": 2100,
+                    "cut_end_ms": 3000,
+                    "cut_segments_ms": [[2100, 3000]],
+                    "text": "b",
+                },
+            ])
 
     def test_sentence_cut_segments_fall_back_to_sentence_bounds_without_vad_overlap(self):
         [sentence] = add_sentence_cut_segments(

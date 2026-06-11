@@ -442,6 +442,9 @@ def _decide_boundary(candidate: BoundaryCandidate, config: SentenceBoundaryFusio
     over_max = candidate.combined_duration_ms > max_ms
     reached_target = candidate.combined_duration_ms >= target_ms
 
+    if candidate.token_gap_ms < 0:
+        return "merge", "merged_non_monotonic_boundary"
+
     if candidate.long_vad_silence:
         return "keep", "long_vad_silence"
 

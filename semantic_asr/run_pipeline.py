@@ -15,6 +15,7 @@ from semantic_asr.config import (
     load_pipeline_profile,
     write_resolved_config,
 )
+from semantic_asr.core import validate_sentence_intervals
 from semantic_asr.outputs import write_all_outputs
 from semantic_asr.registry import ComponentRegistry
 
@@ -77,6 +78,7 @@ def run_profile(
     if os.path.exists(json_path):
         with open(json_path, encoding="utf-8") as fin:
             result = json.load(fin)
+        validate_sentence_intervals(result.get("sentences", []))
         outputs = write_missing_outputs(output_dir, resolved_uttid, result, profile)
         outputs["json"] = json_path
         if profile.output.copy_resolved_config:

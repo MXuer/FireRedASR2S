@@ -684,6 +684,44 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(fused[1]["start_ms"], 5000)
         self.assertIsNone(decisions[0]["vad_silence_ms"])
 
+    def test_negative_token_gap_boundary_merges_instead_of_creating_reversed_interval(self):
+        sentences = [
+            {
+                "start_ms": 242606,
+                "end_ms": 245110,
+                "text": "write، ونخلي بالنا كويس قوي لإن c.",
+                "asr_confidence": 0,
+            },
+            {
+                "start_ms": 238380,
+                "end_ms": 245130,
+                "text": "sharp.",
+                "asr_confidence": 0,
+            },
+        ]
+        frame_probs = {
+            "frame_shift_ms": 10,
+            "frame_length_ms": 25,
+            "probs": [0.05] * 25000,
+        }
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            [],
+            [(238000, 245500)],
+            np.ones(16000 * 250, dtype=np.float32),
+            16000,
+            self.config,
+            frame_probs,
+        )
+
+        self.assertEqual(len(fused), 1)
+        self.assertEqual(fused[0]["start_ms"], 242606)
+        self.assertEqual(fused[0]["end_ms"], 245130)
+        self.assertEqual(decisions[0]["action"], "merge")
+        self.assertEqual(decisions[0]["reason"], "merged_non_monotonic_boundary")
+        self.assertEqual(decisions[0]["token_gap_ms"], -6730)
+
     def test_audio_safe_gap_merges_reported_portuguese_semantic_fragment(self):
         sentences = [
             {

@@ -4,7 +4,7 @@ from typing import Sequence
 _PUNCT_ONLY = re.compile(r"^[^\w\u4e00-\u9fff]+$")
 _EDGE_PUNCT = re.compile(r"(^[^\w\u4e00-\u9fff]+)|([^\w\u4e00-\u9fff]+$)")
 _SENTENCE_END = re.compile(r"[。.!?！？؟]+$")
-_SENTENCE_SPLIT = re.compile(r"[^。.!?！？؟]+[。.!?！？؟]*")
+_SENTENCE_END_CHARS = set("。.!?！？؟")
 _ASCII_WORD = re.compile(r"[a-zA-Z0-9#]")
 
 
@@ -65,29 +65,51 @@ def split_text_by_punctuation(text: str, timestamp: Sequence[Sequence]) -> list[
         selected = timestamps[cursor:cursor + token_count] if token_count > 0 else []
         cursor += token_count
 
-        if selected:
-            start_s = float(selected[0][1])
-            end_s = float(selected[-1][2])
-        elif timestamps:
-            start_s = float(timestamps[0][1])
-            end_s = float(timestamps[-1][2])
-        else:
-            start_s = 0.0
-            end_s = 0.0
+        if not selected:
+            if sentences:
+                sentences[-1]["punc_text"] = _join_tokens([sentences[-1]["punc_text"], sentence_text])
+            continue
+        start_s = float(selected[0][1])
+        end_s = float(selected[-1][2])
         sentences.append(_sentence(start_s, end_s, [sentence_text]))
     return sentences
 
 
 def _split_punctuated_sentence_texts(text: str) -> list[str]:
     sentence_texts = []
-    for match in _SENTENCE_SPLIT.finditer(text):
-        sentence_text = match.group(0).strip()
-        if not sentence_text:
+    start = 0
+    i = 0
+    while i < len(text):
+        if text[i] not in _SENTENCE_END_CHARS or not _is_sentence_boundary(text, i):
+            i += 1
             continue
-        if _PUNCT_ONLY.fullmatch(sentence_text):
-            continue
-        sentence_texts.append(sentence_text)
+        end = i + 1
+        while end < len(text) and text[end] in _SENTENCE_END_CHARS:
+            end += 1
+        _append_sentence_text(sentence_texts, text[start:end])
+        start = end
+        i = end
+
+    _append_sentence_text(sentence_texts, text[start:])
     return sentence_texts
+
+
+def _append_sentence_text(sentence_texts: list[str], sentence_text: str) -> None:
+    sentence_text = sentence_text.strip()
+    if sentence_text and not _PUNCT_ONLY.fullmatch(sentence_text):
+        sentence_texts.append(sentence_text)
+
+
+def _is_sentence_boundary(text: str, index: int) -> bool:
+    if text[index] != ".":
+        return True
+    previous = text[index - 1] if index > 0 else ""
+    following = text[index + 1] if index + 1 < len(text) else ""
+    return not (_is_ascii_token_char(previous) and _is_ascii_token_char(following))
+
+
+def _is_ascii_token_char(char: str) -> bool:
+    return bool(char and _ASCII_WORD.fullmatch(char))
 
 
 def split_timestamp_by_native_punctuation(timestamp: Sequence[Sequence]) -> list[dict]:
