@@ -1,5 +1,14 @@
 # Todo
 
+- [x] Current work: inspect available artifacts for `838db147`, `8606f16f`, and `afdb46d5` MMS errors and locate exact segment/text where recoverable.
+- [x] Current work: compute or recover MMS CTC target length, repeat count and frame count for each failed segment where artifacts allow it.
+- [x] Current work: explain why each failure happens and which upstream stage should be fixed before any fallback.
+
+Review:
+- `838db147-31d3-412a-ae62-edd30ef8a554` is fully recoverable from the diagnostic rerun: the failing segment is `296770-297270ms`, text `إذا حصلت على محاولة تحقيق المنطقة، فإنها تتحقق بمعرفة المنطقة.`, prepared as 10 Arabic word tokens. Uroman/dictionary mapping produces 52 target symbols with 3 consecutive repeats, but the 500ms audio island produces only 24 MMS emission frames, so CTC needs at least 55 frames and fails.
+- `8606f16f-8713-43d8-8491-6236446b61ac` failed historically because MMS reached `forced_align()` with an empty target tensor after uroman/dictionary filtering. The old `error.json` stores only the traceback, not the ASR segment text or token list. A current diagnostic rerun completes and has 103 timestamp segments with zero empty-target segments, so the exact old text cannot be recovered from checked artifacts.
+- `afdb46d5-b788-4d16-bc36-edac8632ae6a` failed historically with the same CTC feasibility pattern as `838db147`: old torchaudio message reports `targets length: 30, log_probs length: 34, repeats: 1`, which our preflight interpretation maps to 30 emission frames, 34 target symbols and 1 repeat. CTC needs at least 35 frames, so the segment is about one frame short. The old `error.json` does not store the ASR text; a GPU diagnostic rerun request was rejected by the approval reviewer, so the exact segment text was not recoverable in this turn.
+
 - [x] Current work: add an MMS preflight error for empty target indices before calling torchaudio forced alignment.
 - [x] Current work: add an MMS preflight error for CTC-impossible `frames < target_chars + repeats` inputs before calling torchaudio forced alignment.
 - [x] Current work: make the MMS adapter fall back to monotonic approximate token timestamps for preflight-impossible segments instead of failing the whole audio.

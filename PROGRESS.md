@@ -105,6 +105,23 @@ Current state:
 
 Recent validation:
 
+- Detailed MMS failure analysis for the three remaining Arabic `batch_5_output_fireredvad` errors:
+  - `838db147-31d3-412a-ae62-edd30ef8a554` is an end-of-audio 500ms VAD island at
+    `296770-297270ms`. Whisper produced
+    `إذا حصلت على محاولة تحقيق المنطقة، فإنها تتحقق بمعرفة المنطقة.`;
+    MMS uroman/dictionary mapping produced 52 target symbols with 3 repeats, but
+    only 24 emission frames were available. CTC needs at least 55 frames, so the
+    upstream issue is a dense ASR hallucination on a tiny isolated VAD island.
+  - `8606f16f-8713-43d8-8491-6236446b61ac` failed historically because
+    `forced_align()` received an empty target tensor after uroman/dictionary
+    filtering. The stored `error.json` does not include the ASR segment text, and
+    a current diagnostic rerun no longer reproduces an empty-target segment.
+  - `afdb46d5-b788-4d16-bc36-edac8632ae6a` failed historically with 30 MMS
+    emission frames versus 34 target symbols plus 1 repeat, so CTC needed at
+    least 35 frames. The stored error lacks ASR text and the GPU diagnostic rerun
+    request was rejected, so the exact text cannot be recovered from available
+    artifacts.
+
 - MMS forced alignment now has preflight checks and fallback for the remaining
   Arabic batch failures:
   - `empty_target` is detected before torchaudio sees an empty `targets`
