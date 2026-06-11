@@ -20,6 +20,8 @@ class PipelineConfig:
     punc_batch_size: int = 1
     sample_rate: int | None = None
     strip_punctuation_before_punc: bool = True
+    asr_vad_min_segment_s: float = 0.5
+    asr_vad_max_merge_silence_s: float = 1.0
     output_vad_min_silence_merge_s: float = 0.2
     output_vad_pad_s: float = 0.2
     preserve_sentence_gaps: bool = False
@@ -79,7 +81,12 @@ class SemanticAsrPipeline:
             assert sample_rate == self.config.sample_rate
 
         raw_vad_result = self._detect(wav_path)
-        segments = self._build_segments(uttid, wav_np, sample_rate, raw_vad_result["timestamps"])
+        asr_vad_segments = prepare_asr_vad_segments(
+            raw_vad_result["timestamps"],
+            min_segment_s=self.config.asr_vad_min_segment_s,
+            max_merge_silence_s=self.config.asr_vad_max_merge_silence_s,
+        )
+        segments = self._build_segments(uttid, wav_np, sample_rate, asr_vad_segments)
         asr_results, asr_segments = self._transcribe(segments)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
         self._require_timestamps(asr_results)
@@ -120,7 +127,7 @@ class SemanticAsrPipeline:
             "raw_vad_segments_ms": [
                 (int(s * 1000), int(e * 1000)) for s, e in raw_vad_result["timestamps"]
             ],
-            "asr_vad_segments_ms": self._segments_ms(raw_vad_result["timestamps"]),
+            "asr_vad_segments_ms": self._segments_ms(asr_vad_segments),
             "dur_s": dur_s,
             "words": words,
             "timestamp_segments": timestamp_segments,
@@ -372,6 +379,52 @@ def merge_close_vad_segments(
         cur_start, cur_end = start, end
     merged.append((cur_start, cur_end))
     return merged
+
+
+def prepare_asr_vad_segments(
+    timestamps: Sequence[tuple[float, float]],
+    min_segment_s: float = 0.5,
+    max_merge_silence_s: float = 1.0,
+) -> list[tuple[float, float]]:
+    segments = _normalize_segments(timestamps)
+    if not segments or min_segment_s <= 0:
+        return segments
+
+    max_gap = max(float(max_merge_silence_s), 0.0)
+    while True:
+        changed = False
+        for index, (start, end) in enumerate(segments):
+            if end - start >= min_segment_s:
+                continue
+
+            previous_gap = (
+                start - segments[index - 1][1]
+                if index > 0
+                else float("inf")
+            )
+            next_gap = (
+                segments[index + 1][0] - end
+                if index + 1 < len(segments)
+                else float("inf")
+            )
+            can_merge_previous = previous_gap <= max_gap
+            can_merge_next = next_gap <= max_gap
+
+            if can_merge_previous and (not can_merge_next or previous_gap <= next_gap):
+                previous_start, previous_end = segments[index - 1]
+                segments[index - 1] = (previous_start, max(previous_end, end))
+                del segments[index]
+            elif can_merge_next:
+                next_start, next_end = segments[index + 1]
+                segments[index + 1] = (min(start, next_start), next_end)
+                del segments[index]
+            else:
+                logger.info("Dropping isolated short ASR VAD segment %.3f-%.3f", start, end)
+                del segments[index]
+            changed = True
+            break
+        if not changed:
+            return segments
 
 
 def pad_vad_segments(

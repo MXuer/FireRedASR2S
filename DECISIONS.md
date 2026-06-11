@@ -14,7 +14,7 @@
 - External re-punctuation strips existing punctuation from token timestamps before calling the punctuation model.
 - FireRed runtime code needed by `semantic_asr` is vendored under `semantic_asr.firered_runtime` for future standalone maintenance.
 - Language-specific module combinations and parameters are represented as explicit JSON/YAML profiles under top-level `configs/`.
-- ASR and timestamp providers receive raw VAD speech segments directly; pre-ASR VAD merging is removed from the core pipeline.
+- ASR and timestamp providers receive ASR VAD segments derived from raw VAD. Tiny raw VAD islands are merged into nearby speech when possible, or skipped when isolated, before ASR and forced alignment.
 - Final output VAD segments are formatted separately: adjacent speech separated by less than 500ms silence is merged, then output segments are padded by 100ms on both sides without crossing adjacent segment boundaries.
 - Sentence boundaries are aligned to final output VAD segment boundaries, so downstream JSON/TextGrid/SRT/CSV exports see the same merged and padded ranges.
 - Pipeline composition uses the registry/config path; old combination builders are removed.

@@ -179,16 +179,16 @@ class ConfigRunnerTest(unittest.TestCase):
             self.assertTrue(os.path.exists(outputs["resolved_config"]))
             with open(outputs["json"], "r", encoding="utf-8") as fin:
                 result = json.load(fin)
-            self.assertEqual(result["text"], "hello. hello.")
-            self.assertEqual(len(result["timestamp_segments"]), 2)
+            self.assertEqual(result["text"], "hello.")
+            self.assertEqual(len(result["timestamp_segments"]), 1)
             self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["text"], "hello")
             self.assertEqual(result["timestamp_segments"][0]["timestamps"][0]["start_ms"], 0)
             self.assertEqual(result["raw_vad_segments_ms"], [[0, 400], [500, 1000]])
-            self.assertEqual(result["asr_vad_segments_ms"], [[0, 400], [500, 1000]])
+            self.assertEqual(result["asr_vad_segments_ms"], [[0, 1000]])
             self.assertEqual(result["vad_frame_speech_probs"]["frame_shift_ms"], 10)
             self.assertEqual(result["vad_frame_speech_probs"]["probs"], [0.0, 0.8, 0.1])
 
-    def test_default_pipeline_uses_raw_vad_segments_for_asr_and_timestamp(self):
+    def test_default_pipeline_postprocesses_vad_segments_for_asr_and_timestamp(self):
         profile = parse_pipeline_profile(fake_profile())
         fake_asr = FakeAsr()
         fake_timestamp = FakeTimestampProvider()
@@ -199,9 +199,9 @@ class ConfigRunnerTest(unittest.TestCase):
 
         result = pipeline.process(self._write_silence_wav(), "sample")
 
-        self.assertEqual(fake_timestamp.segment_ranges, [(0.0, 0.4), (0.5, 1.0)])
+        self.assertEqual(fake_timestamp.segment_ranges, [(0.0, 1.0)])
         self.assertEqual(result["raw_vad_segments_ms"], [(0, 400), (500, 1000)])
-        self.assertEqual(result["asr_vad_segments_ms"], [(0, 400), (500, 1000)])
+        self.assertEqual(result["asr_vad_segments_ms"], [(0, 1000)])
 
     @staticmethod
     def _write_silence_wav() -> str:

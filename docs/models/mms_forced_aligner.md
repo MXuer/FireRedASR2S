@@ -31,14 +31,16 @@ timestamps as:
 [token, start_s, end_s]
 ```
 
-The pipeline feeds MMS with raw VAD speech segments by default. Semantic
-sentence merging is performed after token timestamps are available.
+The pipeline feeds MMS with ASR VAD segments derived from raw VAD. Very short
+raw VAD islands are merged into nearby speech when possible, or skipped when
+isolated, before ASR and MMS alignment. Semantic sentence merging is performed
+after token timestamps are available.
 
 `use_star` is fixed to `False` in the adapter. This avoids inserting `<star>`
 between every input token, which can otherwise force gaps between adjacent
 tokens and make word timestamps less precise. Because `use_star=False` assigns
-the full segment span across tokens, keeping MMS on raw VAD segments is
-important to avoid expanding the first and last token into surrounding silence.
+the full segment span across tokens, ASR VAD postprocessing keeps MMS close to
+real speech while avoiding isolated microsegments that are too short for CTC.
 
 ## Install And Model Files
 

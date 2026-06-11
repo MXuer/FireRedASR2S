@@ -2,7 +2,7 @@
 
 Current state:
 
-- MMS CTC-length failure analysis for Arabic `batch_4_output` is complete. The 30 `targets length is too long for CTC` errors are mostly raw-VAD microsegment failures: 27/30 have only 2-16 MMS emission frames, and a VAD-only scan found matching 50-340ms FireRed VAD speech islands. The MMS path sends raw VAD slices directly to ASR and then to MMS, so Whisper hallucinations on tiny slices can create more uroman target characters than CTC can align. The remaining historical failures are text-density/repeat cases, but their stored `error.json` files lack ASR text, and current reruns did not reproduce the same dense ASR output.
+- MMS CTC-length failure analysis for Arabic `batch_4_output` is complete. The 30 `targets length is too long for CTC` errors are mostly raw-VAD microsegment failures: 27/30 have only 2-16 MMS emission frames, and a VAD-only scan found matching 50-340ms FireRed VAD speech islands. ASR/MMS input VAD is now postprocessed before transcription/alignment: tiny islands below `asr_vad_min_segment_s` are merged into nearby speech when possible, or skipped when isolated. The remaining historical failures are text-density/repeat cases, but their stored `error.json` files lack ASR text, and current reruns did not reproduce the same dense ASR output.
 - The project is being reshaped from the original FireRedASR2S repository into a standalone multilingual semantic ASR pipeline project.
 - Current Arabic batch TextGrid boundary audit found that the three output-time TextGrid errors are caused by already-reversed JSON sentence intervals, not by the TextGrid writer itself. The common root cause is punctuation splitting inside code/URL/decimal tokens (`console.write`, `getlink.io`, `1.3400`) combined with whole-segment timestamp fallback and a boundary-fusion keep path that accepts negative-gap candidates.
 - Fixed the TextGrid reversed-boundary chain by protecting periods inside ASCII token-like strings and decimals, removing whole-segment timestamp fallback for empty punctuation slices, merging negative-gap boundary candidates, and validating final sentence/cut intervals before JSON reuse or output writing. The three Arabic failing audios reran successfully under `output/textgrid_boundary_fix/` with zero invalid intervals and TextGrid files written.
@@ -19,7 +19,7 @@ Current state:
 - FireRed runtime code needed by the standalone project is vendored inside the pipeline package boundary.
 - Existing adapters include Silero VAD, Fun-ASR-Nano-2512, Whisper large, Qwen3-ForcedAligner and FireRed VAD/Punc runtime bridges.
 - Added language-specific profiles for `zh`, `en` and `ru`.
-- ASR and timestamp providers now receive raw VAD speech segments directly; pre-ASR VAD merging was removed from the core pipeline.
+- ASR and timestamp providers now receive postprocessed ASR VAD segments derived from raw VAD; raw VAD remains preserved for `raw_vad_segments_ms` and final cut segments.
 - Final output VAD formatting is separate from ASR slicing: short non-speech gaps can be merged, segments can be padded, and sentence boundaries are aligned to output VAD ranges.
 - Output writers support JSON, JSONL, CSV, SRT and TextGrid.
 - Added a registry/config composition layer:
@@ -92,7 +92,7 @@ Current state:
   semantic-complete boundary with the lowest local speech probability.
   Semantic-incomplete active boundaries still record
   `max_duration_wait_for_silence`.
-- ASR and MMS forced alignment now use raw VAD speech segments by default.
+- ASR and MMS forced alignment now use postprocessed ASR VAD segments derived from raw VAD.
   Semantic sentence merging happens after token timestamps are available.
 - MMS forced aligner forces `use_star=False`; configs cannot override it back
   to true.
@@ -104,6 +104,18 @@ Current state:
   boundary in sentence fusion. The default threshold is 1.0s.
 
 Recent validation:
+
+- ASR VAD microsegment fix validation:
+  - Added `prepare_asr_vad_segments()` with defaults
+    `asr_vad_min_segment_s=0.5` and `asr_vad_max_merge_silence_s=1.0`.
+  - Focused unit tests cover merging a tiny island to the nearest neighbor,
+    dropping an isolated tiny island, merging a tiny chain without overlap, and
+    preserving raw VAD while using postprocessed ASR VAD in the pipeline.
+  - Real Arabic rerun passed for
+    `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/ar_sa/batch_4/5e2e123b-f598-4e7d-973d-3dd8877ccadf.wav`
+    under `output/mms_ctc_fix/5e2e/`: raw VAD still contains
+    `204220-204280ms`, while `asr_vad_segments_ms` has no segment shorter than
+    500ms and MMS CTC alignment completed.
 
 - Arabic batch_4 error audit for
   `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/ar_sa/batch_4_output`:

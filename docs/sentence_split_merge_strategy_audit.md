@@ -52,11 +52,13 @@ The final JSON records these as:
 
 ### 2. ASR Segment Selection
 
-ASR and timestamp providers receive raw VAD speech islands directly. This is no
-longer configurable in the core pipeline.
+ASR and timestamp providers receive ASR VAD speech islands derived from raw VAD.
+Tiny raw VAD islands below `asr_vad_min_segment_s` are merged into a nearby
+speech segment when the neighboring silence gap is within
+`asr_vad_max_merge_silence_s`; isolated tiny islands are skipped.
 
-The selected ASR inputs are stored as `asr_vad_segments_ms`, which should match
-`raw_vad_segments_ms`.
+The selected ASR inputs are stored as `asr_vad_segments_ms`. They may differ
+from `raw_vad_segments_ms`, which remains the unmodified detector output.
 
 ### 3. ASR + Timestamp Provider
 
@@ -67,8 +69,8 @@ The timestamp provider can be:
 - ASR-native CTC/non-autoregressive timestamps;
 - external forced alignment such as MMS or Qwen3 ForcedAligner.
 
-For MMS, raw VAD segments are aligned immediately after ASR. Semantic merging is
-done after timestamps exist.
+For MMS, ASR VAD segments are aligned immediately after ASR. Semantic merging
+is done after timestamps exist.
 
 ### 4. Punctuation To Semantic Candidates
 

@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: add an ASR/MMS input VAD postprocess that merges tiny VAD islands into a nearby speech segment before transcription/alignment.
+- [x] Current work: keep `raw_vad_segments_ms` and final output VAD formatting unchanged while recording the postprocessed ASR VAD segments separately.
+- [x] Current work: add focused unit tests for tiny-island merge, isolated tiny-island drop and no-overlap monotonic behavior.
+- [x] Current work: rerun a previously failing Arabic microsegment sample to verify MMS CTC no longer fails.
+- [x] Current work: update progress and commit the completed fix.
+
+Review:
+- Added `PipelineConfig.asr_vad_min_segment_s` and `PipelineConfig.asr_vad_max_merge_silence_s`; defaults are 0.5s and 1.0s.
+- Added `prepare_asr_vad_segments()`: tiny raw VAD islands merge to the nearest neighbor within the configured silence gap, chained tiny islands collapse safely, and isolated tiny islands are skipped.
+- Pipeline ASR/timestamp stages now use the postprocessed ASR VAD segments, while `raw_vad_segments_ms` and final cut generation still use the original raw VAD detector output.
+- Added focused tests in `tests/test_asr_vad_postprocess.py` and updated config runner tests for the new default ASR VAD behavior.
+- Real Arabic MMS CTC rerun passed for `5e2e123b-f598-4e7d-973d-3dd8877ccadf.wav`; raw VAD still contains `204220-204280ms`, but `asr_vad_segments_ms` contains no sub-500ms segment.
+
 - [x] Current work: identify all Arabic batch errors whose MMS traceback contains `targets length is too long for CTC`.
 - [x] Current work: extract per-error CTC frame/target/repeat counts and recover ASR text where the stored logs allow it.
 - [x] Current work: group the failures by short-segment, token-density, numeric/symbol token and language/text-normalization patterns.

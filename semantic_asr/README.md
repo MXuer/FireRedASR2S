@@ -48,10 +48,16 @@ combinations. Profiles live as JSON files under top-level `configs/`, and
 
 ## ASR And Timestamp VAD Policy
 
-ASR and timestamp providers receive the raw VAD speech segments.
-For forced aligners such as MMS, this keeps alignment audio close to the
-detected speech and avoids assigning leading or trailing silence to the first
-or last token.
+ASR and timestamp providers receive a postprocessed ASR VAD segment list derived
+from raw VAD. Tiny speech islands shorter than `asr_vad_min_segment_s` are
+merged into a nearby segment when the silence gap is no more than
+`asr_vad_max_merge_silence_s`; isolated tiny islands are skipped. This prevents
+forced aligners such as MMS from receiving 50-300ms snippets that can trigger
+ASR hallucinations and impossible CTC alignment paths.
+
+Raw VAD remains available as `raw_vad_segments_ms` and is still used for final
+cut segments. The postprocessed ASR/timestamp inputs are recorded separately as
+`asr_vad_segments_ms`.
 
 Semantic sentence merging happens after timestamps are available, using
 punctuation, token timestamps, raw VAD, frame-level VAD speech probabilities
