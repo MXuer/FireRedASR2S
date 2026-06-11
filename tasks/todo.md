@@ -1,5 +1,22 @@
 # Todo
 
+- [x] Current work: inspect the 5 Arabic `batch_5_output_fireredvad` error JSON files and group them by failing stage.
+- [x] Current work: compare each error with any matching normal JSON output to see whether failure is from pipeline inference or output writing.
+- [x] Current work: trace MMS failures to the exact CTC/target/token pattern and check whether the tiny-VAD fix should address them.
+- [x] Current work: summarize root causes and next fixes without changing code unless the cause is obvious and narrow.
+
+Review:
+- Found 5 errors in `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/ar_sa/batch_5_output_fireredvad`.
+- Four fail during `timestamp:mms_forced_aligner`; none of these have completed result JSON files, so the ASR text printed before MMS was not recoverable from stored artifacts.
+- Three MMS failures are CTC feasibility errors:
+  - `838db147-31d3-412a-ae62-edd30ef8a554`: about 24 frames / 480ms versus 52 target chars plus 3 repeats; this is a micro/dense segment and should be helped by the new ASR VAD tiny-island merge.
+  - `afdb46d5-b788-4d16-bc36-edac8632ae6a`: about 30 frames / 600ms versus 34 target chars plus 1 repeat; this is just above the 0.5s tiny threshold and may still need MMS feasibility guarding or a slightly larger ASR VAD minimum.
+  - `66166626-13c6-4cca-898d-82f1f92fd98c`: about 127 frames / 2.54s versus 140 target chars plus 2 repeats; this is not a tiny island, but an ASR-text-density/CTC-capacity failure.
+- `8606f16f-8713-43d8-8491-6236446b61ac` fails because MMS `token_indices` is empty after uroman/dictionary filtering, causing torchaudio `forced_align()` to call `torch.max()` on an empty target tensor. This needs an explicit MMS guard before calling `forced_align()`.
+- `fd41e9e3-7722-49c8-bcb7-b4d8d88f634f` has an existing stale bad JSON and fails in resume validation with `Invalid sentence interval at index 15: 77120-77120`. The bad interval is caused by old negative-gap boundary decisions splitting `live. worldbank. org.` into three candidates with the same start time.
+- Replaying the old `fd41...` `semantic_sentences` through the current `fuse_sentence_boundaries()` no longer creates the invalid interval: the two negative-gap candidates are merged with reason `merged_non_monotonic_boundary`, producing one valid `في live. worldbank. org.` sentence.
+- Next fixes: add an MMS preflight/guard for empty and CTC-impossible targets, and decide how `run_pipeline` should handle an existing invalid JSON cache instead of failing before regeneration.
+
 - [x] Current work: add an ASR/MMS input VAD postprocess that merges tiny VAD islands into a nearby speech segment before transcription/alignment.
 - [x] Current work: keep `raw_vad_segments_ms` and final output VAD formatting unchanged while recording the postprocessed ASR VAD segments separately.
 - [x] Current work: add focused unit tests for tiny-island merge, isolated tiny-island drop and no-overlap monotonic behavior.

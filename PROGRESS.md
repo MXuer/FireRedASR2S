@@ -105,6 +105,18 @@ Current state:
 
 Recent validation:
 
+- Arabic `batch_5_output_fireredvad` error audit found 5 errors:
+  - 3 MMS CTC feasibility failures: `838db147...` is a micro/dense case
+    likely helped by ASR VAD tiny-island merging; `afdb46d5...` is a 600ms
+    near-threshold dense case; `66166626...` is a 2.54s ASR-text-density case.
+  - 1 MMS empty-target failure: `8606f16f...` reaches
+    `forced_align()` with zero `token_indices` after uroman/dictionary
+    filtering, so MMS needs an explicit preflight guard before torchaudio.
+  - 1 stale bad JSON resume failure: `fd41e9e3...` contains a 0-length
+    `worldbank.` sentence from old negative-gap boundary logic. Replaying its
+    `semantic_sentences` through the current fusion code merges
+    `live. worldbank. org.` and validates successfully.
+
 - ASR VAD microsegment fix validation:
   - Added `prepare_asr_vad_segments()` with defaults
     `asr_vad_min_segment_s=0.5` and `asr_vad_max_merge_silence_s=1.0`.
