@@ -308,14 +308,17 @@ class SemanticAsrPipeline:
                     "start_ms": int(start_s * 1000 + segment_start_ms),
                     "end_ms": int(end_s * 1000 + segment_start_ms),
                 })
-            timestamp_segments.append({
+            timestamp_segment = {
                 "uttid": asr_result["uttid"],
                 "start_ms": segment_start_ms,
                 "end_ms": segment_end_ms,
                 "text": asr_result.get("text", ""),
                 "confidence": asr_result.get("confidence", 0),
                 "timestamps": timestamps,
-            })
+            }
+            if asr_result.get("timestamp_fallback"):
+                timestamp_segment["timestamp_fallback"] = asr_result["timestamp_fallback"]
+            timestamp_segments.append(timestamp_segment)
         return timestamp_segments
 
     @staticmethod

@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: add an MMS preflight error for empty target indices before calling torchaudio forced alignment.
+- [x] Current work: add an MMS preflight error for CTC-impossible `frames < target_chars + repeats` inputs before calling torchaudio forced alignment.
+- [x] Current work: make the MMS adapter fall back to monotonic approximate token timestamps for preflight-impossible segments instead of failing the whole audio.
+- [x] Current work: add unit tests for empty-target fallback, CTC-impossible fallback and normal MMS error propagation.
+- [x] Current work: run focused tests and update progress/commit.
+
+Review:
+- Added `MmsAlignmentFeasibilityError` for two preflight failures before `torchaudio.functional.forced_align()`: `empty_target` and `ctc_target_too_long`.
+- `MmsForcedAlignerTimestampProvider` catches only that feasibility error and falls back to monotonic approximate token timestamps for the current ASR segment. Unexpected MMS/runtime errors still propagate.
+- Fallback metadata is preserved under `timestamp_segments[].timestamp_fallback` in the output JSON.
+- Added unit tests for empty-target preflight, CTC-impossible preflight, adapter fallback, unexpected-error propagation and JSON fallback metadata.
+- Validation passed: `tests.test_mms_forced_aligner tests.test_asr_vad_postprocess`, full `unittest discover tests` with 115 tests, `compileall`, and `git diff --check`.
+- Real GPU rerun of the three remaining Arabic files could not be executed in this turn because the sandbox escalation request was rejected by the approval reviewer.
+
 - [x] Current work: inspect the 5 Arabic `batch_5_output_fireredvad` error JSON files and group them by failing stage.
 - [x] Current work: compare each error with any matching normal JSON output to see whether failure is from pipeline inference or output writing.
 - [x] Current work: trace MMS failures to the exact CTC/target/token pattern and check whether the tiny-VAD fix should address them.

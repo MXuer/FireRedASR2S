@@ -105,6 +105,21 @@ Current state:
 
 Recent validation:
 
+- MMS forced alignment now has preflight checks and fallback for the remaining
+  Arabic batch failures:
+  - `empty_target` is detected before torchaudio sees an empty `targets`
+    tensor;
+  - `ctc_target_too_long` is detected when
+    `frames < target_chars + repeats`;
+  - those feasibility errors fall back to monotonic approximate token
+    timestamps for that ASR segment, and JSON records
+    `timestamp_segments[].timestamp_fallback`;
+  - unexpected MMS/runtime errors still propagate normally.
+  Validation passed for focused MMS/ASR-VAD tests, full unit discover
+  (115 tests), compileall and `git diff --check`. Real GPU rerun of the three
+  remaining Arabic files was not executed because the sandbox escalation
+  request was rejected by the approval reviewer.
+
 - Arabic `batch_5_output_fireredvad` error audit found 5 errors:
   - 3 MMS CTC feasibility failures: `838db147...` is a micro/dense case
     likely helped by ASR VAD tiny-island merging; `afdb46d5...` is a 600ms

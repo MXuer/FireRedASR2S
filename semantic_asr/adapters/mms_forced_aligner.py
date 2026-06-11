@@ -1,10 +1,14 @@
 from dataclasses import dataclass
+import logging
 import re
 from typing import Sequence
 
 from semantic_asr.core import SpeechSegment
 from semantic_asr.language_mapping import canonical_language_id, model_language
-from semantic_asr.mms_runtime.aligner import MmsAligner
+from semantic_asr.mms_runtime.aligner import MmsAligner, MmsAlignmentFeasibilityError
+
+
+logger = logging.getLogger("semantic_asr.adapters.mms_forced_aligner")
 
 
 @dataclass
@@ -40,19 +44,40 @@ class MmsForcedAlignerTimestampProvider:
             print(tokens)
             tokens, alignment_tokens = self._prepare_alignment_items(tokens)
             names = [f"{asr_result['uttid']}_{i}" for i in range(len(tokens))]
-            aligned = self.aligner.align(
-                tokens,
-                segment.wav,
-                segment.sample_rate,
-                names,
-                use_star=self.config.use_star,
-                language=model_language("mms_forced_aligner", self.config.language),
-                raw_transcripts=tokens,
-                alignment_transcripts=alignment_tokens,
-            )
+            fallback = None
+            try:
+                aligned = self.aligner.align(
+                    tokens,
+                    segment.wav,
+                    segment.sample_rate,
+                    names,
+                    use_star=self.config.use_star,
+                    language=model_language("mms_forced_aligner", self.config.language),
+                    raw_transcripts=tokens,
+                    alignment_transcripts=alignment_tokens,
+                )
+            except MmsAlignmentFeasibilityError as exc:
+                logger.warning(
+                    "MMS alignment fallback uttid=%s reason=%s frames=%s target_chars=%s repeats=%s",
+                    asr_result.get("uttid"),
+                    exc.reason,
+                    exc.frame_count,
+                    exc.target_count,
+                    exc.repeat_count,
+                )
+                aligned = self._fallback_alignment(tokens, segment)
+                fallback = {
+                    "provider": "mms_forced_aligner",
+                    "reason": exc.reason,
+                    "frame_count": exc.frame_count,
+                    "target_count": exc.target_count,
+                    "repeat_count": exc.repeat_count,
+                }
 
             timestamped = dict(asr_result)
             timestamped["timestamp"] = self._normalize_alignment(aligned)
+            if fallback is not None:
+                timestamped["timestamp_fallback"] = fallback
             results.append(timestamped)
         return results
 
@@ -106,6 +131,28 @@ class MmsForcedAlignerTimestampProvider:
             if token:
                 timestamps.append([token, float(item["start"]), float(item["end"])])
         return timestamps
+
+    @staticmethod
+    def _fallback_alignment(tokens: Sequence[str], segment: SpeechSegment) -> list[dict]:
+        tokens = [str(token).strip() for token in tokens if str(token).strip()]
+        if not tokens:
+            return []
+
+        duration_s = max(float(segment.end_s) - float(segment.start_s), 0.001)
+        step_s = duration_s / len(tokens)
+        aligned = []
+        for index, token in enumerate(tokens):
+            start_s = index * step_s
+            end_s = duration_s if index == len(tokens) - 1 else (index + 1) * step_s
+            aligned.append({
+                "start": round(start_s, 3),
+                "end": round(max(end_s, start_s + 0.001), 3),
+                "duration": round(max(end_s - start_s, 0.001), 3),
+                "clean_text": token,
+                "text": token,
+                "name": f"{segment.uttid}_{index}",
+            })
+        return aligned
 
 
 _NUMERIC_PREFIX_WORDS = {

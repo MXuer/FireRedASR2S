@@ -111,6 +111,22 @@ class AsrVadPostprocessTest(unittest.TestCase):
         self.assertEqual(timestamp.segment_ranges, [(0.0, 1.35), (1.6, 2.4)])
         self.assertEqual(asr.uttids, ["sample_s0_e1350", "sample_s1600_e2400"])
 
+    def test_timestamp_segments_preserve_fallback_metadata(self):
+        pipeline = object.__new__(SemanticAsrPipeline)
+
+        [segment] = pipeline._format_timestamp_segments([
+            {
+                "uttid": "sample_s1000_e2000",
+                "text": "hello",
+                "confidence": 0,
+                "timestamp": [["hello", 0.0, 1.0]],
+                "timestamp_fallback": {"provider": "mms_forced_aligner", "reason": "empty_target"},
+            }
+        ])
+
+        self.assertEqual(segment["timestamp_fallback"]["provider"], "mms_forced_aligner")
+        self.assertEqual(segment["timestamp_fallback"]["reason"], "empty_target")
+
     @staticmethod
     def _write_silence_wav() -> str:
         tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)

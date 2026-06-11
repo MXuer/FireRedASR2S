@@ -16,6 +16,17 @@ EMISSION_INTERVAL = 30
 logger = logging.getLogger("semantic_asr.mms_runtime.aligner")
 
 
+class MmsAlignmentFeasibilityError(RuntimeError):
+    def __init__(self, reason: str, frame_count: int, target_count: int, repeat_count: int):
+        self.reason = reason
+        self.frame_count = frame_count
+        self.target_count = target_count
+        self.repeat_count = repeat_count
+        super().__init__(
+            f"{reason}: frames={frame_count}, target_chars={target_count}, repeats={repeat_count}"
+        )
+
+
 class MmsAligner:
     def __init__(self, model_path: str, device: str, uroman_path: str = "uroman/bin") -> None:
         logger.info("Loading MMS aligner model from %s", model_path)
@@ -99,6 +110,22 @@ class MmsAligner:
             emissions = torch.cat([emissions, torch.zeros(time_steps, 1).to(self.device)], dim=1)
 
         token_indices = [self.dictionary[c] for c in " ".join(tokens).split(" ") if c in self.dictionary]
+        repeat_count = _count_consecutive_repeats(token_indices)
+        if not token_indices:
+            del emissions
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            raise MmsAlignmentFeasibilityError("empty_target", time_steps, 0, 0)
+        if len(token_indices) + repeat_count > time_steps:
+            del emissions
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+            raise MmsAlignmentFeasibilityError(
+                "ctc_target_too_long",
+                time_steps,
+                len(token_indices),
+                repeat_count,
+            )
         blank = self.dictionary["<blank>"]
         # torchaudio forced_align has unstable CUDA behavior for some scripts.
         # Keep model emissions on GPU, but run the lightweight DP alignment on CPU.
@@ -163,3 +190,7 @@ class MmsAligner:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         return emissions, stride
+
+
+def _count_consecutive_repeats(token_indices: list[int]) -> int:
+    return sum(1 for previous, current in zip(token_indices, token_indices[1:]) if previous == current)

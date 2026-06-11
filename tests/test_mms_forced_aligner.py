@@ -1,9 +1,12 @@
 import unittest
 
+import torch
+
 from semantic_asr.adapters.mms_forced_aligner import MmsForcedAlignerConfig, MmsForcedAlignerTimestampProvider
 from semantic_asr.core import SpeechSegment
 from semantic_asr.language_mapping import model_language
 from semantic_asr.mms_runtime import aligner as mms_aligner_module
+from semantic_asr.mms_runtime.aligner import MmsAlignmentFeasibilityError
 from semantic_asr.mms_runtime.align_utils import Segment
 
 
@@ -163,6 +166,64 @@ class MmsForcedAlignerTest(unittest.TestCase):
             MmsForcedAlignerTimestampProvider._normalize_alignment(aligned),
             [["hello", 0.1, 0.3]],
         )
+
+    def test_provider_falls_back_for_mms_feasibility_error(self):
+        class FakeAligner:
+            def align(inner_self, *args, **kwargs):
+                raise MmsAlignmentFeasibilityError("ctc_target_too_long", 24, 52, 3)
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        segment = SpeechSegment("test", 10.0, 12.0, 16000, [0.0] * 32000)
+
+        [result] = provider.add_timestamps([{"uttid": "test", "text": "hello world"}], [segment])
+
+        self.assertEqual(result["timestamp"], [["hello", 0.0, 1.0], ["world", 1.0, 2.0]])
+        self.assertEqual(result["timestamp_fallback"]["reason"], "ctc_target_too_long")
+        self.assertEqual(result["timestamp_fallback"]["frame_count"], 24)
+        self.assertEqual(result["timestamp_fallback"]["target_count"], 52)
+        self.assertEqual(result["timestamp_fallback"]["repeat_count"], 3)
+
+    def test_provider_does_not_swallow_unexpected_mms_errors(self):
+        class FakeAligner:
+            def align(inner_self, *args, **kwargs):
+                raise RuntimeError("boom")
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        segment = SpeechSegment("test", 0.0, 1.0, 16000, [0.0] * 16000)
+
+        with self.assertRaisesRegex(RuntimeError, "boom"):
+            provider.add_timestamps([{"uttid": "test", "text": "hello"}], [segment])
+
+    def test_mms_runtime_rejects_empty_target_before_torchaudio(self):
+        aligner = object.__new__(mms_aligner_module.MmsAligner)
+        aligner.device = "cpu"
+        aligner.dictionary = {"<blank>": 0, "a": 1}
+        aligner.generate_emissions = lambda waveform, sample_rate: (torch.zeros(4, 2), 20.0)
+
+        with self.assertRaisesRegex(MmsAlignmentFeasibilityError, "empty_target") as ctx:
+            aligner.get_alignments([0.0] * 16000, 16000, ["!"])
+
+        self.assertEqual(ctx.exception.reason, "empty_target")
+        self.assertEqual(ctx.exception.frame_count, 4)
+        self.assertEqual(ctx.exception.target_count, 0)
+
+    def test_mms_runtime_rejects_ctc_impossible_target_before_torchaudio(self):
+        aligner = object.__new__(mms_aligner_module.MmsAligner)
+        aligner.device = "cpu"
+        aligner.dictionary = {"<blank>": 0, "a": 1}
+        aligner.generate_emissions = lambda waveform, sample_rate: (torch.zeros(2, 2), 20.0)
+
+        with self.assertRaisesRegex(MmsAlignmentFeasibilityError, "ctc_target_too_long") as ctx:
+            aligner.get_alignments([0.0] * 16000, 16000, ["a a a"])
+
+        self.assertEqual(ctx.exception.reason, "ctc_target_too_long")
+        self.assertEqual(ctx.exception.frame_count, 2)
+        self.assertEqual(ctx.exception.target_count, 3)
+        self.assertEqual(ctx.exception.repeat_count, 2)
 
     def test_mms_runtime_keeps_numeric_star_placeholder_when_use_star_inserts_noise_stars(self):
         aligner = object.__new__(mms_aligner_module.MmsAligner)
