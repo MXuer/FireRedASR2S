@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: inspect `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/ar_sa/batch_4_output` error files.
+- [x] Current work: group Arabic batch errors by exception type, stage and root cause.
+- [x] Current work: inspect representative JSON outputs where needed to distinguish output-writer errors from pipeline strategy errors.
+- [x] Current work: summarize the error causes and recommended fixes.
+
+Review:
+- Found 47 `*.error.json` files in `batch_4_output`: 44 failed in `timestamp:mms_forced_aligner`, 3 failed while writing TextGrid.
+- MMS failures break down into 30 `targets length is too long for CTC`, 6 empty-target `torch.max()` failures, 7 `get_spans` label/token assertion mismatches and 1 short-emission shape failure.
+- 27 of the CTC-length errors had only 14-16 MMS emission frames, which points to very short raw VAD/ASR segments being sent into MMS with more alignment characters than the CTC path can support.
+- The remaining larger CTC errors indicate ASR text/character count is too dense for the available audio frames, especially with repeated characters or code-switched/unsupported text.
+- The 3 TextGrid errors already had JSON files, but each JSON contains one reversed sentence interval (`end_ms < start_ms`), which then leaves overlapping neighboring output intervals after TextGrid sorting.
+- The reversed TextGrid cases are tied to non-monotonic punctuation/timestamp candidates around mixed Arabic/English/numeric fragments such as `write console`, `330`, and `getlink.io`.
+
 - [x] Current work: inspect `output/de_de/848c4ebd-419a-4c42-a85a-2bb1ab52b121.json` for current German sentence/punctuation output.
 - [x] Current work: run a Qwen JSON-only experiment on the German timestamp tokens with boundary and punctuation suggestions.
 - [x] Current work: compare Qwen suggested spans/punctuation against the current output and manually judge German readability.

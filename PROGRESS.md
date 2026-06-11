@@ -102,6 +102,17 @@ Current state:
 
 Recent validation:
 
+- Arabic batch_4 error audit for
+  `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/ar_sa/batch_4_output`:
+  47 `*.error.json` files were present. 44 failed in MMS forced alignment and
+  3 failed while writing TextGrid. MMS failures were mostly CTC alignment
+  feasibility errors: 30 `targets length is too long for CTC`, including 27
+  cases with only 14-16 emission frames; 6 empty-target `torch.max()` failures;
+  7 `get_spans` label/token assertion mismatches; and 1 short-emission shape
+  error. The TextGrid failures already had JSON outputs but each contained one
+  reversed sentence interval, leaving overlapping neighboring intervals after
+  TextGrid sorting.
+
 - Qwen German punctuation/boundary experiment on
   `output/de_de/848c4ebd-419a-4c42-a85a-2bb1ab52b121.json`: full-file
   punctuation over 799 stripped tokens timed out, and 90-second window tests
