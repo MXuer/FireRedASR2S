@@ -198,13 +198,22 @@ def _punctuation_for_label(label: str, mapping: dict[str, str]) -> str:
         normalized.upper(),
         normalized.lower(),
         normalized.replace("LABEL_", ""),
-        normalized.replace("B-", "").replace("I-", ""),
-        normalized.replace("B_", "").replace("I_", ""),
+        _strip_sequence_prefix(normalized, "-"),
+        _strip_sequence_prefix(normalized, "_"),
     ]
     for candidate in candidates:
         if candidate in mapping:
             return mapping[candidate]
     return ""
+
+
+def _strip_sequence_prefix(label: str, separator: str) -> str:
+    prefixes = ("B", "I", "E", "S", "U")
+    for prefix in prefixes:
+        marker = f"{prefix}{separator}"
+        if label.startswith(marker):
+            return label[len(marker):]
+    return label
 
 
 def _timestamp_tokens(timestamp: Sequence[Sequence]) -> list[str]:

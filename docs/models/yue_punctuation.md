@@ -52,10 +52,13 @@ index instead of converting Cantonese text back through whitespace token counts.
 That keeps no-space Chinese/Cantonese timestamps stable.
 
 Predicted labels are mapped to punctuation with a configurable
-`label_to_punctuation` dictionary. The default mapping covers common English
-label names, `LABEL_*` placeholders, and literal Chinese punctuation symbols.
-If the downloaded checkpoint exposes different labels, keep the adapter and
-override only the mapping:
+`label_to_punctuation` dictionary. The downloaded checkpoint exposes labels
+such as `O`, `S-。`, `S-，`, `S-、`, `S-？`, `S-！`, `S-；` and `S-︰`.
+The adapter strips common sequence-label prefixes such as `B-`, `I-`, `E-`,
+`S-` and `U-`, so those labels map through the literal punctuation entries.
+
+If a future checkpoint exposes different labels, keep the adapter and override
+only the mapping:
 
 ```json
 {

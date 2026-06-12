@@ -146,9 +146,19 @@ Recent validation:
   label-to-punctuation mapping. Validation passed: focused punctuation and
   language-support tests, standalone skip-load example, full unit discover
   (128 tests), `compileall semantic_asr tests examples`, and `git diff --check`.
-  A real model load was not run in this turn because the checkpoint was not
-  downloaded locally and Hugging Face raw config access failed with SSL/network
-  errors.
+  At initial integration time, a real model load was not run because the
+  checkpoint was not yet available locally and Hugging Face raw config access
+  failed with SSL/network errors.
+
+- Real `yue_punctuation` smoke test passed after the checkpoint was downloaded
+  locally. The local snapshot
+  `~/.cache/huggingface/hub/models--nizzzo--zh-yue-punctuation-restore-v3/snapshots/015afa4682164b92e38d69271d6700f59d443098`
+  loaded on GPU with `CUDA_VISIBLE_DEVICES=4` and produced timestamp-mapped
+  output: `我今日返工，你去邊係唔係一齊食飯？`. The real model labels use
+  sequence prefixes such as `S-。` and `S-，`; `yue_punctuation` now strips
+  `B/I/E/S/U` prefixes before mapping labels to punctuation. Validation passed:
+  focused punctuation/language-support tests, full unit discover (128 tests),
+  `compileall semantic_asr tests examples`, and `git diff --check`.
 
 - Fixed the remaining German `batch_2_output` MMS span errors by collapsing
   whitespace in uroman tokens before `get_alignments()` and `get_spans()`, then

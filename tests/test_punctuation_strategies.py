@@ -147,7 +147,7 @@ class PunctuationStrategyTest(unittest.TestCase):
     def test_yue_label_mapping_adds_cantonese_punctuation_without_spaces(self):
         text = punctuate_yue_tokens_from_labels(
             ["我", "今日", "返工", "你", "去", "邊"],
-            ["O", "O", "COMMA", "O", "O", "QUESTION_MARK"],
+            ["O", "O", "S-，", "O", "O", "S-？"],
         )
 
         self.assertEqual(text, "我今日返工，你去邊？")
@@ -163,7 +163,7 @@ class PunctuationStrategyTest(unittest.TestCase):
                 ["去", 0.9, 1.0],
                 ["邊", 1.0, 1.2],
             ],
-            ["O", "O", "PERIOD", "O", "O", "QUESTION_MARK"],
+            ["O", "O", "S-。", "O", "O", "S-？"],
         )
 
         self.assertEqual(len(sentences), 2)

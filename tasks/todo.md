@@ -1,5 +1,15 @@
 # Todo
 
+- [x] Current work: run a real-model smoke test for downloaded `nizzzo/zh-yue-punctuation-restore-v3`.
+- [x] Current work: verify the output shape includes timestamp-mapped `punc_sentences`.
+- [x] Current work: record the result in progress and commit the test record.
+
+Review:
+- Real model load passed from local snapshot `~/.cache/huggingface/hub/models--nizzzo--zh-yue-punctuation-restore-v3/snapshots/015afa4682164b92e38d69271d6700f59d443098` on `CUDA_VISIBLE_DEVICES=4`.
+- Smoke text `我 今日 返工 你 去 邊 係 唔 係 一齊 食 飯` produced one timestamp-mapped sentence: `我今日返工，你去邊係唔係一齊食飯？`.
+- The checkpoint's real labels are `O`, `S-。`, `S-，`, `S-、`, `S-？`, `S-！`, `S-；`, `S-︰`; fixed `yue_punctuation` to strip sequence-label prefixes such as `S-`.
+- Validation passed: focused punctuation/language-support tests, full unit discover with 128 tests, `compileall semantic_asr tests examples`, and `git diff --check`.
+
 - [x] Current work: inspect the Hugging Face model metadata for `nizzzo/zh-yue-punctuation-restore-v3` and decide the adapter interface.
 - [x] Current work: add a Cantonese punctuation adapter, registry entry, and language-support metadata.
 - [x] Current work: add standalone example/docs and unit tests for model loading skip mode plus punctuation output mapping.
