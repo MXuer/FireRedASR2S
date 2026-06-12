@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: inspect the Hugging Face model metadata for `nizzzo/zh-yue-punctuation-restore-v3` and decide the adapter interface.
+- [x] Current work: add a Cantonese punctuation adapter, registry entry, and language-support metadata.
+- [x] Current work: add standalone example/docs and unit tests for model loading skip mode plus punctuation output mapping.
+- [x] Current work: run focused/full validation, update progress, and commit only this change set.
+
+Review:
+- Added `yue_punctuation` as a Cantonese token-classification punctuation component for `nizzzo/zh-yue-punctuation-restore-v3`.
+- The adapter maps predictions directly back to timestamp token indices instead of re-tokenizing no-space Cantonese text, so sentence spans remain aligned to the original ASR/forced-alignment timeline.
+- Registered the model in the component registry and language-support catalog for `yue_hk` / `Cantonese`.
+- Added `examples/test_yue_punctuation.py` and `docs/models/yue_punctuation.md`.
+- Validation passed: focused punctuation/language-support tests, skip-load standalone example, full unit discover with 128 tests, `compileall semantic_asr tests examples`, and `git diff --check`.
+
 - [x] Current work: make final `cut_segments_ms` / `cut_start_ms` / `cut_end_ms` use padded `output_vad_segments` instead of raw VAD.
 - [x] Current work: add regression coverage proving `output_vad_pad_s` affects TextGrid/CSV/SRT output times through `cut_*`.
 - [x] Current work: run focused/full validation and update progress/commit.

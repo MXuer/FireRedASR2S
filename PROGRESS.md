@@ -69,6 +69,11 @@ Current state:
   - registry name: `naqta`;
   - language support: Arabic profiles such as `ar_sa`;
   - docs, standalone skip-load test and `configs/ar_sa_naqta.json` were added.
+- Added nizzzo Cantonese punctuation restoration model as a `punc` component:
+  - adapter: `semantic_asr.adapters.yue_punctuation`;
+  - registry name: `yue_punctuation`;
+  - language support: `yue_hk` / Cantonese aliases;
+  - docs and standalone skip-load test were added.
 - Added Qwen semantic-boundary prompting as a `punc` component:
   - adapter: `semantic_asr.adapters.qwen_semantic_boundary`;
   - registry name: `qwen_semantic_boundary`;
@@ -134,6 +139,16 @@ Recent validation:
   `1100-1475ms` and final `cut_end_ms` uses the padded boundary. Validation
   passed: focused ASR-VAD/punctuation/output tests, full unit discover
   (125 tests), `compileall semantic_asr tests`, and `git diff --check`.
+
+- Added `yue_punctuation` for `nizzzo/zh-yue-punctuation-restore-v3`.
+  The adapter uses Hugging Face token classification, maps labels directly to
+  timestamp token indices for no-space Cantonese text, and exposes configurable
+  label-to-punctuation mapping. Validation passed: focused punctuation and
+  language-support tests, standalone skip-load example, full unit discover
+  (128 tests), `compileall semantic_asr tests examples`, and `git diff --check`.
+  A real model load was not run in this turn because the checkpoint was not
+  downloaded locally and Hugging Face raw config access failed with SSL/network
+  errors.
 
 - Fixed the remaining German `batch_2_output` MMS span errors by collapsing
   whitespace in uroman tokens before `get_alignments()` and `get_spans()`, then

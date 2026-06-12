@@ -8,6 +8,10 @@ from semantic_asr.core import (
     validate_sentence_intervals,
 )
 from semantic_asr.adapters.naqta_punctuation import punctuate_tokens_from_labels
+from semantic_asr.adapters.yue_punctuation import (
+    punctuate_timestamp_from_labels as punctuate_yue_timestamp_from_labels,
+    punctuate_tokens_from_labels as punctuate_yue_tokens_from_labels,
+)
 from semantic_asr.punctuation import AsrNativePunc, AsrTextPunc, split_text_by_punctuation
 
 
@@ -139,6 +143,36 @@ class PunctuationStrategyTest(unittest.TestCase):
         )
 
         self.assertEqual(text, "هذا اختبار، هل تسمعني؟")
+
+    def test_yue_label_mapping_adds_cantonese_punctuation_without_spaces(self):
+        text = punctuate_yue_tokens_from_labels(
+            ["我", "今日", "返工", "你", "去", "邊"],
+            ["O", "O", "COMMA", "O", "O", "QUESTION_MARK"],
+        )
+
+        self.assertEqual(text, "我今日返工，你去邊？")
+
+    def test_yue_timestamp_punctuation_maps_sentences_by_token_index(self):
+        sentences = punctuate_yue_timestamp_from_labels(
+            [
+                ["我", 0.0, 0.1],
+                ["今日", 0.1, 0.4],
+                ["返工", 0.4, 0.7],
+                ["", 0.7, 0.8],
+                ["你", 0.8, 0.9],
+                ["去", 0.9, 1.0],
+                ["邊", 1.0, 1.2],
+            ],
+            ["O", "O", "PERIOD", "O", "O", "QUESTION_MARK"],
+        )
+
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["punc_text"], "我今日返工。")
+        self.assertEqual(sentences[0]["start_s"], 0.0)
+        self.assertEqual(sentences[0]["end_s"], 0.7)
+        self.assertEqual(sentences[1]["punc_text"], "你去邊？")
+        self.assertEqual(sentences[1]["start_s"], 0.8)
+        self.assertEqual(sentences[1]["end_s"], 1.2)
 
     def test_format_skips_punctuation_only_punc_sentence(self):
         pipeline = object.__new__(SemanticAsrPipeline)

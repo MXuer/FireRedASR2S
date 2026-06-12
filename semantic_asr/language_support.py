@@ -237,6 +237,13 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="punc",
+        name="yue_punctuation",
+        languages=("yue",),
+        aliases={"yue": ("cantonese", "yue-hk", "ct-hk")},
+        notes="Cantonese punctuation restoration model nizzzo/zh-yue-punctuation-restore-v3.",
+    ),
+    ModelLanguageSupport(
+        role="punc",
         name="xlm_roberta_punctuation",
         languages=(
             "af", "am", "ar", "bg", "bn", "de", "el", "en", "es", "et",

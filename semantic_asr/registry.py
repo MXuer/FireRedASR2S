@@ -61,6 +61,7 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("punc", "naqta", _build_naqta_punctuation)
     registry.register("punc", "qwen_semantic_boundary", _build_qwen_semantic_boundary)
     registry.register("punc", "xlm_roberta_punctuation", _build_xlm_roberta_punctuation)
+    registry.register("punc", "yue_punctuation", _build_yue_punctuation)
     return registry
 
 
@@ -188,6 +189,12 @@ def _build_naqta_punctuation(params: Mapping[str, Any]) -> PuncModel:
     from semantic_asr.adapters.naqta_punctuation import NaqtaPunctuation, NaqtaPunctuationConfig
 
     return NaqtaPunctuation(_dataclass_from_mapping(NaqtaPunctuationConfig, params))
+
+
+def _build_yue_punctuation(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.adapters.yue_punctuation import YuePunctuation, YuePunctuationConfig
+
+    return YuePunctuation(_dataclass_from_mapping(YuePunctuationConfig, params))
 
 
 def _build_qwen_semantic_boundary(params: Mapping[str, Any]) -> PuncModel:
