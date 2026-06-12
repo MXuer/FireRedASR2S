@@ -159,6 +159,15 @@ Recent validation:
   `B/I/E/S/U` prefixes before mapping labels to punctuation. Validation passed:
   focused punctuation/language-support tests, full unit discover (128 tests),
   `compileall semantic_asr tests examples`, and `git diff --check`.
+- Real `yue_punctuation` Cantonese-English mixed-input smoke tests passed on
+  GPU with the same local snapshot. Example outputs:
+  `我今日開meeting，你send email畀我，好唔好？`,
+  `呢個project deadline係Friday。` / `你confirm咗未？`, and
+  `如果client approve咗，我哋就start development下個sprint，再review`.
+  English tokens remained in the text and timestamp-mapped `punc_sentences`
+  were returned. The third sample did not receive final punctuation, so
+  code-switch input is supported technically but still needs domain quality
+  checks before production use.
 
 - Fixed the remaining German `batch_2_output` MMS span errors by collapsing
   whitespace in uroman tokens before `get_alignments()` and `get_spans()`, then

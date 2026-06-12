@@ -1,5 +1,14 @@
 # Todo
 
+- [x] Current work: run real `yue_punctuation` smoke tests on Cantonese-English mixed input.
+- [x] Current work: inspect whether punctuation and timestamp-mapped sentence spans remain valid for code-switch tokens.
+- [x] Current work: record the result in progress and commit the test record if files change.
+
+Review:
+- Real GPU smoke tests passed for three Cantonese-English mixed inputs using the local `nizzzo/zh-yue-punctuation-restore-v3` snapshot on `CUDA_VISIBLE_DEVICES=4`.
+- The adapter handled English tokens such as `meeting`, `send email`, `project deadline`, `Friday`, `confirm`, `client approve`, `start development`, `sprint`, and `review` without crashing or losing timestamp spans.
+- Outputs remained timestamp-mapped `punc_sentences`. Two examples produced sentence-final punctuation and one produced only internal commas, so code-switch input is technically supported but punctuation quality still needs domain smoke tests.
+
 - [x] Current work: run a real-model smoke test for downloaded `nizzzo/zh-yue-punctuation-restore-v3`.
 - [x] Current work: verify the output shape includes timestamp-mapped `punc_sentences`.
 - [x] Current work: record the result in progress and commit the test record.
