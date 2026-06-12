@@ -5,7 +5,8 @@
     "vad": {
       "name": "firered_vad",
       "params": {
-        "use_gpu": true
+        "use_gpu": true,
+        "extend_speech_frame": 5
       }
     },
     "asr": {
@@ -15,11 +16,12 @@
       "name": "mms_forced_aligner"
     },
     "punc": {
-      "name": "asr_native"
+      "name": "asr_text"
     }
   },
   "pipeline": {
-    "strip_punctuation_before_punc": false
+    "strip_punctuation_before_punc": false,
+    "output_vad_pad_s": 0.4
   },
   "output": {
     "outdir": "output/experiments/vi_vn"
