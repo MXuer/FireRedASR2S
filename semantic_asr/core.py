@@ -111,10 +111,11 @@ class SemanticAsrPipeline:
                 raw_vad_result.get("frame_speech_probs"),
             )
         output_vad_segments = self._format_output_vad_segments(raw_vad_result["timestamps"], dur_s)
+        output_vad_segments_ms = self._segments_ms(output_vad_segments)
         if not self.config.preserve_sentence_gaps:
-            sentences = align_sentences_to_output_vad(sentences, self._segments_ms(output_vad_segments))
+            sentences = align_sentences_to_output_vad(sentences, output_vad_segments_ms)
         sentences = remove_sentence_overlaps(sentences)
-        sentences = add_sentence_cut_segments(sentences, self._segments_ms(raw_vad_result["timestamps"]))
+        sentences = add_sentence_cut_segments(sentences, output_vad_segments_ms)
         validate_sentence_intervals(sentences)
 
         text = "".join(s["text"] for s in sentences)
@@ -124,7 +125,7 @@ class SemanticAsrPipeline:
             "uttid": uttid,
             "text": text,
             "sentences": sentences,
-            "vad_segments_ms": self._segments_ms(output_vad_segments),
+            "vad_segments_ms": output_vad_segments_ms,
             "raw_vad_segments_ms": [
                 (int(s * 1000), int(e * 1000)) for s, e in raw_vad_result["timestamps"]
             ],

@@ -129,6 +129,27 @@ class AsrVadPostprocessTest(unittest.TestCase):
         self.assertEqual(timestamp.segment_ranges, [(0.0, 1.35), (1.6, 2.4)])
         self.assertEqual(asr.uttids, ["sample_s0_e1350", "sample_s1600_e2400"])
 
+    def test_output_vad_padding_reaches_final_cut_times(self):
+        pipeline = SemanticAsrPipeline(
+            vad=FakeVad(),
+            asr=RecordingAsr(),
+            timestamp_provider=FakeTimestamp(),
+            punc=FakePunc(),
+            config=PipelineConfig(
+                asr_vad_min_segment_s=0.5,
+                asr_vad_max_merge_silence_s=1.0,
+                output_vad_min_silence_merge_s=0.0,
+                output_vad_pad_s=0.2,
+            ),
+        )
+
+        result = pipeline.process(self._write_silence_wav(), "sample")
+
+        self.assertEqual(result["raw_vad_segments_ms"][1], (1200, 1350))
+        self.assertIn((1100, 1475), result["vad_segments_ms"])
+        self.assertEqual(result["sentences"][0]["cut_start_ms"], 0)
+        self.assertEqual(result["sentences"][0]["cut_end_ms"], 1475)
+
     def test_timestamp_segments_preserve_fallback_metadata(self):
         pipeline = object.__new__(SemanticAsrPipeline)
 

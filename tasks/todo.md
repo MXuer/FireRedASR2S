@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: make final `cut_segments_ms` / `cut_start_ms` / `cut_end_ms` use padded `output_vad_segments` instead of raw VAD.
+- [x] Current work: add regression coverage proving `output_vad_pad_s` affects TextGrid/CSV/SRT output times through `cut_*`.
+- [x] Current work: run focused/full validation and update progress/commit.
+
+Review:
+- Pipeline now computes `output_vad_segments_ms` once from merged/padded output VAD and uses it for both sentence-to-output-VAD alignment and final `add_sentence_cut_segments()`.
+- Final `cut_segments_ms`, `cut_start_ms` and `cut_end_ms` now reflect `output_vad_pad_s`; TextGrid/CSV/SRT already consume those `cut_*` fields.
+- Raw VAD is still preserved unchanged under `raw_vad_segments_ms` for debugging and boundary-fusion support.
+- Added regression coverage showing a raw segment `1200-1350ms` becomes padded/clipped output VAD `1100-1475ms`, and the final sentence `cut_end_ms` follows that padded value.
+- Validation passed: focused ASR-VAD/punctuation/output tests, full `unittest discover tests` with 125 tests, `compileall semantic_asr tests`, and `git diff --check`.
+
+
 - [x] Current work: inspect the four German `batch_2_output` errors again after MMS whitespace normalization and determine whether they are stale or newly reproduced.
 - [x] Current work: if newly reproduced, trace the exact MMS token/span mismatch and patch the smallest upstream normalization gap.
 - [x] Current work: run focused/unit validation plus GPU verification on the affected German samples.

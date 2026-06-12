@@ -121,8 +121,19 @@ Current state:
   short incomplete fragments still merge.
 - Raw VAD silence at or above `max_merge_vad_silence_s` is a hard no-merge
   boundary in sentence fusion. The default threshold is 1.0s.
+- Final cut timestamps now use padded output VAD segments, so
+  `output_vad_pad_s` affects `cut_segments_ms`, `cut_start_ms`,
+  `cut_end_ms` and therefore TextGrid/CSV/SRT export times. Raw VAD remains
+  preserved unchanged in `raw_vad_segments_ms`.
 
 Recent validation:
+
+- Fixed `output_vad_pad_s` propagation to final exports by feeding padded
+  `output_vad_segments_ms` into `add_sentence_cut_segments()`. Regression
+  coverage confirms raw `1200-1350ms` becomes non-overlapping padded
+  `1100-1475ms` and final `cut_end_ms` uses the padded boundary. Validation
+  passed: focused ASR-VAD/punctuation/output tests, full unit discover
+  (125 tests), `compileall semantic_asr tests`, and `git diff --check`.
 
 - Fixed the remaining German `batch_2_output` MMS span errors by collapsing
   whitespace in uroman tokens before `get_alignments()` and `get_spans()`, then
