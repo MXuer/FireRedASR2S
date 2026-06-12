@@ -68,6 +68,7 @@ class MmsAligner:
             [str(item["alignment_transcript"]).strip().lower() for item in items],
             language,
         )
+        tokens = _normalize_token_spaces(tokens)
         if use_star:
             expanded_items = [{"inserted_star": True}]
             expanded_tokens = ["<star>"]
@@ -194,3 +195,10 @@ class MmsAligner:
 
 def _count_consecutive_repeats(token_indices: list[int]) -> int:
     return sum(1 for previous, current in zip(token_indices, token_indices[1:]) if previous == current)
+
+
+def _normalize_token_spaces(tokens: list[str]) -> list[str]:
+    return [
+        "<star>" if token == "<star>" else " ".join(str(token).split())
+        for token in tokens
+    ]

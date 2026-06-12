@@ -5,6 +5,7 @@ import numpy as np
 from semantic_asr.adapters.dolphin import _get_text, _normalize_timestamps
 from semantic_asr.adapters.funasr_nano import FunAsrNano, FunAsrNanoConfig
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig, _to_float32, normalize_qwen3_asr_language
+from semantic_asr.adapters.whisper_large import WhisperLarge, WhisperLargeConfig
 
 
 class _NoBatchFunAsrModel:
@@ -21,6 +22,15 @@ class _QwenModel:
     def transcribe(self, audio, language, return_time_stamps):
         self.language = language
         return [{"text": "ok"} for _ in audio]
+
+
+class _WhisperModel:
+    def __init__(self):
+        self.kwargs = None
+
+    def transcribe(self, wav_path, **kwargs):
+        self.kwargs = kwargs
+        return {"text": "ok", "segments": []}
 
 
 class AdapterInputTest(unittest.TestCase):
@@ -68,6 +78,26 @@ class AdapterInputTest(unittest.TestCase):
         results = adapter._generate(["a.wav", "b.wav"])
 
         self.assertEqual(results, [{"text": "a.wav"}, {"text": "b.wav"}])
+
+    def test_whisper_uses_short_audio_decode_settings(self):
+        adapter = object.__new__(WhisperLarge)
+        adapter.config = WhisperLargeConfig(
+            language="ar_sa",
+            word_timestamps=False,
+            short_audio_threshold_s=1.0,
+            short_beam_size=5,
+            short_length_penalty=0.0,
+            short_temperature=0.0,
+        )
+        adapter.model = _WhisperModel()
+
+        [result] = adapter.transcribe(["utt"], [(16000, np.zeros(8000, dtype=np.float32))])
+
+        self.assertEqual(result["text"], "ok")
+        self.assertEqual(adapter.model.kwargs["language"], "ar")
+        self.assertEqual(adapter.model.kwargs["beam_size"], 5)
+        self.assertEqual(adapter.model.kwargs["length_penalty"], 0.0)
+        self.assertEqual(adapter.model.kwargs["temperature"], 0.0)
 
 
 if __name__ == "__main__":

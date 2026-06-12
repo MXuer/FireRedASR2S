@@ -2,6 +2,24 @@
 
 Current state:
 
+- MMS runtime now normalizes uroman token whitespace before both CTC alignment
+  and span reconstruction, so repeated/edge spaces cannot create empty
+  expected characters in `get_spans()`.
+- Whisper large now exposes normal decode options plus short-audio overrides.
+  Short clips default to stricter deterministic beam decoding with
+  `short_temperature=0.0`, `short_beam_size=5` and
+  `short_length_penalty=0.0`; this is a mitigation only, not the main
+  hallucination guard.
+- MMS forced alignment now performs adapter-level ASR feasibility checks before
+  calling alignment. It estimates frame count, uroman/dictionary target count,
+  consecutive repeats and required frame count. Empty text/target,
+  CTC-impossible spans and dense tiny-segment hallucinations are skipped by
+  default and recorded in top-level `discarded_asr_segments`.
+- Approximate MMS timestamp fallback is now opt-in with
+  `fallback_on_feasibility_error=true`; the default path avoids producing
+  fake monotonic timestamps for unalignable ASR text.
+- ASR VAD postprocessing now treats `duration <= asr_vad_min_segment_s` as tiny,
+  so exact-threshold 500ms islands no longer slip through.
 - MMS CTC-length failure analysis for Arabic `batch_4_output` is complete. The 30 `targets length is too long for CTC` errors are mostly raw-VAD microsegment failures: 27/30 have only 2-16 MMS emission frames, and a VAD-only scan found matching 50-340ms FireRed VAD speech islands. ASR/MMS input VAD is now postprocessed before transcription/alignment: tiny islands below `asr_vad_min_segment_s` are merged into nearby speech when possible, or skipped when isolated. The remaining historical failures are text-density/repeat cases, but their stored `error.json` files lack ASR text, and current reruns did not reproduce the same dense ASR output.
 - The project is being reshaped from the original FireRedASR2S repository into a standalone multilingual semantic ASR pipeline project.
 - Current Arabic batch TextGrid boundary audit found that the three output-time TextGrid errors are caused by already-reversed JSON sentence intervals, not by the TextGrid writer itself. The common root cause is punctuation splitting inside code/URL/decimal tokens (`console.write`, `getlink.io`, `1.3400`) combined with whole-segment timestamp fallback and a boundary-fusion keep path that accepts negative-gap candidates.
@@ -104,6 +122,35 @@ Current state:
   boundary in sentence fusion. The default threshold is 1.0s.
 
 Recent validation:
+
+- Fixed the remaining German `batch_2_output` MMS span errors by collapsing
+  whitespace in uroman tokens before `get_alignments()` and `get_spans()`.
+  Validation passed: `tests.test_mms_forced_aligner`, full unit discover
+  (123 tests), `compileall semantic_asr tests`, and `git diff --check`.
+
+- Implemented the four-part short-segment anti-hallucination and MMS
+  feasibility strategy:
+  - Whisper short-audio decode parameters are configurable and tested.
+  - MMS checks target/frame feasibility before forced alignment.
+  - Unalignable tiny hallucinations and empty targets are recorded as
+    `discarded_asr_segments` instead of flowing into approximate timestamps by
+    default.
+  - Exact `asr_vad_min_segment_s` duration now counts as tiny.
+  Validation passed: focused adapter/ASR-VAD/MMS tests, full unit discover
+  before the final doc-only edits, `compileall semantic_asr tests`, config parse
+  for 13 JSON profiles and `git diff --check`. A real GPU rerun of
+  `838db147...` was requested but rejected by the automatic approval reviewer.
+
+- Whisper length-penalty demo on the known hallucinated Arabic `838db147` 500ms
+  segment (`296770-297270ms`) showed that decode-time length penalty is only a
+  partial mitigation. Current-like decoding reproduced
+  `إذا حصلت على محاولة تحقيق المنطقة، فإنها تتحقق بمعرفة المنطقة.`;
+  `beam_size=5` without length penalty produced an even longer repetitive
+  hallucination; `beam_size=5` with `length_penalty=0.0`, `0.2` or `1.0`
+  shortened the output to `اشتركوا في القناة` but still emitted hallucinated
+  text. The shortened result had `no_speech_prob≈0.296` and
+  `avg_logprob≈-0.56`, so Whisper's default no-speech/logprob filters would not
+  reject it.
 
 - Detailed MMS failure analysis for the three remaining Arabic `batch_5_output_fireredvad` errors:
   - `838db147-31d3-412a-ae62-edd30ef8a554` is an end-of-audio 500ms VAD island at

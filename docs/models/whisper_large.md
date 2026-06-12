@@ -54,6 +54,32 @@ Each worker process loads one Whisper model instance. This can improve
 throughput on a large GPU, but GPU memory usage increases roughly with
 `num_workers`.
 
+## Short Segment Decode Settings
+
+The adapter exposes Whisper decode options such as `temperature`, `beam_size`,
+`best_of`, `patience` and `length_penalty`. For short VAD segments it can
+override the normal settings with:
+
+```json
+{
+  "components": {
+    "asr": {
+      "name": "whisper_large",
+      "params": {
+        "short_audio_threshold_s": 1.0,
+        "short_temperature": 0.0,
+        "short_beam_size": 5,
+        "short_length_penalty": 0.0
+      }
+    }
+  }
+}
+```
+
+A focused Arabic 500ms hallucination test showed that length penalty can shorten
+hallucinated output, but it does not eliminate hallucination. Keep the MMS
+pre-alignment feasibility check enabled as the main guard for tiny VAD islands.
+
 ## Standalone Output Test
 
 ```bash

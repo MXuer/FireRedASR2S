@@ -42,15 +42,18 @@ tokens and make word timestamps less precise. Because `use_star=False` assigns
 the full segment span across tokens, ASR VAD postprocessing keeps MMS close to
 real speech while avoiding isolated microsegments that are too short for CTC.
 
-Before calling torchaudio forced alignment, the MMS runtime checks whether the
-target sequence is alignable:
+Before calling torchaudio forced alignment, the adapter checks whether the ASR
+segment is alignable:
 
 - empty target after uroman/dictionary filtering;
 - CTC-impossible target where `frames < target_chars + repeats`.
+- dense text on a tiny segment, marked as `short_segment_hallucination`.
 
-Those cases fall back to monotonic approximate token timestamps for the current
-ASR segment instead of failing the whole audio. The generated JSON records this
-under `timestamp_segments[].timestamp_fallback`.
+Those cases are skipped before MMS alignment by default and are recorded in the
+generated JSON under top-level `discarded_asr_segments`. Approximate monotonic
+timestamp fallback is available only when `fallback_on_feasibility_error=true`;
+it should be treated as diagnostic or experimental because the timestamps are
+not acoustically aligned.
 
 ## Install And Model Files
 

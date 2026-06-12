@@ -173,8 +173,9 @@ class MmsForcedAlignerTest(unittest.TestCase):
                 raise MmsAlignmentFeasibilityError("ctc_target_too_long", 24, 52, 3)
 
         provider = object.__new__(MmsForcedAlignerTimestampProvider)
-        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.config = MmsForcedAlignerConfig(language="en_us", fallback_on_feasibility_error=True)
         provider.aligner = FakeAligner()
+        provider.last_discarded_segments = []
         segment = SpeechSegment("test", 10.0, 12.0, 16000, [0.0] * 32000)
 
         [result] = provider.add_timestamps([{"uttid": "test", "text": "hello world"}], [segment])
@@ -184,6 +185,69 @@ class MmsForcedAlignerTest(unittest.TestCase):
         self.assertEqual(result["timestamp_fallback"]["frame_count"], 24)
         self.assertEqual(result["timestamp_fallback"]["target_count"], 52)
         self.assertEqual(result["timestamp_fallback"]["repeat_count"], 3)
+
+    def test_provider_discards_mms_feasibility_error_by_default(self):
+        class FakeAligner:
+            def align(inner_self, *args, **kwargs):
+                raise MmsAlignmentFeasibilityError("ctc_target_too_long", 24, 52, 3)
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        provider.last_discarded_segments = []
+        segment = SpeechSegment("test", 0.0, 0.5, 16000, [0.0] * 8000)
+
+        results = provider.add_timestamps([{"uttid": "test", "text": "hello world"}], [segment])
+
+        self.assertEqual(results, [])
+        self.assertEqual(provider.last_discarded_segments[0]["reason"], "ctc_target_too_long")
+        self.assertEqual(provider.last_discarded_segments[0]["frame_count"], 24)
+
+    def test_provider_prechecks_short_hallucination_before_mms_align(self):
+        class FakeAligner:
+            dictionary = {"<blank>": 0, "a": 1}
+
+            def _uromanize_alignment_tokens(inner_self, tokens, language):
+                return tokens
+
+            def align(inner_self, *args, **kwargs):
+                raise AssertionError("align should not be called")
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        provider.last_discarded_segments = []
+        segment = SpeechSegment("test", 0.0, 0.04, 16000, [0.0] * 640)
+
+        results = provider.add_timestamps([{"uttid": "test", "text": "a a a"}], [segment])
+
+        self.assertEqual(results, [])
+        discard = provider.last_discarded_segments[0]
+        self.assertEqual(discard["reason"], "short_segment_hallucination")
+        self.assertEqual(discard["frame_count"], 2)
+        self.assertEqual(discard["target_count"], 3)
+        self.assertEqual(discard["repeat_count"], 2)
+
+    def test_provider_prechecks_empty_target_before_mms_align(self):
+        class FakeAligner:
+            dictionary = {"<blank>": 0, "a": 1}
+
+            def _uromanize_alignment_tokens(inner_self, tokens, language):
+                return tokens
+
+            def align(inner_self, *args, **kwargs):
+                raise AssertionError("align should not be called")
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        provider.last_discarded_segments = []
+        segment = SpeechSegment("test", 0.0, 1.0, 16000, [0.0] * 16000)
+
+        results = provider.add_timestamps([{"uttid": "test", "text": "!!!"}], [segment])
+
+        self.assertEqual(results, [])
+        self.assertEqual(provider.last_discarded_segments[0]["reason"], "empty_target")
 
     def test_provider_does_not_swallow_unexpected_mms_errors(self):
         class FakeAligner:
@@ -261,6 +325,44 @@ class MmsForcedAlignerTest(unittest.TestCase):
 
         self.assertEqual(captured["tokens"], ["<star>", "<star>", "<star>", "년", "<star>"])
         self.assertEqual([item["text"] for item in aligned], ["1952", "년"])
+
+    def test_mms_runtime_normalizes_uroman_token_spaces_before_alignment_and_spans(self):
+        aligner = object.__new__(mms_aligner_module.MmsAligner)
+        aligner.uroman_path = "uroman/bin"
+        aligner.device = "cpu"
+        captured = {}
+
+        def fake_uromanize(tokens, language):
+            return [" a  b "]
+
+        def fake_get_alignments(waveform, sample_rate, tokens):
+            captured["align_tokens"] = tokens
+            return [], 10.0
+
+        def fake_get_spans(tokens, segments):
+            captured["span_tokens"] = tokens
+            return [[Segment("a", 0, 1)]]
+
+        original_get_spans = mms_aligner_module.get_spans
+        try:
+            aligner._uromanize_alignment_tokens = fake_uromanize
+            aligner.get_alignments = fake_get_alignments
+            mms_aligner_module.get_spans = fake_get_spans
+            aligner.align(
+                ["raw"],
+                [0.0] * 16000,
+                16000,
+                ["sample_0"],
+                use_star=False,
+                language="deu",
+                raw_transcripts=["raw"],
+                alignment_transcripts=["raw"],
+            )
+        finally:
+            mms_aligner_module.get_spans = original_get_spans
+
+        self.assertEqual(captured["align_tokens"], ["a b"])
+        self.assertEqual(captured["span_tokens"], ["a b"])
 
 
 if __name__ == "__main__":

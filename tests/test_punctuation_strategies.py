@@ -207,6 +207,22 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(sentences[1]["cut_segments_ms"], [[286542, 286580], [286700, 287690]])
         self.assertLessEqual(sentences[0]["cut_end_ms"], sentences[1]["cut_start_ms"])
 
+    def test_sentence_cut_segments_coalesce_overlapping_padded_vad_islands(self):
+        [sentence] = add_sentence_cut_segments(
+            [
+                {
+                    "start_ms": 43000,
+                    "end_ms": 47000,
+                    "text": "a",
+                    "asr_confidence": 0,
+                }
+            ],
+            [(43000, 45160), (44888, 47000)],
+        )
+
+        self.assertEqual(sentence["cut_segments_ms"], [[43000, 47000]])
+        validate_sentence_intervals([sentence])
+
     def test_sentence_cut_overlaps_are_resolved_for_textgrid_intervals(self):
         sentences = remove_sentence_cut_overlaps(
             [

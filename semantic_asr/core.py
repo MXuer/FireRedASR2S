@@ -89,6 +89,7 @@ class SemanticAsrPipeline:
         segments = self._build_segments(uttid, wav_np, sample_rate, asr_vad_segments)
         asr_results, asr_segments = self._transcribe(segments)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
+        discarded_asr_segments = list(getattr(self.timestamp_provider, "last_discarded_segments", []))
         self._require_timestamps(asr_results)
         timestamp_segments = self._format_timestamp_segments(asr_results)
         if self.config.strip_punctuation_before_punc:
@@ -134,6 +135,8 @@ class SemanticAsrPipeline:
             "vad_frame_speech_probs": raw_vad_result.get("frame_speech_probs"),
             "wav_path": wav_path,
         }
+        if discarded_asr_segments:
+            result["discarded_asr_segments"] = discarded_asr_segments
         if boundary_config.enabled:
             result["semantic_sentences"] = semantic_sentences
             result["sentence_boundary_decisions"] = boundary_decisions
@@ -397,7 +400,7 @@ def prepare_asr_vad_segments(
     while True:
         changed = False
         for index, (start, end) in enumerate(segments):
-            if end - start >= min_segment_s:
+            if end - start > min_segment_s:
                 continue
 
             previous_gap = (
@@ -511,7 +514,7 @@ def add_sentence_cut_segments(
     sentences: Sequence[dict],
     raw_vad_segments_ms: Sequence[tuple[int, int]],
 ) -> list[dict]:
-    raw_vad = [(int(start), int(end)) for start, end in raw_vad_segments_ms if int(end) > int(start)]
+    raw_vad = _coalesce_overlapping_segments_ms(raw_vad_segments_ms)
     enriched = []
     for sentence_source in sentences:
         sentence = dict(sentence_source)
@@ -528,6 +531,27 @@ def add_sentence_cut_segments(
         sentence["cut_end_ms"] = cut_segments[-1][1]
         enriched.append(sentence)
     return remove_sentence_cut_overlaps(enriched)
+
+
+def _coalesce_overlapping_segments_ms(
+    segments_ms: Sequence[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    segments = sorted(
+        (int(start), int(end))
+        for start, end in segments_ms
+        if int(end) > int(start)
+    )
+    if not segments:
+        return []
+
+    merged = [segments[0]]
+    for start, end in segments[1:]:
+        previous_start, previous_end = merged[-1]
+        if start <= previous_end:
+            merged[-1] = (previous_start, max(previous_end, end))
+            continue
+        merged.append((start, end))
+    return merged
 
 
 def remove_sentence_cut_overlaps(sentences: Sequence[dict]) -> list[dict]:

@@ -20,6 +20,19 @@ class MmsForcedAlignerConfig:
     normalize_text: bool = False
     uroman_path: str = "uroman/bin"
     num_workers: int = 1
+    fallback_on_feasibility_error: bool = False
+    short_hallucination_segment_s: float = 0.8
+    short_hallucination_target_rate: float = 50.0
+    estimated_frame_ms: float = 20.0
+
+
+@dataclass
+class _AlignmentCheck:
+    reason: str | None
+    frame_count: int
+    target_count: int
+    repeat_count: int
+    required_frame_count: int
 
 
 class MmsForcedAlignerTimestampProvider:
@@ -35,14 +48,19 @@ class MmsForcedAlignerTimestampProvider:
             device=self.config.device,
             uroman_path=self.config.uroman_path,
         )
+        self.last_discarded_segments: list[dict] = []
 
     def add_timestamps(self, batch_asr_result: Sequence[dict], batch_segments: Sequence[SpeechSegment]) -> list[dict]:
         results = []
+        self.last_discarded_segments = []
         for asr_result, segment in zip(batch_asr_result, batch_segments):
             tokens = self._prepare_tokens(asr_result.get("text", ""))
-            print(asr_result)
-            print(tokens)
             tokens, alignment_tokens = self._prepare_alignment_items(tokens)
+            check = self._alignment_check(alignment_tokens, segment)
+            if check.reason is not None:
+                self._record_discard(asr_result, segment, tokens, check)
+                continue
+
             names = [f"{asr_result['uttid']}_{i}" for i in range(len(tokens))]
             fallback = None
             try:
@@ -57,6 +75,16 @@ class MmsForcedAlignerTimestampProvider:
                     alignment_transcripts=alignment_tokens,
                 )
             except MmsAlignmentFeasibilityError as exc:
+                check = _AlignmentCheck(
+                    reason=exc.reason,
+                    frame_count=exc.frame_count,
+                    target_count=exc.target_count,
+                    repeat_count=exc.repeat_count,
+                    required_frame_count=exc.target_count + exc.repeat_count,
+                )
+                if not self.config.fallback_on_feasibility_error:
+                    self._record_discard(asr_result, segment, tokens, check)
+                    continue
                 logger.warning(
                     "MMS alignment fallback uttid=%s reason=%s frames=%s target_chars=%s repeats=%s",
                     asr_result.get("uttid"),
@@ -80,6 +108,68 @@ class MmsForcedAlignerTimestampProvider:
                 timestamped["timestamp_fallback"] = fallback
             results.append(timestamped)
         return results
+
+    def _alignment_check(self, alignment_tokens: Sequence[str], segment: SpeechSegment) -> "_AlignmentCheck":
+        if not alignment_tokens:
+            return _AlignmentCheck("empty_text", self._estimate_frame_count(segment), 0, 0, 0)
+        if not hasattr(self.aligner, "_uromanize_alignment_tokens") or not hasattr(self.aligner, "dictionary"):
+            return _AlignmentCheck(None, self._estimate_frame_count(segment), 0, 0, 0)
+
+        uroman_tokens = self.aligner._uromanize_alignment_tokens(
+            [str(token).strip().lower() for token in alignment_tokens],
+            model_language("mms_forced_aligner", self.config.language),
+        )
+        token_indices = [
+            self.aligner.dictionary[token]
+            for token in " ".join(uroman_tokens).split(" ")
+            if token in self.aligner.dictionary
+        ]
+        frame_count = self._estimate_frame_count(segment)
+        target_count = len(token_indices)
+        repeat_count = _count_consecutive_repeats(token_indices)
+        required = target_count + repeat_count
+        if target_count == 0:
+            return _AlignmentCheck("empty_target", frame_count, target_count, repeat_count, required)
+        if required > frame_count:
+            reason = "ctc_target_too_long"
+            duration_s = max(float(segment.end_s) - float(segment.start_s), 0.001)
+            target_rate = target_count / duration_s
+            if (
+                duration_s <= self.config.short_hallucination_segment_s
+                and target_rate >= self.config.short_hallucination_target_rate
+            ):
+                reason = "short_segment_hallucination"
+            return _AlignmentCheck(reason, frame_count, target_count, repeat_count, required)
+        return _AlignmentCheck(None, frame_count, target_count, repeat_count, required)
+
+    def _estimate_frame_count(self, segment: SpeechSegment) -> int:
+        duration_s = max(float(segment.end_s) - float(segment.start_s), 0.0)
+        frame_ms = max(float(self.config.estimated_frame_ms), 1.0)
+        return int(duration_s * 1000.0 / frame_ms)
+
+    def _record_discard(
+        self,
+        asr_result: dict,
+        segment: SpeechSegment,
+        tokens: Sequence[str],
+        check: "_AlignmentCheck",
+    ) -> None:
+        item = {
+            "provider": "mms_forced_aligner",
+            "uttid": asr_result.get("uttid"),
+            "start_ms": int(segment.start_s * 1000),
+            "end_ms": int(segment.end_s * 1000),
+            "duration_s": round(max(float(segment.end_s) - float(segment.start_s), 0.0), 3),
+            "text": asr_result.get("text", ""),
+            "tokens": list(tokens),
+            "reason": check.reason,
+            "frame_count": check.frame_count,
+            "target_count": check.target_count,
+            "repeat_count": check.repeat_count,
+            "required_frame_count": check.required_frame_count,
+        }
+        logger.warning("Discarding ASR segment before MMS alignment: %s", item)
+        self.last_discarded_segments.append(item)
 
     def _prepare_tokens(self, text: str) -> list[str]:
         text = str(text).strip()
@@ -375,3 +465,7 @@ def _is_numeric_suffix_token(token: str) -> bool:
 
 def _is_numeric_bridge_token(token: str) -> bool:
     return str(token).strip() in _NUMERIC_INFIX_SYMBOLS
+
+
+def _count_consecutive_repeats(token_indices: Sequence[int]) -> int:
+    return sum(1 for previous, current in zip(token_indices, token_indices[1:]) if previous == current)

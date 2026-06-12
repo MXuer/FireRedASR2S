@@ -1,5 +1,68 @@
 # Todo
 
+- [x] Current work: normalize MMS uroman token whitespace before both `get_alignments()` and `get_spans()`.
+- [x] Current work: add regression coverage for a uroman token containing repeated/edge spaces.
+- [x] Current work: run focused MMS tests and update progress/TODO.
+
+Review:
+- Added MMS runtime whitespace normalization immediately after uroman token generation: each non-`<star>` token is collapsed with `" ".join(token.split())`.
+- The normalized token list is now the single source used by both `get_alignments()` and `get_spans()`, preventing empty split pieces from creating assertions such as `===> o <=> `.
+- Added a runtime regression test that simulates uroman returning `" a  b "` and verifies both alignment and span reconstruction receive `"a b"`.
+- Validation passed: `tests.test_mms_forced_aligner`, full `unittest discover tests` with 123 tests, `compileall semantic_asr tests`, and `git diff --check`.
+
+
+- [x] Current work: inspect the 4 remaining German error JSON files in `de_de/batch_2_output`.
+- [x] Current work: identify the exact exception class, failing MMS stage and whether normal JSON/result output exists for those uttids.
+- [x] Current work: explain why the remaining errors differ from the already staged cut-segment overlap fix.
+
+Review:
+- Remaining error files: `1be9ef3a-4984-4b66-aea8-fc1759c775c4`, `54b7866f-a300-4145-98d6-9cec3dce698c`, `5ac7a083-cdcf-46ab-9af3-dd75b89c5eee`, `60aaac37-88f4-4dd8-a437-6c9d469b3e38`.
+- All 4 fail in `semantic_asr.mms_runtime.align_utils.get_spans()` with `AssertionError('===> <label> <=> ')`, where `<label>` is `o`, `<star>`, `a` or `d` and the expected token character is empty.
+- This is an MMS token/span reconstruction bug: uromanized token strings are split with `token.split(" ")`, so multiple spaces or empty pieces create an empty expected character. The forced-align path has labels for real symbols, but `get_spans()` tries to match them against `""`.
+- No ordinary JSON exists for these 4 uttids and `result.jsonl` has no successful records for them, so the exact ASR text/segment cannot be recovered from current artifacts without rerunning with diagnostic logging.
+- This is separate from the staged Ten-VAD padded-cut overlap fix, which addressed the earlier `Overlapping cut segment` errors.
+
+- [x] Current work: inspect all error files in `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/de_de/batch_2_output` and group by concrete exception.
+- [x] Current work: trace the failing code path against the current uncommitted MMS/Whisper changes.
+- [x] Current work: fix the root cause with minimal code changes and add regression coverage.
+- [x] Current work: rerun focused/unit validation and a representative German batch sample after the fix.
+- [x] Current work: update progress/TODO and commit if git approval allows it.
+
+Review:
+- The original 30 German `batch_2_output` failures were cut-segment validation errors from overlapping padded Ten-VAD islands. The staged fix coalesces overlapping raw VAD cut islands before final `cut_segments_ms` generation.
+- A real rerun of `02503fdb-e58c-42dd-b0d1-ad4bc7faed21.wav` passed and generated JSON/TextGrid/SRT/CSV under `output/de_de_batch2_verify_one`.
+- The current directory now has 4 remaining errors, all in MMS span reconstruction: `get_spans()` asserts because `seg.label` is `o`, `<star>`, `a` or `d`, while the expected `ltr` is an empty string.
+- These 4 remaining errors are not the cut-overlap bug. They happen after MMS forced alignment has produced segments, when uromanized token strings are split with `token.split(" ")`; multiple spaces or empty pieces in the token string create an empty expected character that cannot match any CTC segment label.
+- The existing error JSON files do not contain the ASR text or segment id, and `result.jsonl` has no success records for those 4 uttids, so exact offending text cannot be recovered without a diagnostic rerun.
+
+
+- [x] Current work: expose Whisper decode parameters and allow stricter short-audio decode settings.
+- [x] Current work: add a pre-MMS ASR alignment quality check that computes target/frame feasibility and detects empty targets before MMS.
+- [x] Current work: discard or record unalignable tiny hallucination segments before forced alignment instead of relying on approximate fallback.
+- [x] Current work: treat `duration <= asr_vad_min_segment_s` as tiny in ASR VAD preprocessing and add focused regression tests.
+- [x] Current work: run focused tests, update progress and commit.
+
+Review:
+- `WhisperLargeConfig` now exposes normal decode options and short-audio overrides. For short clips, the adapter defaults to `temperature=0.0`, `beam_size=5`, `length_penalty=0.0`.
+- `prepare_asr_vad_segments()` now treats `duration <= asr_vad_min_segment_s` as tiny, so exact-threshold 500ms islands are merged or dropped instead of slipping through.
+- `MmsForcedAlignerTimestampProvider` now computes alignment feasibility before calling MMS alignment: estimated frame count, uroman/dictionary target count, repeat count and required frame count. Empty text/target, CTC-impossible spans and dense tiny-segment hallucinations are skipped by default.
+- Skipped ASR segments are recorded on the final JSON as `discarded_asr_segments`; approximate monotonic timestamp fallback is now opt-in with `fallback_on_feasibility_error=true`.
+- Updated Whisper and MMS docs for the new parameters and default behavior.
+- Validation passed: focused adapter/ASR-VAD/MMS tests, full unit discover before docs, compileall, config parse for 13 JSON profiles and `git diff --check`.
+- Real GPU rerun of `838db147` was requested for end-to-end verification but rejected by the automatic approval reviewer, so this turn could not produce a real sample JSON.
+
+
+- [x] Current work: run a focused Whisper length-penalty demo on the known hallucinated `838db147` 500ms segment before changing pipeline logic.
+- [x] Current work: compare default/current-like decoding against beam-search length-penalty variants and record whether hallucination is reduced.
+
+Review:
+- Demo segment: `/data_151/duhu/DBC/ASR/22424_微软ITN5语种混合模型测试/ar_sa/batch_5/838db147-31d3-412a-ae62-edd30ef8a554.wav`, `296770-297270ms`, duration `0.5s`.
+- Current-like Whisper large-v3 decoding reproduced the old hallucination: `إذا حصلت على محاولة تحقيق المنطقة، فإنها تتحقق بمعرفة المنطقة.`
+- `beam_size=5` without length penalty produced an even longer repetitive hallucination.
+- `beam_size=5` with `length_penalty=0.0`, `0.2` or `1.0` shortened the hallucination to `اشتركوا في القناة`, but still did not suppress text.
+- The segment metadata was not enough for Whisper's default filters to reject it: `no_speech_prob≈0.296`, `avg_logprob≈-0.56` for the shortened hallucination. Conclusion: length penalty can reduce output length but cannot be the main anti-hallucination mechanism for tiny VAD islands.
+
+
 - [x] Current work: inspect available artifacts for `838db147`, `8606f16f`, and `afdb46d5` MMS errors and locate exact segment/text where recoverable.
 - [x] Current work: compute or recover MMS CTC target length, repeat count and frame count for each failed segment where artifacts allow it.
 - [x] Current work: explain why each failure happens and which upstream stage should be fixed before any fallback.

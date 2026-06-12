@@ -47,6 +47,15 @@ class FakeTimestamp:
         return results
 
 
+class DiscardingTimestamp(FakeTimestamp):
+    def add_timestamps(self, batch_asr_result, batch_segments):
+        self.last_discarded_segments = [{
+            "uttid": batch_asr_result[0]["uttid"],
+            "reason": "short_segment_hallucination",
+        }]
+        return []
+
+
 class FakePunc:
     def process_with_timestamp(self, batch_timestamp, batch_uttid):
         return [
@@ -76,6 +85,15 @@ class AsrVadPostprocessTest(unittest.TestCase):
         )
 
         self.assertEqual(segments, [(0.0, 1.0), (5.0, 6.0)])
+
+    def test_treats_exact_min_duration_as_tiny(self):
+        segments = prepare_asr_vad_segments(
+            [(0.0, 1.0), (1.2, 1.7), (2.0, 3.0)],
+            min_segment_s=0.5,
+            max_merge_silence_s=1.0,
+        )
+
+        self.assertEqual(segments, [(0.0, 1.7), (2.0, 3.0)])
 
     def test_merges_tiny_chain_without_overlap(self):
         segments = prepare_asr_vad_segments(
@@ -126,6 +144,24 @@ class AsrVadPostprocessTest(unittest.TestCase):
 
         self.assertEqual(segment["timestamp_fallback"]["provider"], "mms_forced_aligner")
         self.assertEqual(segment["timestamp_fallback"]["reason"], "empty_target")
+
+    def test_pipeline_records_discarded_asr_segments_from_timestamp_provider(self):
+        pipeline = SemanticAsrPipeline(
+            vad=FakeVad(),
+            asr=RecordingAsr(),
+            timestamp_provider=DiscardingTimestamp(),
+            punc=FakePunc(),
+            config=PipelineConfig(
+                asr_vad_min_segment_s=0.5,
+                asr_vad_max_merge_silence_s=1.0,
+                output_vad_pad_s=0.0,
+            ),
+        )
+
+        result = pipeline.process(self._write_silence_wav(), "sample")
+
+        self.assertEqual(result["sentences"], [])
+        self.assertEqual(result["discarded_asr_segments"][0]["reason"], "short_segment_hallucination")
 
     @staticmethod
     def _write_silence_wav() -> str:
