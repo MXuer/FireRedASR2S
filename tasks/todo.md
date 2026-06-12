@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: inspect the four German `batch_2_output` errors again after MMS whitespace normalization and determine whether they are stale or newly reproduced.
+- [x] Current work: if newly reproduced, trace the exact MMS token/span mismatch and patch the smallest upstream normalization gap.
+- [x] Current work: run focused/unit validation plus GPU verification on the affected German samples.
+
+Review:
+- The four German errors were newly reproduced after the first whitespace-collapse fix. Their mtimes were `2026-06-12 02:16-02:17`, and traceback line numbers pointed to the normalized-token code path.
+- The remaining gap was empty uroman tokens, not repeated spaces inside non-empty tokens. Target construction ignored empty pieces, but `get_spans()` still saw an empty token and tried to match labels such as `o`, `<star>`, `a` and `d` against `""`.
+- Added `_drop_empty_alignment_tokens()` after `_normalize_token_spaces()` in MMS runtime, keeping `items` and `tokens` aligned and dropping only tokens whose normalized uroman string is empty.
+- Added a regression test that simulates uroman returning `["", " o "]`; the empty raw token is dropped, `get_alignments()`/`get_spans()` receive only `["o"]`, and the returned timestamp item is the non-empty token.
+- Validation passed: `tests.test_mms_forced_aligner`, full `unittest discover tests` with 124 tests, `compileall semantic_asr tests`, and `git diff --check`.
+- GPU verification passed on the four affected German wavs with `CUDA_VISIBLE_DEVICES=4,5,6,7` and `semantic_asr/run_batch.py`; all four returned `ok: true` and generated JSON/TextGrid/SRT/CSV under `output/de_de_batch2_remaining4_verify`.
+
 - [x] Current work: normalize MMS uroman token whitespace before both `get_alignments()` and `get_spans()`.
 - [x] Current work: add regression coverage for a uroman token containing repeated/edge spaces.
 - [x] Current work: run focused MMS tests and update progress/TODO.

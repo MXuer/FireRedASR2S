@@ -364,6 +364,45 @@ class MmsForcedAlignerTest(unittest.TestCase):
         self.assertEqual(captured["align_tokens"], ["a b"])
         self.assertEqual(captured["span_tokens"], ["a b"])
 
+    def test_mms_runtime_drops_empty_uroman_tokens_before_alignment_and_spans(self):
+        aligner = object.__new__(mms_aligner_module.MmsAligner)
+        aligner.uroman_path = "uroman/bin"
+        aligner.device = "cpu"
+        captured = {}
+
+        def fake_uromanize(tokens, language):
+            return ["", " o "]
+
+        def fake_get_alignments(waveform, sample_rate, tokens):
+            captured["align_tokens"] = tokens
+            return [], 10.0
+
+        def fake_get_spans(tokens, segments):
+            captured["span_tokens"] = tokens
+            return [[Segment("o", 0, 1)]]
+
+        original_get_spans = mms_aligner_module.get_spans
+        try:
+            aligner._uromanize_alignment_tokens = fake_uromanize
+            aligner.get_alignments = fake_get_alignments
+            mms_aligner_module.get_spans = fake_get_spans
+            aligned = aligner.align(
+                ["?", "ok"],
+                [0.0] * 16000,
+                16000,
+                ["sample_0", "sample_1"],
+                use_star=False,
+                language="deu",
+                raw_transcripts=["?", "ok"],
+                alignment_transcripts=["?", "ok"],
+            )
+        finally:
+            mms_aligner_module.get_spans = original_get_spans
+
+        self.assertEqual(captured["align_tokens"], ["o"])
+        self.assertEqual(captured["span_tokens"], ["o"])
+        self.assertEqual([item["text"] for item in aligned], ["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

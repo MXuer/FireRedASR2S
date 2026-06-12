@@ -69,6 +69,7 @@ class MmsAligner:
             language,
         )
         tokens = _normalize_token_spaces(tokens)
+        items, tokens = _drop_empty_alignment_tokens(items, tokens)
         if use_star:
             expanded_items = [{"inserted_star": True}]
             expanded_tokens = ["<star>"]
@@ -202,3 +203,13 @@ def _normalize_token_spaces(tokens: list[str]) -> list[str]:
         "<star>" if token == "<star>" else " ".join(str(token).split())
         for token in tokens
     ]
+
+
+def _drop_empty_alignment_tokens(items: list[dict], tokens: list[str]) -> tuple[list[dict], list[str]]:
+    kept_items = []
+    kept_tokens = []
+    for item, token in zip(items, tokens):
+        if token == "<star>" or str(token).strip():
+            kept_items.append(item)
+            kept_tokens.append(token)
+    return kept_items, kept_tokens

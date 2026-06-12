@@ -3,8 +3,9 @@
 Current state:
 
 - MMS runtime now normalizes uroman token whitespace before both CTC alignment
-  and span reconstruction, so repeated/edge spaces cannot create empty
-  expected characters in `get_spans()`.
+  and span reconstruction, then drops alignment items whose normalized uroman
+  token is empty. This prevents repeated/edge spaces or empty uroman outputs
+  from creating empty expected characters in `get_spans()`.
 - Whisper large now exposes normal decode options plus short-audio overrides.
   Short clips default to stricter deterministic beam decoding with
   `short_temperature=0.0`, `short_beam_size=5` and
@@ -124,9 +125,12 @@ Current state:
 Recent validation:
 
 - Fixed the remaining German `batch_2_output` MMS span errors by collapsing
-  whitespace in uroman tokens before `get_alignments()` and `get_spans()`.
+  whitespace in uroman tokens before `get_alignments()` and `get_spans()`, then
+  dropping empty normalized uroman tokens with their matching alignment items.
   Validation passed: `tests.test_mms_forced_aligner`, full unit discover
-  (123 tests), `compileall semantic_asr tests`, and `git diff --check`.
+  (124 tests), `compileall semantic_asr tests`, `git diff --check`, and GPU
+  batch verification on the four affected German wavs under
+  `output/de_de_batch2_remaining4_verify`.
 
 - Implemented the four-part short-segment anti-hallucination and MMS
   feasibility strategy:
