@@ -3,9 +3,10 @@
   "language": "de_de",
   "components": {
     "vad": {
-      "name": "ten_vad",
+      "name": "firered_vad",
       "params": {
-        "speech_pad_ms": 200
+        "use_gpu": true,
+        "extend_speech_frame": 5
       }
     },
     "asr": {

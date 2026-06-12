@@ -6,7 +6,7 @@
       "name": "firered_vad",
       "params": {
         "use_gpu": true,
-        "extend_speech_frame": 20
+        "extend_speech_frame": 5
       }
     },
     "asr": {
