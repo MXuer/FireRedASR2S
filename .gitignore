@@ -11,3 +11,4 @@ pretrained_models/
 *.swo
 data/
 output/
+qwen_api.md
