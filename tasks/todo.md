@@ -1,5 +1,16 @@
 # Todo
 
+- [x] Current work: run real `yue_punctuation` smoke tests on simplified Cantonese and simplified Cantonese-English input.
+- [x] Current work: inspect whether simplified text gets punctuation and valid timestamp-mapped `punc_sentences`.
+- [x] Current work: record the result in progress and commit the test record if files change.
+
+Review:
+- Real GPU smoke tests passed for simplified Cantonese and simplified Cantonese-English inputs using the local `nizzzo/zh-yue-punctuation-restore-v3` snapshot on `CUDA_VISIBLE_DEVICES=4`.
+- Simplified Cantonese output: `我今日返工，你去边系唔系一齐食饭？`.
+- Simplified Cantonese-English output: `我今日开meeting，你send email畀我好唔好？`.
+- A longer simplified mixed sample returned `如果client approve咗，我哋就start development下个sprint，再review`, matching the previous traditional mixed sample behavior: internal commas work, final punctuation is not guaranteed.
+- Timestamp-mapped `punc_sentences` remained valid for all samples.
+
 - [x] Current work: run real `yue_punctuation` smoke tests on Cantonese-English mixed input.
 - [x] Current work: inspect whether punctuation and timestamp-mapped sentence spans remain valid for code-switch tokens.
 - [x] Current work: record the result in progress and commit the test record if files change.

@@ -168,6 +168,14 @@ Recent validation:
   were returned. The third sample did not receive final punctuation, so
   code-switch input is supported technically but still needs domain quality
   checks before production use.
+- Real `yue_punctuation` simplified Cantonese and simplified Cantonese-English
+  smoke tests also passed with timestamp-mapped output. Example outputs:
+  `我今日返工，你去边系唔系一齐食饭？`,
+  `我今日开meeting，你send email畀我好唔好？`, and
+  `如果client approve咗，我哋就start development下个sprint，再review`.
+  Simplified input is supported technically; longer mixed samples show the same
+  quality caveat as traditional code-switch input, where final punctuation is
+  not guaranteed.
 
 - Fixed the remaining German `batch_2_output` MMS span errors by collapsing
   whitespace in uroman tokens before `get_alignments()` and `get_spans()`, then
