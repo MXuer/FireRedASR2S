@@ -182,12 +182,28 @@ DEMO_HTML = """<!doctype html>
     }
     .review-grid {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) 360px;
+      grid-template-columns: minmax(0, 1fr);
       gap: 16px;
     }
     audio {
       width: 100%;
       margin-bottom: 10px;
+    }
+    .review-tools {
+      display: grid;
+      grid-template-columns: 80px minmax(0, 1fr) 96px;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .review-tools input {
+      height: 28px;
+      padding: 0;
+    }
+    .review-tools span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
     }
     .wave-wrap {
       position: relative;
@@ -195,15 +211,19 @@ DEMO_HTML = """<!doctype html>
       border: 1px solid var(--line);
       border-radius: 8px;
       background: #fbfcfe;
-      overflow: hidden;
+      overflow-x: auto;
+      overflow-y: hidden;
+      cursor: grab;
+      user-select: none;
+      touch-action: none;
     }
+    .wave-wrap.dragging { cursor: grabbing; }
     canvas {
       display: block;
-      width: 100%;
       height: 220px;
     }
     .segment-list {
-      max-height: 300px;
+      max-height: 280px;
       overflow: auto;
       border: 1px solid var(--line);
       border-radius: 8px;
@@ -302,6 +322,14 @@ DEMO_HTML = """<!doctype html>
       <div class="review-grid">
         <div>
           <audio id="review-audio" controls></audio>
+          <div class="review-tools">
+            <span>Zoom</span>
+            <input id="wave-zoom" type="range" min="1" max="48" step="1" value="1">
+            <span id="wave-zoom-label">1x</span>
+            <span>Visible</span>
+            <span id="wave-visible">00:00.000 - 00:00.000</span>
+            <span></span>
+          </div>
           <div class="wave-wrap">
             <canvas id="waveform" width="1200" height="220"></canvas>
           </div>
@@ -312,7 +340,7 @@ DEMO_HTML = """<!doctype html>
     </section>
   </main>
   <script>
-    const state = { jobs: [], timer: null, review: null };
+    const state = { jobs: [], timer: null, review: null, waveDrag: null };
     const tokenInput = document.getElementById("token");
     const configSelect = document.getElementById("config");
     const fileInput = document.getElementById("audio");
@@ -326,6 +354,10 @@ DEMO_HTML = """<!doctype html>
     const segmentList = document.getElementById("segment-list");
     const waveform = document.getElementById("waveform");
     const waveContext = waveform.getContext("2d");
+    const waveWrap = document.querySelector(".wave-wrap");
+    const waveZoom = document.getElementById("wave-zoom");
+    const waveZoomLabel = document.getElementById("wave-zoom-label");
+    const waveVisible = document.getElementById("wave-visible");
 
     function authHeaders() {
       return { Authorization: `Bearer ${tokenInput.value.trim()}` };
@@ -515,8 +547,17 @@ DEMO_HTML = """<!doctype html>
       reviewAudio.src = audioUrl;
       const buffer = await decodeAudioFile(job.fileObject);
       const segments = normalizeSegments(result.sentences || []);
-      state.review = { jobId, file: job.fileObject, audioBuffer: buffer, duration: result.dur_s || buffer.duration, segments };
+      state.review = {
+        jobId,
+        file: job.fileObject,
+        audioBuffer: buffer,
+        duration: result.dur_s || buffer.duration,
+        segments,
+        zoom: Number(waveZoom.value || 1),
+        peaksByWidth: new Map(),
+      };
       renderSegmentList(segments);
+      resizeWaveformForZoom();
       drawWaveform();
       reviewMessage.textContent = `${segments.length} segments loaded.`;
       review.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -558,6 +599,7 @@ DEMO_HTML = """<!doctype html>
       if (!reviewState) {
         return;
       }
+      resizeWaveformForZoom();
       const width = waveform.width;
       const height = waveform.height;
       const durationMs = Math.max(1, reviewState.duration * 1000);
@@ -565,21 +607,13 @@ DEMO_HTML = """<!doctype html>
       waveContext.fillStyle = "#fbfcfe";
       waveContext.fillRect(0, 0, width, height);
 
-      const channel = reviewState.audioBuffer.getChannelData(0);
-      const samplesPerPixel = Math.max(1, Math.floor(channel.length / width));
+      const peaks = peaksForWidth(reviewState, width);
       waveContext.strokeStyle = "#475467";
       waveContext.lineWidth = 1;
       waveContext.beginPath();
       for (let x = 0; x < width; x += 1) {
-        let min = 1;
-        let max = -1;
-        const start = x * samplesPerPixel;
-        const stop = Math.min(channel.length, start + samplesPerPixel);
-        for (let i = start; i < stop; i += 1) {
-          const value = channel[i];
-          if (value < min) min = value;
-          if (value > max) max = value;
-        }
+        const min = peaks[x * 2];
+        const max = peaks[x * 2 + 1];
         waveContext.moveTo(x, (1 - max) * height / 2);
         waveContext.lineTo(x, (1 - min) * height / 2);
       }
@@ -592,6 +626,79 @@ DEMO_HTML = """<!doctype html>
         waveContext.fillRect(x, 0, w, height);
       });
       drawPlaybackCursor();
+      updateVisibleWindow();
+    }
+
+    function resizeWaveformForZoom() {
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const zoom = clampZoom(Number(waveZoom.value || reviewState.zoom || 1));
+      reviewState.zoom = zoom;
+      waveZoom.value = String(zoom);
+      waveZoomLabel.textContent = `${zoom}x`;
+      const visibleWidth = Math.max(600, Math.floor(waveWrap.clientWidth || 1200));
+      const targetWidth = Math.min(60000, Math.max(visibleWidth, Math.floor(visibleWidth * zoom)));
+      if (waveform.width !== targetWidth) {
+        waveform.width = targetWidth;
+        waveform.style.width = `${targetWidth}px`;
+      }
+      waveform.height = 220;
+    }
+
+    function setWaveZoom(nextZoom, anchorClientX = null) {
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const oldWidth = waveform.width || waveWrap.clientWidth || 1;
+      let anchorRatio;
+      if (anchorClientX === null) {
+        anchorRatio = (waveWrap.scrollLeft + waveWrap.clientWidth / 2) / oldWidth;
+      } else {
+        const rect = waveform.getBoundingClientRect();
+        anchorRatio = (waveWrap.scrollLeft + anchorClientX - rect.left) / oldWidth;
+      }
+      reviewState.zoom = clampZoom(nextZoom);
+      waveZoom.value = String(reviewState.zoom);
+      resizeWaveformForZoom();
+      drawWaveform();
+      const anchorX = anchorRatio * waveform.width;
+      if (anchorClientX === null) {
+        waveWrap.scrollLeft = Math.max(0, anchorX - waveWrap.clientWidth / 2);
+      } else {
+        const wrapRect = waveWrap.getBoundingClientRect();
+        waveWrap.scrollLeft = Math.max(0, anchorX - (anchorClientX - wrapRect.left));
+      }
+      updateVisibleWindow();
+    }
+
+    function clampZoom(value) {
+      return Math.max(1, Math.min(48, Math.round(value || 1)));
+    }
+
+    function peaksForWidth(reviewState, width) {
+      if (reviewState.peaksByWidth.has(width)) {
+        return reviewState.peaksByWidth.get(width);
+      }
+      const channel = reviewState.audioBuffer.getChannelData(0);
+      const peaks = new Float32Array(width * 2);
+      for (let x = 0; x < width; x += 1) {
+        const start = Math.floor(x * channel.length / width);
+        const stop = Math.max(start + 1, Math.floor((x + 1) * channel.length / width));
+        let min = 1;
+        let max = -1;
+        for (let i = start; i < stop && i < channel.length; i += 1) {
+          const value = channel[i];
+          if (value < min) min = value;
+          if (value > max) max = value;
+        }
+        peaks[x * 2] = min;
+        peaks[x * 2 + 1] = max;
+      }
+      reviewState.peaksByWidth.set(width, peaks);
+      return peaks;
     }
 
     function drawPlaybackCursor() {
@@ -607,6 +714,19 @@ DEMO_HTML = """<!doctype html>
       waveContext.lineTo(x, waveform.height);
       waveContext.stroke();
       updateActiveSegment(reviewAudio.currentTime * 1000);
+      keepPlaybackCursorVisible(x);
+    }
+
+    function keepPlaybackCursorVisible(cursorX) {
+      if (reviewAudio.paused) {
+        return;
+      }
+      const left = waveWrap.scrollLeft;
+      const right = left + waveWrap.clientWidth;
+      if (cursorX < left + 24 || cursorX > right - 24) {
+        waveWrap.scrollLeft = Math.max(0, cursorX - waveWrap.clientWidth * 0.35);
+        updateVisibleWindow();
+      }
     }
 
     function seekSegment(index) {
@@ -619,6 +739,7 @@ DEMO_HTML = """<!doctype html>
         return;
       }
       reviewAudio.currentTime = segment.startMs / 1000;
+      scrollToTime(segment.startMs);
       reviewAudio.play();
       drawWaveform();
     }
@@ -637,6 +758,28 @@ DEMO_HTML = """<!doctype html>
       if (button) {
         button.classList.add("active");
       }
+    }
+
+    function scrollToTime(ms) {
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const durationMs = Math.max(1, reviewState.duration * 1000);
+      const x = ms / durationMs * waveform.width;
+      waveWrap.scrollLeft = Math.max(0, x - waveWrap.clientWidth * 0.2);
+      updateVisibleWindow();
+    }
+
+    function updateVisibleWindow() {
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const durationMs = Math.max(1, reviewState.duration * 1000);
+      const startMs = waveWrap.scrollLeft / waveform.width * durationMs;
+      const endMs = (waveWrap.scrollLeft + waveWrap.clientWidth) / waveform.width * durationMs;
+      waveVisible.textContent = `${formatMs(startMs)} - ${formatMs(Math.min(durationMs, endMs))}`;
     }
 
     function formatMs(ms) {
@@ -684,7 +827,52 @@ DEMO_HTML = """<!doctype html>
       seekSegment(button.dataset.segmentIndex);
     });
     reviewAudio.addEventListener("timeupdate", drawWaveform);
+    waveZoom.addEventListener("input", () => setWaveZoom(Number(waveZoom.value)));
+    waveWrap.addEventListener("scroll", updateVisibleWindow);
+    window.addEventListener("resize", drawWaveform);
+    waveWrap.addEventListener("wheel", (event) => {
+      if (!state.review) {
+        return;
+      }
+      event.preventDefault();
+      const direction = event.deltaY < 0 ? 1 : -1;
+      const factor = event.shiftKey ? 4 : 2;
+      setWaveZoom(Number(waveZoom.value) + direction * factor, event.clientX);
+    }, { passive: false });
+    waveWrap.addEventListener("pointerdown", (event) => {
+      if (!state.review) {
+        return;
+      }
+      state.waveDrag = {
+        pointerId: event.pointerId,
+        startX: event.clientX,
+        scrollLeft: waveWrap.scrollLeft,
+        moved: false,
+      };
+      waveWrap.classList.add("dragging");
+      waveWrap.setPointerCapture(event.pointerId);
+    });
+    waveWrap.addEventListener("pointermove", (event) => {
+      const drag = state.waveDrag;
+      if (!drag || drag.pointerId !== event.pointerId) {
+        return;
+      }
+      const deltaX = event.clientX - drag.startX;
+      if (Math.abs(deltaX) > 3) {
+        drag.moved = true;
+      }
+      waveWrap.scrollLeft = drag.scrollLeft - deltaX;
+      updateVisibleWindow();
+    });
+    waveWrap.addEventListener("pointerup", (event) => finishWaveDrag(event));
+    waveWrap.addEventListener("pointercancel", (event) => finishWaveDrag(event));
     waveform.addEventListener("click", (event) => {
+      const finishedDrag = state.waveDrag;
+      state.waveDrag = null;
+      if (finishedDrag && finishedDrag.moved) {
+        state.waveDrag = null;
+        return;
+      }
       const rect = waveform.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
       if (reviewAudio.duration) {
@@ -692,6 +880,18 @@ DEMO_HTML = """<!doctype html>
         drawWaveform();
       }
     });
+
+    function finishWaveDrag(event) {
+      const drag = state.waveDrag;
+      if (!drag || drag.pointerId !== event.pointerId) {
+        return;
+      }
+      waveWrap.classList.remove("dragging");
+      try {
+        waveWrap.releasePointerCapture(event.pointerId);
+      } catch (_error) {
+      }
+    }
     tokenInput.addEventListener("change", loadConfigs);
     checkHealth();
     loadConfigs().catch((error) => {

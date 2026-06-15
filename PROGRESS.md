@@ -148,6 +148,18 @@ Current state:
 
 Recent validation:
 
+- Improved long-audio waveform review in the web demo. The waveform now has a
+  `1x-48x` zoom slider, mouse-wheel zoom around the cursor, horizontal
+  drag-to-pan, a visible-window readout and auto-scroll while playback moves
+  outside the current viewport. Canvas waveform peaks are cached per zoom width
+  to avoid rescanning all audio samples on every playback cursor update. The
+  sentence/time-text list now sits below the waveform so the audio timeline can
+  use the full review width. Validation passed: `tests.test_service`,
+  `compileall semantic_asr_service tests/test_service.py` and `git diff
+  --check`. The demo server was restarted on `0.0.0.0:10086`; `/demo` contains
+  the zoom/drag logic and `/health` returned `{"ok": true}`. GPU 7 workers
+  remained running.
+
 - Added browser-side waveform review to the web demo. Completed jobs now expose
   a `View` button that fetches the result JSON with bearer auth, decodes the
   still-available local uploaded audio file in the browser, draws a canvas

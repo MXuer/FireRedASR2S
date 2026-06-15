@@ -94,6 +94,11 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("normalizeSegments(result.sentences || [])", demo)
         self.assertIn("drawWaveform()", demo)
         self.assertIn("seekSegment(button.dataset.segmentIndex)", demo)
+        self.assertIn('id="wave-zoom"', demo)
+        self.assertIn('grid-template-columns: minmax(0, 1fr);', demo)
+        self.assertIn('waveWrap.addEventListener("wheel"', demo)
+        self.assertIn('waveWrap.addEventListener("pointerdown"', demo)
+        self.assertIn("setWaveZoom(Number(waveZoom.value)", demo)
 
     def test_configs_route_returns_allowed_profiles(self):
         settings = self._settings(tempfile.mkdtemp())

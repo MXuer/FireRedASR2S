@@ -122,6 +122,11 @@ play the corresponding audio. If the browser page was refreshed, reselect and
 resubmit the local audio file because browsers do not preserve access to local
 files across page loads.
 
+For long audio review, use the waveform zoom slider or mouse wheel over the
+waveform to zoom in and out. Drag the waveform horizontally to pan through the
+timeline. The sentence/time-text list is shown below the waveform so the audio
+area stays wide.
+
 For a demo backed by GPU 7 with two workers:
 
 ```bash

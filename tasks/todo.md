@@ -1,5 +1,21 @@
 # Todo
 
+- [x] Current work: add waveform zoom controls for long-audio review in the web demo.
+- [x] Current work: make waveform canvas horizontally scrollable and redraw segments/playback cursor at the selected zoom scale.
+- [x] Current work: keep click-to-seek accurate after zoom/scroll changes.
+- [x] Current work: support mouse-wheel zoom around the cursor and drag-to-pan on the waveform.
+- [x] Current work: move the segment/time-text list below the waveform to maximize waveform width.
+- [x] Current work: add focused demo tests, validate, restart the demo server and commit.
+
+Review:
+- Added waveform zoom for long-audio review with a `1x-48x` slider and mouse-wheel zoom around the cursor position.
+- The waveform canvas now expands horizontally with zoom inside a scrollable timeline. Min/max waveform peaks are cached per canvas width so playback cursor redraws do not rescan all audio samples.
+- Added drag-to-pan on the waveform and kept click-to-seek accurate by suppressing seek after a drag gesture.
+- Segment/time-text list now sits below the waveform instead of in a right column, giving the waveform the full review width.
+- Playback cursor and active segment update at the zoomed scale; playback auto-scrolls when the cursor leaves the visible window.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, and `git diff --check`.
+- Restarted the demo server on `0.0.0.0:10086`; `/demo` contains zoom/drag logic and `/health` returned `{"ok": true}`. GPU 7 workers were left running.
+
 - [x] Current work: add a browser-side waveform review panel to the web demo.
 - [x] Current work: overlay completed ASR sentence/cut intervals on the waveform and show corresponding text.
 - [x] Current work: support audio playback, seek-by-segment, and current playback cursor in the review panel.
