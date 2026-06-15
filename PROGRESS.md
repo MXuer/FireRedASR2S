@@ -148,6 +148,20 @@ Current state:
 
 Recent validation:
 
+- Fixed `asr_text` sentence-to-timestamp mapping for CJK character-level MMS
+  timestamps. `split_text_by_punctuation()` now first consumes timestamp tokens
+  by normalized text/token matching, so Korean/Japanese/Chinese character
+  tokens are not counted with whitespace words. If normalized matching fails,
+  the previous whitespace token-count heuristic remains as fallback. Regression
+  tests cover Korean `감회가 새롭습니다.`, Japanese and Chinese character-level
+  timestamps. The affected Korean demo segment now maps
+  `감회가 새롭습니다.` to `23660-24961ms`, covering `감` through `다`.
+  Validation passed: `tests.test_punctuation_strategies`, full `unittest
+  discover tests` (154 tests), `compileall semantic_asr
+  tests/test_punctuation_strategies.py`, and `git diff --check`. The demo
+  server and both GPU 7 workers were restarted; `/health` returned
+  `{"ok": true}` on `127.0.0.1:10086`.
+
 - Korean demo job `2e472ebc81214ede9818f2a2e7c09a29` exposed a timestamp/text
   drift in `asr_text` punctuation mapping. The reported sentence
   `감회가 새롭습니다.` has text that should span `감` through `다`

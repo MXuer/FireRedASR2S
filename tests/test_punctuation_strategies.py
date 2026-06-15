@@ -40,6 +40,84 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(len(result["punc_sentences"]), 2)
         self.assertEqual(result["punc_sentences"][-1]["end_s"], 0.9)
 
+    def test_asr_text_punctuation_maps_korean_character_timestamps(self):
+        sentences = split_text_by_punctuation(
+            "감회가 새롭습니다. 중국 공산당은 이에 대해.",
+            [
+                ["감", 0.0, 0.28],
+                ["회", 0.3, 0.38],
+                ["가", 0.38, 0.5],
+                ["새", 0.5, 0.62],
+                ["롭", 0.62, 0.76],
+                ["습", 0.76, 0.92],
+                ["니", 0.94, 1.001],
+                ["다", 1.001, 1.301],
+                ["중", 1.301, 1.681],
+                ["국", 1.681, 1.801],
+                ["공", 1.801, 1.941],
+                ["산", 1.941, 2.101],
+                ["당", 2.101, 2.281],
+                ["은", 2.281, 2.461],
+                ["이", 2.461, 2.541],
+                ["에", 2.541, 2.641],
+                ["대", 2.641, 2.761],
+                ["해", 2.761, 2.922],
+            ],
+        )
+
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["punc_text"], "감회가 새롭습니다.")
+        self.assertEqual(sentences[0]["start_s"], 0.0)
+        self.assertEqual(sentences[0]["end_s"], 1.301)
+        self.assertEqual(sentences[1]["start_s"], 1.301)
+        self.assertEqual(sentences[1]["end_s"], 2.922)
+
+    def test_asr_text_punctuation_maps_japanese_character_timestamps(self):
+        sentences = split_text_by_punctuation(
+            "今日は晴れです。明日も行きます。",
+            [
+                ["今", 0.0, 0.1],
+                ["日", 0.1, 0.2],
+                ["は", 0.2, 0.3],
+                ["晴", 0.3, 0.4],
+                ["れ", 0.4, 0.5],
+                ["で", 0.5, 0.6],
+                ["す", 0.6, 0.7],
+                ["明", 0.8, 0.9],
+                ["日", 0.9, 1.0],
+                ["も", 1.0, 1.1],
+                ["行", 1.1, 1.2],
+                ["き", 1.2, 1.3],
+                ["ま", 1.3, 1.4],
+                ["す", 1.4, 1.5],
+            ],
+        )
+
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["end_s"], 0.7)
+        self.assertEqual(sentences[1]["start_s"], 0.8)
+        self.assertEqual(sentences[1]["end_s"], 1.5)
+
+    def test_asr_text_punctuation_maps_chinese_character_timestamps(self):
+        sentences = split_text_by_punctuation(
+            "今天很好。明天继续。",
+            [
+                ["今", 0.0, 0.1],
+                ["天", 0.1, 0.2],
+                ["很", 0.2, 0.3],
+                ["好", 0.3, 0.4],
+                ["明", 0.5, 0.6],
+                ["天", 0.6, 0.7],
+                ["继", 0.7, 0.8],
+                ["续", 0.8, 0.9],
+            ],
+        )
+
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["end_s"], 0.4)
+        self.assertEqual(sentences[1]["start_s"], 0.5)
+        self.assertEqual(sentences[1]["end_s"], 0.9)
+
     def test_text_punctuation_does_not_create_standalone_punctuation_sentence(self):
         sentences = split_text_by_punctuation(
             "first sentence. . second sentence.",

@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: fix `asr_text` punctuation mapping for CJK character-level MMS timestamps.
+- [x] Current work: add regression tests for Korean/Japanese/Chinese character-level timestamp consumption.
+- [x] Current work: rerun the affected Korean job or targeted reproduction to confirm `감회가 새롭습니다.` spans through `다`.
+- [x] Current work: restart the demo server on port `10086` after validation.
+- [x] Current work: update progress/TODO and commit the fix.
+
+Review:
+- `split_text_by_punctuation()` now first aligns each punctuated sentence to timestamp tokens by normalized token-string matching, which works for Korean/Japanese/Chinese character-level MMS timestamps.
+- If normalized matching fails, it falls back to the previous whitespace token-count heuristic to preserve behavior on mismatched or unusual text.
+- Added regression tests for Korean, Japanese and Chinese character-level timestamp consumption.
+- Targeted reproduction on job `2e472ebc81214ede9818f2a2e7c09a29` now maps `감회가 새롭습니다.` from `23660ms` through `24961ms`, covering `감` through `다`.
+- Validation passed: punctuation strategy tests, full `unittest discover tests` with 154 tests, `compileall semantic_asr tests/test_punctuation_strategies.py`, and `git diff --check`.
+- Restarted the demo server on `0.0.0.0:10086` and restarted two `semantic_asr_service.worker --device 7` workers. `/health` returned `{"ok": true}` after restart.
+
 - [x] Current work: analyze why job `2e472ebc81214ede9818f2a2e7c09a29` has `cut_start_ms` later than sentence `start_ms` for Korean segment `감회가 새롭습니다.`
 - [x] Current work: inspect the job JSON, raw/output VAD segments, timestamp words and config around `23435-24040ms`.
 - [x] Current work: trace the code path that assigns `cut_segments_ms` and explain the root cause before changing code.

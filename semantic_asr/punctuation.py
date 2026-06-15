@@ -55,7 +55,9 @@ def split_text_by_punctuation(text: str, timestamp: Sequence[Sequence]) -> list[
     cursor = 0
     sentences = []
     for i, sentence_text in enumerate(sentence_texts):
-        token_count = len(strip_timestamp_punctuation([[tok, 0, 0] for tok in sentence_text.split()]))
+        token_count = _count_timestamp_tokens_for_sentence(sentence_text, timestamps, cursor)
+        if token_count is None:
+            token_count = len(strip_timestamp_punctuation([[tok, 0, 0] for tok in sentence_text.split()]))
         if token_count == 0:
             if sentences:
                 sentences[-1]["punc_text"] += sentence_text
@@ -73,6 +75,35 @@ def split_text_by_punctuation(text: str, timestamp: Sequence[Sequence]) -> list[
         end_s = float(selected[-1][2])
         sentences.append(_sentence(start_s, end_s, [sentence_text]))
     return sentences
+
+
+def _count_timestamp_tokens_for_sentence(
+    sentence_text: str,
+    timestamps: Sequence[Sequence],
+    cursor: int,
+) -> int | None:
+    expected = _normalize_for_timestamp_match(sentence_text)
+    if not expected:
+        return 0
+
+    consumed = ""
+    for index in range(cursor, len(timestamps)):
+        consumed += _normalize_for_timestamp_match(str(timestamps[index][0]))
+        if not consumed:
+            continue
+        if expected == consumed:
+            return index - cursor + 1
+        if not expected.startswith(consumed):
+            return None
+    return None
+
+
+def _normalize_for_timestamp_match(text: str) -> str:
+    return "".join(char.lower() for char in text if _is_timestamp_match_char(char))
+
+
+def _is_timestamp_match_char(char: str) -> bool:
+    return char.isalnum() or char == "_" or char == "#"
 
 
 def _split_punctuated_sentence_texts(text: str) -> list[str]:
