@@ -130,8 +130,23 @@ Current state:
   `output_vad_pad_s` affects `cut_segments_ms`, `cut_start_ms`,
   `cut_end_ms` and therefore TextGrid/CSV/SRT export times. Raw VAD remains
   preserved unchanged in `raw_vad_segments_ms`.
+- External users can now call the package through the `SemanticASR` SDK facade
+  instead of invoking CLI modules directly. The facade exposes reusable
+  single-file transcription, batch transcription, and model/language query
+  helpers from the package root.
 
 Recent validation:
+
+- Added external Python SDK facade `SemanticASR`:
+  - `SemanticASR.from_config()` loads a profile and initializes models once;
+  - `transcribe()` reuses the loaded pipeline, writes selected artifacts, and
+    returns `{"result": ..., "outputs": ...}`;
+  - `transcribe_batch()` delegates to the existing multi-process batch runner
+    and supports temporary `CUDA_VISIBLE_DEVICES` selection through `devices`;
+  - package root now exports `list_models()`, `list_model_languages()` and
+    `suggest_components()`.
+  Validation passed: focused API/config/batch tests, full unit discover
+  (134 tests), `compileall semantic_asr tests examples`, and `git diff --check`.
 
 - Fixed `output_vad_pad_s` propagation to final exports by feeding padded
   `output_vad_segments_ms` into `add_sentence_cut_segments()`. Regression

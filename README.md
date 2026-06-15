@@ -72,6 +72,48 @@ under `docs/models/` whenever adding a new adapter.
 Multilingual test-audio planning lives in
 `docs/test_audio_matrix.md`.
 
+## Python SDK
+
+External callers can use `SemanticASR` directly instead of invoking the CLI.
+The loaded models are reused by the `SemanticASR` instance across single-file
+calls:
+
+```python
+from semantic_asr import SemanticASR
+
+asr = SemanticASR.from_config("configs/zh_cn.json")
+output = asr.transcribe(
+    wav_path="data/test/short.wav",
+    uttid="short",
+    outdir="output/sdk/zh_cn",
+    formats=("json", "srt", "csv", "textgrid"),
+)
+
+print(output["result"]["text"])
+print(output["outputs"])
+```
+
+Batch processing is also exposed through the SDK. It uses the same worker and
+GPU assignment behavior as `semantic_asr/run_batch.py`:
+
+```python
+results = asr.transcribe_batch(
+    wav_scp="data/test/wav.scp",
+    outdir="output/sdk/batch",
+    num_workers=8,
+    devices="4,5,6,7",
+)
+```
+
+Model support queries are available from the package root:
+
+```python
+from semantic_asr import list_models, list_model_languages
+
+print(list_models("yue_hk"))
+print(list_model_languages("qwen3_asr_1_7b", role="asr"))
+```
+
 ## Run A Config
 
 ```bash

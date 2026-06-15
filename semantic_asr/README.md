@@ -46,6 +46,23 @@ Different languages can use different VAD, ASR, timestamp and punctuation
 combinations. Profiles live as JSON files under top-level `configs/`, and
 `semantic_asr.config` builds them through the component registry.
 
+## External SDK Facade
+
+External users should prefer the package-level `SemanticASR` facade:
+
+```python
+from semantic_asr import SemanticASR
+
+asr = SemanticASR.from_config("configs/zh_cn.json")
+output = asr.transcribe("audio.wav", outdir="output/audio")
+```
+
+`SemanticASR.transcribe()` reuses the loaded VAD, ASR, timestamp and
+punctuation models across calls on the same instance. It returns a dictionary
+with `result` for the in-memory pipeline JSON and `outputs` for any written
+artifacts. `SemanticASR.transcribe_batch()` delegates to the existing
+multi-process batch runner so workers can be distributed across visible GPUs.
+
 ## ASR And Timestamp VAD Policy
 
 ASR and timestamp providers receive a postprocessed ASR VAD segment list derived

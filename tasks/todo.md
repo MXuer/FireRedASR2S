@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: add external Python SDK facade `SemanticASR` for single-file transcription with reusable loaded models.
+- [x] Current work: expose batch transcription, model query helpers, and package-level imports for external users.
+- [x] Current work: add focused SDK tests and README/API docs.
+- [x] Current work: run validation, update progress, and commit only SDK-related files.
+
+Review:
+- Added package-level external SDK facade `SemanticASR` with `from_config()`, `from_profile()`, `transcribe()` and `transcribe_batch()`.
+- Single-file `transcribe()` reuses the loaded pipeline on the same SDK instance, supports JSON/SRT/CSV/TextGrid output writing, validates cached JSON, and returns `{"result": ..., "outputs": ...}`.
+- Batch `transcribe_batch()` delegates to the existing multi-process batch runner and accepts an optional `devices` value that temporarily sets `CUDA_VISIBLE_DEVICES`.
+- Exposed `list_models()`, `list_model_languages()` and `suggest_components()` from the package root.
+- Added SDK docs in README files and focused tests for output writing, cache reuse, no-output mode, format validation, batch delegation/device handling, and model query exports.
+- Validation passed: focused API/config/batch tests, full unit discover with 134 tests, `compileall semantic_asr tests examples`, and `git diff --check`.
+
 - [x] Current work: run real `yue_punctuation` smoke tests on simplified Cantonese and simplified Cantonese-English input.
 - [x] Current work: inspect whether simplified text gets punctuation and valid timestamp-mapped `punc_sentences`.
 - [x] Current work: record the result in progress and commit the test record if files change.
