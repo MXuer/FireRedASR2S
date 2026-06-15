@@ -148,6 +148,16 @@ Current state:
 
 Recent validation:
 
+- Fixed authenticated artifact downloads in the web demo. The page no longer
+  renders raw artifact `<a href>` links, because browser link clicks do not
+  include `Authorization: Bearer ...` headers. Artifact controls now fetch the
+  file with the current API token through `apiFetch()`, convert the response to
+  a blob and trigger the browser download. Validation passed:
+  `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`
+  and `git diff --check`. The running demo server on `0.0.0.0:10086` was
+  restarted so the MacBook page receives the new JavaScript; the two GPU 7
+  workers remained running.
+
 - The web demo is currently reachable from the server at
   `http://127.0.0.1:10086/demo` and is listening on `0.0.0.0:10086`. The
   server's LAN IP is `10.10.23.8`, so a machine on the same reachable network

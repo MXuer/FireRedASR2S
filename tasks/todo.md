@@ -1,5 +1,16 @@
 # Todo
 
+- [x] Current work: fix web demo artifact downloads so they include the bearer token.
+- [x] Current work: add regression coverage that the demo uses authenticated JS downloads instead of raw links.
+- [x] Current work: validate service tests and record the fix.
+
+Review:
+- Fixed the web demo artifact download path: artifact controls are now buttons that call `apiFetch()` with the current bearer token, fetch the artifact as a blob, and trigger a browser download.
+- Removed raw artifact `<a href>` links from the generated job table so downloads no longer hit authenticated endpoints without headers.
+- Added service test assertions that the demo uses authenticated JS downloads and does not include the old raw target link pattern.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, and `git diff --check`.
+- Restarted only the demo server on `0.0.0.0:10086` so the MacBook page receives the new JavaScript. The two GPU 7 workers stayed running.
+
 - [x] Current work: diagnose why the web demo is not reachable from a MacBook.
 - [x] Current work: check whether the service is running and listening on `0.0.0.0:10086`.
 - [x] Current work: identify the server IP/URL the MacBook should use and document access options.

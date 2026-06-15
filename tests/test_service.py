@@ -86,6 +86,9 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('apiFetch("/v1/jobs"', demo)
         self.assertIn("`/v1/jobs/${item.job_id}`", demo)
         self.assertIn("/v1/configs", demo)
+        self.assertIn("downloadArtifact(button.dataset.downloadJob", demo)
+        self.assertIn('data-download-format="${escapeHtml(name)}"', demo)
+        self.assertNotIn('target="_blank" rel="noopener"', demo)
 
     def test_configs_route_returns_allowed_profiles(self):
         settings = self._settings(tempfile.mkdtemp())

@@ -158,18 +158,19 @@ DEMO_HTML = """<!doctype html>
       flex-wrap: wrap;
       gap: 8px;
     }
-    .downloads a {
+    .downloads button {
       display: inline-flex;
       align-items: center;
       height: 28px;
       padding: 0 9px;
       border: 1px solid var(--line);
       border-radius: 6px;
+      background: #fff;
       color: var(--brand);
-      text-decoration: none;
       font-weight: 700;
       font-size: 12px;
     }
+    .downloads button:hover { background: #f8fafc; }
     .message {
       min-height: 24px;
       color: var(--muted);
@@ -372,9 +373,28 @@ DEMO_HTML = """<!doctype html>
         return job.error ? `<span class="message error">${escapeHtml(job.error)}</span>` : "";
       }
       return `<div class="downloads">${Object.keys(job.artifacts).map((name) => {
-        const href = job.artifacts[name];
-        return `<a href="${href}" target="_blank" rel="noopener">${escapeHtml(name)}</a>`;
+        return `<button type="button" data-download-job="${escapeHtml(job.job_id)}" data-download-format="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
       }).join("")}</div>`;
+    }
+
+    async function downloadArtifact(jobId, format) {
+      message.textContent = "";
+      message.className = "message";
+      try {
+        const response = await apiFetch(`/v1/jobs/${jobId}/artifacts/${format}`);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = `${jobId}.${format === "textgrid" ? "TextGrid" : format}`;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        message.textContent = error.message;
+        message.className = "message error";
+      }
     }
 
     function escapeHtml(value) {
@@ -389,6 +409,13 @@ DEMO_HTML = """<!doctype html>
 
     document.getElementById("submit").addEventListener("click", submitJobs);
     document.getElementById("refresh").addEventListener("click", refreshJobs);
+    jobsBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-download-job]");
+      if (!button) {
+        return;
+      }
+      downloadArtifact(button.dataset.downloadJob, button.dataset.downloadFormat);
+    });
     tokenInput.addEventListener("change", loadConfigs);
     checkHealth();
     loadConfigs().catch((error) => {
