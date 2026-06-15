@@ -115,6 +115,13 @@ upload one or more local audio files, submit jobs, poll status and download
 JSON/SRT/CSV/TextGrid artifacts. It calls the existing `/v1/jobs` endpoints;
 there is no separate backend.
 
+After a job succeeds, click `View` to review the result in the browser. The
+demo decodes the local uploaded audio file, draws a waveform, overlays sentence
+cut intervals from the JSON result and lets the user click a segment to seek and
+play the corresponding audio. If the browser page was refreshed, reselect and
+resubmit the local audio file because browsers do not preserve access to local
+files across page loads.
+
 For a demo backed by GPU 7 with two workers:
 
 ```bash

@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: add a browser-side waveform review panel to the web demo.
+- [x] Current work: overlay completed ASR sentence/cut intervals on the waveform and show corresponding text.
+- [x] Current work: support audio playback, seek-by-segment, and current playback cursor in the review panel.
+- [x] Current work: add focused demo tests and restart the demo server after validation.
+
+Review:
+- Added a web demo review panel with an audio player, waveform canvas and clickable sentence list.
+- Completed jobs now show a `View` button. It fetches the job JSON with bearer auth, decodes the local uploaded audio file in the browser and overlays `cut_start_ms/cut_end_ms` intervals on the waveform.
+- Clicking a segment seeks playback to that sentence/cut interval. The waveform also shows a playback cursor and the active segment is highlighted while audio plays.
+- The browser can only review audio files still available from the current upload session; after a page refresh, users need to reselect and resubmit the local audio file.
+- Added focused service-demo assertions for waveform/review JS and documented the feature in `semantic_asr_service/README.md`.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, and `git diff --check`.
+- Restarted the demo server on `0.0.0.0:10086`; `/demo` contains the waveform review logic and `/health` returned `{"ok": true}`. GPU 7 workers were left running.
+
 - [x] Current work: fix `asr_text` punctuation mapping for CJK character-level MMS timestamps.
 - [x] Current work: add regression tests for Korean/Japanese/Chinese character-level timestamp consumption.
 - [x] Current work: rerun the affected Korean job or targeted reproduction to confirm `감회가 새롭습니다.` spans through `다`.

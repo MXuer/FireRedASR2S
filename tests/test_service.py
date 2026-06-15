@@ -89,6 +89,11 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("downloadArtifact(button.dataset.downloadJob", demo)
         self.assertIn('data-download-format="${escapeHtml(name)}"', demo)
         self.assertNotIn('target="_blank" rel="noopener"', demo)
+        self.assertIn('id="waveform"', demo)
+        self.assertIn("decodeAudioFile(job.fileObject)", demo)
+        self.assertIn("normalizeSegments(result.sentences || [])", demo)
+        self.assertIn("drawWaveform()", demo)
+        self.assertIn("seekSegment(button.dataset.segmentIndex)", demo)
 
     def test_configs_route_returns_allowed_profiles(self):
         settings = self._settings(tempfile.mkdtemp())

@@ -171,6 +171,69 @@ DEMO_HTML = """<!doctype html>
       font-size: 12px;
     }
     .downloads button:hover { background: #f8fafc; }
+    .review {
+      grid-column: 1 / -1;
+      padding: 16px;
+    }
+    .review h2 {
+      margin: 0 0 12px;
+      font-size: 16px;
+      letter-spacing: 0;
+    }
+    .review-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 360px;
+      gap: 16px;
+    }
+    audio {
+      width: 100%;
+      margin-bottom: 10px;
+    }
+    .wave-wrap {
+      position: relative;
+      min-height: 220px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfcfe;
+      overflow: hidden;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 220px;
+    }
+    .segment-list {
+      max-height: 300px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .segment-item {
+      width: 100%;
+      height: auto;
+      min-height: 48px;
+      display: block;
+      padding: 8px 10px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      background: #fff;
+      color: var(--ink);
+      text-align: left;
+      font-weight: 500;
+    }
+    .segment-item:hover,
+    .segment-item.active {
+      background: #ecfeff;
+      color: var(--brand-dark);
+    }
+    .segment-time {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 3px;
+    }
     .message {
       min-height: 24px;
       color: var(--muted);
@@ -180,6 +243,7 @@ DEMO_HTML = """<!doctype html>
     @media (max-width: 820px) {
       header { padding: 0 16px; }
       main { grid-template-columns: 1fr; padding: 14px; }
+      .review-grid { grid-template-columns: 1fr; }
       th:nth-child(2), td:nth-child(2) { display: none; }
     }
   </style>
@@ -233,15 +297,35 @@ DEMO_HTML = """<!doctype html>
         <tbody id="jobs"></tbody>
       </table>
     </section>
+    <section class="review" id="review" hidden>
+      <h2 id="review-title">Review</h2>
+      <div class="review-grid">
+        <div>
+          <audio id="review-audio" controls></audio>
+          <div class="wave-wrap">
+            <canvas id="waveform" width="1200" height="220"></canvas>
+          </div>
+          <p id="review-message" class="message"></p>
+        </div>
+        <div id="segment-list" class="segment-list"></div>
+      </div>
+    </section>
   </main>
   <script>
-    const state = { jobs: [], timer: null };
+    const state = { jobs: [], timer: null, review: null };
     const tokenInput = document.getElementById("token");
     const configSelect = document.getElementById("config");
     const fileInput = document.getElementById("audio");
     const jobsBody = document.getElementById("jobs");
     const message = document.getElementById("message");
     const health = document.getElementById("health");
+    const review = document.getElementById("review");
+    const reviewTitle = document.getElementById("review-title");
+    const reviewAudio = document.getElementById("review-audio");
+    const reviewMessage = document.getElementById("review-message");
+    const segmentList = document.getElementById("segment-list");
+    const waveform = document.getElementById("waveform");
+    const waveContext = waveform.getContext("2d");
 
     function authHeaders() {
       return { Authorization: `Bearer ${tokenInput.value.trim()}` };
@@ -308,7 +392,14 @@ DEMO_HTML = """<!doctype html>
           form.append("formats", selectedFormats());
           const response = await apiFetch("/v1/jobs", { method: "POST", body: form });
           const job = await response.json();
-          state.jobs.unshift({ file: file.name, job_id: job.job_id, status: job.status, progress: {}, artifacts: {} });
+          state.jobs.unshift({
+            file: file.name,
+            fileObject: file,
+            job_id: job.job_id,
+            status: job.status,
+            progress: {},
+            artifacts: {},
+          });
         }
         renderJobs();
         startPolling();
@@ -362,19 +453,20 @@ DEMO_HTML = """<!doctype html>
           <td>${escapeHtml(job.job_id || "")}</td>
           <td><span class="status ${escapeHtml(job.status || "")}">${escapeHtml(job.status || "")}</span></td>
           <td>${escapeHtml((job.progress && job.progress.stage) || "")}</td>
-          <td>${artifactLinks(job)}</td>
+          <td>${artifactControls(job)}</td>
         `;
         jobsBody.appendChild(row);
       });
     }
 
-    function artifactLinks(job) {
+    function artifactControls(job) {
       if (!job.artifacts || !Object.keys(job.artifacts).length) {
         return job.error ? `<span class="message error">${escapeHtml(job.error)}</span>` : "";
       }
-      return `<div class="downloads">${Object.keys(job.artifacts).map((name) => {
+      const downloads = Object.keys(job.artifacts).map((name) => {
         return `<button type="button" data-download-job="${escapeHtml(job.job_id)}" data-download-format="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
-      }).join("")}</div>`;
+      }).join("");
+      return `<div class="downloads"><button type="button" data-review-job="${escapeHtml(job.job_id)}">View</button>${downloads}</div>`;
     }
 
     async function downloadArtifact(jobId, format) {
@@ -397,6 +489,164 @@ DEMO_HTML = """<!doctype html>
       }
     }
 
+    async function openReview(jobId) {
+      const job = state.jobs.find((item) => item.job_id === jobId);
+      if (!job) {
+        return;
+      }
+      if (!job.fileObject) {
+        message.textContent = "浏览器没有保留该任务的本地音频文件，请重新选择并提交音频后查看波形。";
+        message.className = "message error";
+        return;
+      }
+      message.textContent = "";
+      message.className = "message";
+      review.hidden = false;
+      reviewTitle.textContent = `Review - ${job.file}`;
+      reviewMessage.textContent = "Loading waveform...";
+      segmentList.innerHTML = "";
+
+      const resultResponse = await apiFetch(`/v1/jobs/${jobId}/result`);
+      const result = await resultResponse.json();
+      const audioUrl = URL.createObjectURL(job.fileObject);
+      if (reviewAudio.src) {
+        URL.revokeObjectURL(reviewAudio.src);
+      }
+      reviewAudio.src = audioUrl;
+      const buffer = await decodeAudioFile(job.fileObject);
+      const segments = normalizeSegments(result.sentences || []);
+      state.review = { jobId, file: job.fileObject, audioBuffer: buffer, duration: result.dur_s || buffer.duration, segments };
+      renderSegmentList(segments);
+      drawWaveform();
+      reviewMessage.textContent = `${segments.length} segments loaded.`;
+      review.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function decodeAudioFile(file) {
+      const arrayBuffer = await file.arrayBuffer();
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const audioContext = new AudioContextClass();
+      try {
+        return await audioContext.decodeAudioData(arrayBuffer.slice(0));
+      } finally {
+        if (audioContext.close) {
+          audioContext.close();
+        }
+      }
+    }
+
+    function normalizeSegments(sentences) {
+      return sentences.map((sentence, index) => ({
+        index,
+        startMs: Number(sentence.cut_start_ms ?? sentence.start_ms ?? 0),
+        endMs: Number(sentence.cut_end_ms ?? sentence.end_ms ?? 0),
+        text: sentence.text || "",
+      })).filter((segment) => segment.endMs > segment.startMs);
+    }
+
+    function renderSegmentList(segments) {
+      segmentList.innerHTML = segments.map((segment) => `
+        <button type="button" class="segment-item" data-segment-index="${segment.index}">
+          <span class="segment-time">${formatMs(segment.startMs)} - ${formatMs(segment.endMs)}</span>
+          ${escapeHtml(segment.text)}
+        </button>
+      `).join("");
+    }
+
+    function drawWaveform() {
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const width = waveform.width;
+      const height = waveform.height;
+      const durationMs = Math.max(1, reviewState.duration * 1000);
+      waveContext.clearRect(0, 0, width, height);
+      waveContext.fillStyle = "#fbfcfe";
+      waveContext.fillRect(0, 0, width, height);
+
+      const channel = reviewState.audioBuffer.getChannelData(0);
+      const samplesPerPixel = Math.max(1, Math.floor(channel.length / width));
+      waveContext.strokeStyle = "#475467";
+      waveContext.lineWidth = 1;
+      waveContext.beginPath();
+      for (let x = 0; x < width; x += 1) {
+        let min = 1;
+        let max = -1;
+        const start = x * samplesPerPixel;
+        const stop = Math.min(channel.length, start + samplesPerPixel);
+        for (let i = start; i < stop; i += 1) {
+          const value = channel[i];
+          if (value < min) min = value;
+          if (value > max) max = value;
+        }
+        waveContext.moveTo(x, (1 - max) * height / 2);
+        waveContext.lineTo(x, (1 - min) * height / 2);
+      }
+      waveContext.stroke();
+
+      reviewState.segments.forEach((segment, index) => {
+        const x = segment.startMs / durationMs * width;
+        const w = Math.max(1, (segment.endMs - segment.startMs) / durationMs * width);
+        waveContext.fillStyle = index % 2 === 0 ? "rgba(17, 109, 110, 0.18)" : "rgba(180, 84, 8, 0.16)";
+        waveContext.fillRect(x, 0, w, height);
+      });
+      drawPlaybackCursor();
+    }
+
+    function drawPlaybackCursor() {
+      const reviewState = state.review;
+      if (!reviewState || !reviewAudio.duration) {
+        return;
+      }
+      const x = reviewAudio.currentTime / reviewAudio.duration * waveform.width;
+      waveContext.strokeStyle = "#b42318";
+      waveContext.lineWidth = 2;
+      waveContext.beginPath();
+      waveContext.moveTo(x, 0);
+      waveContext.lineTo(x, waveform.height);
+      waveContext.stroke();
+      updateActiveSegment(reviewAudio.currentTime * 1000);
+    }
+
+    function seekSegment(index) {
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const segment = reviewState.segments.find((item) => item.index === Number(index));
+      if (!segment) {
+        return;
+      }
+      reviewAudio.currentTime = segment.startMs / 1000;
+      reviewAudio.play();
+      drawWaveform();
+    }
+
+    function updateActiveSegment(currentMs) {
+      document.querySelectorAll(".segment-item").forEach((item) => item.classList.remove("active"));
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const active = reviewState.segments.find((segment) => currentMs >= segment.startMs && currentMs < segment.endMs);
+      if (!active) {
+        return;
+      }
+      const button = segmentList.querySelector(`[data-segment-index="${active.index}"]`);
+      if (button) {
+        button.classList.add("active");
+      }
+    }
+
+    function formatMs(ms) {
+      const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+      const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+      const seconds = String(totalSeconds % 60).padStart(2, "0");
+      const millis = String(Math.floor(ms % 1000)).padStart(3, "0");
+      return `${minutes}:${seconds}.${millis}`;
+    }
+
     function escapeHtml(value) {
       return String(value).replace(/[&<>"']/g, (char) => ({
         "&": "&amp;",
@@ -415,6 +665,32 @@ DEMO_HTML = """<!doctype html>
         return;
       }
       downloadArtifact(button.dataset.downloadJob, button.dataset.downloadFormat);
+    });
+    jobsBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-review-job]");
+      if (!button) {
+        return;
+      }
+      openReview(button.dataset.reviewJob).catch((error) => {
+        message.textContent = error.message;
+        message.className = "message error";
+      });
+    });
+    segmentList.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-segment-index]");
+      if (!button) {
+        return;
+      }
+      seekSegment(button.dataset.segmentIndex);
+    });
+    reviewAudio.addEventListener("timeupdate", drawWaveform);
+    waveform.addEventListener("click", (event) => {
+      const rect = waveform.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
+      if (reviewAudio.duration) {
+        reviewAudio.currentTime = ratio * reviewAudio.duration;
+        drawWaveform();
+      }
     });
     tokenInput.addEventListener("change", loadConfigs);
     checkHealth();

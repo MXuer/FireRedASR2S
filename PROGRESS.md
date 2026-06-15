@@ -148,6 +148,17 @@ Current state:
 
 Recent validation:
 
+- Added browser-side waveform review to the web demo. Completed jobs now expose
+  a `View` button that fetches the result JSON with bearer auth, decodes the
+  still-available local uploaded audio file in the browser, draws a canvas
+  waveform, overlays sentence `cut_start_ms/cut_end_ms` intervals and lets the
+  user click a segment to seek/play the corresponding audio. The waveform also
+  shows a playback cursor and highlights the active segment. Validation passed:
+  `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`
+  and `git diff --check`. The demo server was restarted on
+  `0.0.0.0:10086`; `/demo` contains the review logic and `/health` returned
+  `{"ok": true}`. Existing GPU 7 workers remained running.
+
 - Fixed `asr_text` sentence-to-timestamp mapping for CJK character-level MMS
   timestamps. `split_text_by_punctuation()` now first consumes timestamp tokens
   by normalized text/token matching, so Korean/Japanese/Chinese character
