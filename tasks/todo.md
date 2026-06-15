@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: diagnose why the web demo is not reachable from a MacBook.
+- [x] Current work: check whether the service is running and listening on `0.0.0.0:10086`.
+- [x] Current work: identify the server IP/URL the MacBook should use and document access options.
+- [x] Current work: update progress/TODO if any repo documentation changes are needed.
+
+Review:
+- The demo service had not been running on port `10086`; only an unrelated `uvicorn app.main:app` process was listening on port `8000`.
+- Started `semantic_asr_service.app` with `SEMANTIC_ASR_SERVICE_HOST=0.0.0.0` and `SEMANTIC_ASR_SERVICE_PORT=10086`.
+- Started two `semantic_asr_service.worker --device 7` processes using the same `service_data/demo` queue.
+- Server IP is `10.10.23.8`; MacBook should open `http://10.10.23.8:10086/demo`.
+- Local HTTP validation passed: `/demo` returned the page, `/v1/configs` returned the allowed config list with `Authorization: Bearer dev-token`, and `ss` showed `0.0.0.0:10086` listening.
+
 - [x] Current work: add a built-in web demo page served by the existing FastAPI service.
 - [x] Current work: support API-token entry, language/profile selection, multiple local audio uploads, job polling and artifact downloads in the demo.
 - [x] Current work: document how to start the server on port 10086 with two workers bound to GPU 7.

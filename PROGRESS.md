@@ -148,6 +148,13 @@ Current state:
 
 Recent validation:
 
+- The web demo is currently reachable from the server at
+  `http://127.0.0.1:10086/demo` and is listening on `0.0.0.0:10086`. The
+  server's LAN IP is `10.10.23.8`, so a machine on the same reachable network
+  should open `http://10.10.23.8:10086/demo`. The running setup uses
+  `SEMANTIC_ASR_SERVICE_DATA_DIR=service_data/demo`, token `dev-token`, and two
+  workers started with `semantic_asr_service.worker --device 7`.
+
 - Added the web demo route and `GET /v1/configs` for allowlist-backed profile
   selection. Documented a GPU 7 demo deployment with the API server on port
   `10086` and two `semantic-asr-worker --device 7` processes. Validation
