@@ -11,6 +11,7 @@ import soundfile as sf
 from fastapi import HTTPException
 
 from semantic_asr_service.app import (
+    create_app,
     _get_authorized_job,
     _job_response,
     _parse_formats,
@@ -75,6 +76,24 @@ class SemanticAsrServiceTest(unittest.TestCase):
 
         self.assertEqual(default_settings.port, 10086)
         self.assertEqual(overridden_settings.port, 12345)
+
+    def test_web_demo_route_uses_existing_job_api_and_multi_file_upload(self):
+        settings = self._settings(tempfile.mkdtemp())
+        app = create_app(settings=settings, store=JobStore(settings.db_path))
+        demo = self._route_endpoint(app, "/demo")()
+
+        self.assertIn('id="audio" type="file" multiple', demo)
+        self.assertIn('apiFetch("/v1/jobs"', demo)
+        self.assertIn("`/v1/jobs/${item.job_id}`", demo)
+        self.assertIn("/v1/configs", demo)
+
+    def test_configs_route_returns_allowed_profiles(self):
+        settings = self._settings(tempfile.mkdtemp())
+        settings.allowed_configs = {"vi_vn", "zh_cn"}
+        app = create_app(settings=settings, store=JobStore(settings.db_path))
+        response = self._route_endpoint(app, "/v1/configs")(user={"user_id": "alice"})
+
+        self.assertEqual(response, {"configs": ["vi_vn", "zh_cn"]})
 
     def test_submit_job_core_creates_queued_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -205,6 +224,13 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(failed_result["job_id"], failed["job_id"])
         self.assertEqual(failed_result["status"], "failed")
         self.assertIn("boom", failed_result["error"])
+
+    @staticmethod
+    def _route_endpoint(app, path: str):
+        for route in app.routes:
+            if getattr(route, "path", None) == path:
+                return route.endpoint
+        raise AssertionError(f"Route not found: {path}")
 
     @staticmethod
     def _write_wav(tmpdir: str, samples: int = 160) -> str:

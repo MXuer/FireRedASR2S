@@ -97,5 +97,38 @@ Available endpoints:
 - `GET /v1/jobs/{job_id}`
 - `GET /v1/jobs/{job_id}/result`
 - `GET /v1/jobs/{job_id}/artifacts/{json|srt|csv|textgrid}`
+- `GET /v1/configs`
 - `GET /v1/models?language=zh_cn`
+- `GET /demo`
 - `GET /health`
+
+## Web Demo
+
+The same API service also serves a browser demo at:
+
+```text
+http://server:10086/demo
+```
+
+The page lets a user enter an API token, choose an allowed language/profile,
+upload one or more local audio files, submit jobs, poll status and download
+JSON/SRT/CSV/TextGrid artifacts. It calls the existing `/v1/jobs` endpoints;
+there is no separate backend.
+
+For a demo backed by GPU 7 with two workers:
+
+```bash
+export SEMANTIC_ASR_SERVICE_DATA_DIR=service_data/demo
+export SEMANTIC_ASR_ALLOWED_CONFIGS=zh_cn,en_us,vi_vn,ar_sa,de_de
+export SEMANTIC_ASR_API_KEYS='demo-token:demo,admin-token:admin:admin'
+export SEMANTIC_ASR_SERVICE_PORT=10086
+
+semantic-asr-server
+```
+
+In two additional shells:
+
+```bash
+semantic-asr-worker --device 7
+semantic-asr-worker --device 7
+```

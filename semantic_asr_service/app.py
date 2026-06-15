@@ -3,11 +3,12 @@ import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, HTMLResponse
 import soundfile as sf
 
 from semantic_asr.api import list_models
 from semantic_asr_service.artifacts import artifact_path, artifact_urls
+from semantic_asr_service.demo import DEMO_HTML
 from semantic_asr_service.schemas import JobCreateResponse, JobStatusResponse
 from semantic_asr_service.settings import ServiceSettings, load_settings
 from semantic_asr_service.store import JobStore
@@ -29,6 +30,14 @@ def create_app(
     @app.get("/health")
     def health():
         return {"ok": True}
+
+    @app.get("/demo", response_class=HTMLResponse)
+    def demo():
+        return DEMO_HTML
+
+    @app.get("/v1/configs")
+    def get_configs(user=Depends(_require_user)):
+        return {"configs": sorted(settings.allowed_configs)}
 
     @app.post("/v1/jobs", response_model=JobCreateResponse)
     def create_job(

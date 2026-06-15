@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: add a built-in web demo page served by the existing FastAPI service.
+- [x] Current work: support API-token entry, language/profile selection, multiple local audio uploads, job polling and artifact downloads in the demo.
+- [x] Current work: document how to start the server on port 10086 with two workers bound to GPU 7.
+- [x] Current work: add focused tests for the demo route/static UI and run service validation.
+- [x] Current work: update progress and commit the web demo change set.
+
+Review:
+- Added a built-in `/demo` page served by the existing FastAPI app. The page uses the existing API service directly; there is no second backend.
+- Added `GET /v1/configs` so the demo can populate the language/profile selector from the service allowlist.
+- The demo supports API-token entry, language/profile selection, multiple local audio file uploads, selectable JSON/SRT/CSV/TextGrid outputs, status polling and artifact download links.
+- Documented demo startup in `semantic_asr_service/README.md`, including port `10086` and two workers bound to GPU 7 with `semantic-asr-worker --device 7` in two shells.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `git diff --check`, and real HTTP smoke for `/demo` plus authenticated `/v1/configs` on `127.0.0.1:10086`.
+
 - [x] Current work: start the HTTP service on port 10086 with `vi_vn` allowed and a dedicated smoke-test data dir.
 - [x] Current work: start one worker on GPU 4 and submit `/data/duhu/FireRedASR2S/data/vi_vn/98e27c7d-561c-4a4f-a607-e54cd6d06c9d.wav`.
 - [x] Current work: poll the job until completion/failure and inspect generated JSON/SRT/CSV/TextGrid artifacts.

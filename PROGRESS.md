@@ -141,8 +141,20 @@ Current state:
   accepts uploads, records SQLite jobs, and separate worker processes claim jobs
   and run `SemanticASR` on assigned GPUs.
   The service default port is `10086`.
+- The HTTP service now includes a built-in browser demo at `/demo`. The page
+  lets users enter an API token, choose an allowed language/profile, upload
+  multiple local audio files, submit jobs, poll status and download generated
+  JSON/SRT/CSV/TextGrid artifacts.
 
 Recent validation:
+
+- Added the web demo route and `GET /v1/configs` for allowlist-backed profile
+  selection. Documented a GPU 7 demo deployment with the API server on port
+  `10086` and two `semantic-asr-worker --device 7` processes. Validation
+  passed: `tests.test_service`, `compileall semantic_asr_service
+  tests/test_service.py`, `git diff --check`, and a real HTTP smoke where
+  `/demo` returned the page and authenticated `/v1/configs` returned
+  `{"configs":["vi_vn","zh_cn"]}` on `127.0.0.1:10086`.
 
 - Real asynchronous HTTP service smoke passed for Vietnamese `vi_vn`.
   The service ran on port `10086` with `SEMANTIC_ASR_ALLOWED_CONFIGS=vi_vn`,
