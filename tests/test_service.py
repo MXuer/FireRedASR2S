@@ -4,6 +4,7 @@ import os
 import tempfile
 import unittest
 from types import SimpleNamespace
+from unittest import mock
 
 import numpy as np
 import soundfile as sf
@@ -19,7 +20,7 @@ from semantic_asr_service.app import (
     _validate_audio_duration,
 )
 from semantic_asr_service.artifacts import artifact_path
-from semantic_asr_service.settings import ServiceSettings, _parse_api_keys
+from semantic_asr_service.settings import ServiceSettings, _parse_api_keys, load_settings
 from semantic_asr_service.store import JobStore
 from semantic_asr_service.worker import run_worker_once
 
@@ -45,6 +46,35 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(api_keys["token-a"], "alice")
         self.assertEqual(api_keys["admin-token"], "admin")
         self.assertIn("admin-token", admin_tokens)
+
+    def test_service_port_defaults_to_10086_and_can_be_overridden(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "SEMANTIC_ASR_SERVICE_DATA_DIR": os.path.join(tmpdir, "service_data"),
+                    "SEMANTIC_ASR_CONFIGS_DIR": os.path.join(tmpdir, "configs"),
+                    "SEMANTIC_ASR_ALLOWED_CONFIGS": "zh_cn",
+                    "SEMANTIC_ASR_API_KEYS": "token-a:alice",
+                },
+                clear=True,
+            ):
+                default_settings = load_settings()
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "SEMANTIC_ASR_SERVICE_DATA_DIR": os.path.join(tmpdir, "service_data"),
+                    "SEMANTIC_ASR_CONFIGS_DIR": os.path.join(tmpdir, "configs"),
+                    "SEMANTIC_ASR_ALLOWED_CONFIGS": "zh_cn",
+                    "SEMANTIC_ASR_API_KEYS": "token-a:alice",
+                    "SEMANTIC_ASR_SERVICE_PORT": "12345",
+                },
+                clear=True,
+            ):
+                overridden_settings = load_settings()
+
+        self.assertEqual(default_settings.port, 10086)
+        self.assertEqual(overridden_settings.port, 12345)
 
     def test_submit_job_core_creates_queued_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:

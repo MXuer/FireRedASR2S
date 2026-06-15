@@ -180,7 +180,8 @@ app = create_app()
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("semantic_asr_service.app:app", host="0.0.0.0", port=8000)
+    settings = load_settings()
+    uvicorn.run("semantic_asr_service.app:app", host=settings.host, port=settings.port)
 
 
 if __name__ == "__main__":

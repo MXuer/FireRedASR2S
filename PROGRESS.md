@@ -140,8 +140,17 @@ Current state:
 - External remote users can now call an asynchronous FastAPI service. The API
   accepts uploads, records SQLite jobs, and separate worker processes claim jobs
   and run `SemanticASR` on assigned GPUs.
+  The service default port is `10086`.
 
 Recent validation:
+
+- Changed the HTTP service default port to `10086`. `semantic-asr-server` now
+  reads `SEMANTIC_ASR_SERVICE_HOST` and `SEMANTIC_ASR_SERVICE_PORT`, defaulting
+  to `0.0.0.0:10086`. README examples were updated from port 8000 to 10086.
+  Real smoke test passed outside the sandbox:
+  `GET http://127.0.0.1:10086/health` returned `{"ok": true}`. Validation
+  passed: focused service tests, full unit discover (149 tests), `compileall
+  semantic_asr_service tests/test_service.py`, and `git diff --check`.
 
 - Added `semantic_asr_service`:
   - FastAPI routes for `POST /v1/jobs`, job status, JSON result download,

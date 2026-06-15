@@ -183,7 +183,7 @@ semantic-asr-worker --device 7
 Submit a remote job:
 
 ```bash
-curl -X POST http://server:8000/v1/jobs \
+curl -X POST http://server:10086/v1/jobs \
   -H "Authorization: Bearer user-token" \
   -F "audio=@demo.wav" \
   -F "config=zh_cn" \

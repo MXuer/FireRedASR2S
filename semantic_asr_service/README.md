@@ -22,6 +22,7 @@ export SEMANTIC_ASR_ALLOWED_CONFIGS=zh_cn,ar_sa,hakka
 export SEMANTIC_ASR_API_KEYS='user-token:user,admin-token:admin:admin'
 export SEMANTIC_ASR_MAX_UPLOAD_MB=2048
 export SEMANTIC_ASR_MAX_AUDIO_SECONDS=0
+export SEMANTIC_ASR_SERVICE_PORT=10086
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -40,7 +41,8 @@ Equivalent module form:
 python -m semantic_asr_service.app
 ```
 
-The API listens on `0.0.0.0:8000`.
+The API listens on `0.0.0.0:10086` by default. Override it with
+`SEMANTIC_ASR_SERVICE_PORT`.
 
 ## Start Workers
 
@@ -60,7 +62,7 @@ checking model memory usage.
 ## Submit A Job
 
 ```bash
-curl -X POST http://server:8000/v1/jobs \
+curl -X POST http://server:10086/v1/jobs \
   -H "Authorization: Bearer user-token" \
   -F "audio=@demo.wav" \
   -F "config=zh_cn" \
@@ -80,13 +82,13 @@ Response:
 
 ```bash
 curl -H "Authorization: Bearer user-token" \
-  http://server:8000/v1/jobs/abc123
+  http://server:10086/v1/jobs/abc123
 
 curl -H "Authorization: Bearer user-token" \
-  -O http://server:8000/v1/jobs/abc123/artifacts/srt
+  -O http://server:10086/v1/jobs/abc123/artifacts/srt
 
 curl -H "Authorization: Bearer user-token" \
-  -O http://server:8000/v1/jobs/abc123/result
+  -O http://server:10086/v1/jobs/abc123/result
 ```
 
 Available endpoints:

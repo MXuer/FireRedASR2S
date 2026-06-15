@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: change HTTP service default port from 8000 to 10086 and make it configurable.
+- [x] Current work: update service/README examples from 8000 to 10086.
+- [x] Current work: smoke test the service on port 10086 with `/health`.
+- [x] Current work: run validation, update progress, and commit the port change.
+
+Review:
+- `semantic-asr-server` now defaults to `0.0.0.0:10086` through `ServiceSettings.port`.
+- Added `SEMANTIC_ASR_SERVICE_HOST` and `SEMANTIC_ASR_SERVICE_PORT`; default port is `10086`, and tests cover override to a custom port.
+- README and service README examples now use `server:10086`.
+- Real smoke test passed outside the sandbox: temporary server started on `0.0.0.0:10086`, and `GET http://127.0.0.1:10086/health` returned `{"ok": true}`.
+- Validation passed: focused service tests, full unit discover with 149 tests, `compileall semantic_asr_service tests/test_service.py`, and `git diff --check`.
+
 - [x] Current work: implement FastAPI async job service with API-key auth and SQLite-backed job queue.
 - [x] Current work: implement service worker that claims queued jobs and runs `SemanticASR` into per-job output dirs.
 - [x] Current work: expose `semantic-asr-server` and `semantic-asr-worker` commands plus service docs and requirements.

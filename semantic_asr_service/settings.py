@@ -13,6 +13,8 @@ class ServiceSettings:
     admin_tokens: set[str] = field(default_factory=set)
     max_upload_mb: int = 2048
     max_audio_seconds: float = 0
+    host: str = "0.0.0.0"
+    port: int = 10086
     allowed_extensions: set[str] = field(default_factory=lambda: {".wav", ".flac", ".mp3", ".m4a", ".ogg"})
     poll_interval_s: float = 2.0
 
@@ -54,6 +56,8 @@ def load_settings() -> ServiceSettings:
         admin_tokens=admin_tokens,
         max_upload_mb=int(os.environ.get("SEMANTIC_ASR_MAX_UPLOAD_MB", "2048")),
         max_audio_seconds=float(os.environ.get("SEMANTIC_ASR_MAX_AUDIO_SECONDS", "0")),
+        host=os.environ.get("SEMANTIC_ASR_SERVICE_HOST", "0.0.0.0"),
+        port=int(os.environ.get("SEMANTIC_ASR_SERVICE_PORT", "10086")),
         allowed_extensions=_env_set("SEMANTIC_ASR_ALLOWED_EXTENSIONS") or {".wav", ".flac", ".mp3", ".m4a", ".ogg"},
         poll_interval_s=float(os.environ.get("SEMANTIC_ASR_POLL_INTERVAL_S", "2.0")),
     )
@@ -83,4 +87,3 @@ def _parse_api_keys(raw: str) -> tuple[dict[str, str], set[str]]:
         if role == "admin":
             admin_tokens.add(token)
     return api_keys, admin_tokens
-
