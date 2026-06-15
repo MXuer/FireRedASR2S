@@ -63,6 +63,16 @@ with `result` for the in-memory pipeline JSON and `outputs` for any written
 artifacts. `SemanticASR.transcribe_batch()` delegates to the existing
 multi-process batch runner so workers can be distributed across visible GPUs.
 
+The same external surface is available as a unified CLI:
+
+```bash
+semantic-asr transcribe --config configs/zh_cn.json --wav-path audio.wav --outdir output/audio
+semantic-asr batch --config configs/hakka.json --wav-scp wav.scp --outdir output/batch --num-workers 8 --devices 4,5,6,7
+semantic-asr models yue_hk --role punc
+```
+
+When the package is not installed, use `python -m semantic_asr.cli ...`.
+
 ## ASR And Timestamp VAD Policy
 
 ASR and timestamp providers receive a postprocessed ASR VAD segment list derived

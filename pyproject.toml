@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "semantic-asr-pipeline"
+version = "0.1.0"
+description = "Multilingual long-audio semantic ASR pipeline"
+requires-python = ">=3.10"
+
+[project.scripts]
+semantic-asr = "semantic_asr.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["semantic_asr*"]

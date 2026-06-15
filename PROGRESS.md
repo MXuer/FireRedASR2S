@@ -134,8 +134,23 @@ Current state:
   instead of invoking CLI modules directly. The facade exposes reusable
   single-file transcription, batch transcription, and model/language query
   helpers from the package root.
+- External users can also use the unified CLI `semantic-asr` after editable
+  install. It wraps the SDK with `transcribe`, `batch`, `models` and
+  `model-languages` subcommands.
 
 Recent validation:
+
+- Added unified external CLI:
+  - `semantic-asr transcribe` wraps `SemanticASR.transcribe()` and exposes
+    `--devices` before model loading plus output formats/cache controls;
+  - `semantic-asr batch` wraps `SemanticASR.transcribe_batch()` and exposes
+    `--num-workers`, `--devices` and `--max-seconds`;
+  - `semantic-asr models` and `semantic-asr model-languages` expose the model
+    support query helpers.
+  Added `pyproject.toml` console script metadata. Validation passed: focused
+  CLI/API tests, real `python -m semantic_asr.cli models yue_hk --role punc`,
+  full unit discover (139 tests), `compileall semantic_asr tests examples`,
+  and `git diff --check`.
 
 - Added external Python SDK facade `SemanticASR`:
   - `SemanticASR.from_config()` loads a profile and initializes models once;

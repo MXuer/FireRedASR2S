@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: add unified external CLI on top of the `SemanticASR` SDK.
+- [x] Current work: expose `--num-workers` and `--devices` in batch CLI, and expose `--devices` in single-file CLI before model loading.
+- [x] Current work: add console-script packaging metadata plus CLI tests/docs.
+- [x] Current work: run validation, update progress, and commit CLI-related files.
+
+Review:
+- Added unified CLI module `semantic_asr.cli` with subcommands `transcribe`, `batch`, `models`, and `model-languages`.
+- Added `pyproject.toml` console script so editable installs expose `semantic-asr`; without install, users can run `python -m semantic_asr.cli`.
+- `semantic-asr batch` exposes `--num-workers` and `--devices`; `--devices` is forwarded to SDK batch as temporary `CUDA_VISIBLE_DEVICES`.
+- `semantic-asr transcribe` exposes `--devices` before model loading, plus `--formats`, `--max-seconds`, `--uttid`, `--outdir`, and `--no-cache`.
+- Added CLI tests for transcribe, batch worker/device forwarding, model queries, and format parsing.
+- Validation passed: focused CLI/API tests, real `python -m semantic_asr.cli models yue_hk --role punc`, full unit discover with 139 tests, `compileall semantic_asr tests examples`, and `git diff --check`.
+
 - [x] Current work: add external Python SDK facade `SemanticASR` for single-file transcription with reusable loaded models.
 - [x] Current work: expose batch transcription, model query helpers, and package-level imports for external users.
 - [x] Current work: add focused SDK tests and README/API docs.

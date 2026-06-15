@@ -114,6 +114,50 @@ print(list_models("yue_hk"))
 print(list_model_languages("qwen3_asr_1_7b", role="asr"))
 ```
 
+## Unified CLI
+
+After installing the package in editable mode, the unified command is
+available as `semantic-asr`:
+
+```bash
+pip install -e .
+```
+
+Single file:
+
+```bash
+semantic-asr transcribe \
+  --config configs/zh_cn.json \
+  --wav-path data/test/short.wav \
+  --uttid short \
+  --outdir output/cli/zh_cn \
+  --formats json,srt,csv,textgrid \
+  --devices 4
+```
+
+Batch:
+
+```bash
+semantic-asr batch \
+  --config configs/hakka.json \
+  --wav-scp data/test/wav.scp \
+  --outdir output/cli/hakka \
+  --num-workers 8 \
+  --devices 4,5,6,7
+```
+
+`--num-workers` is exposed by the unified CLI and is passed through to the
+existing batch runner. `--devices` temporarily sets `CUDA_VISIBLE_DEVICES`
+before model loading or worker assignment. Without installation, the same CLI
+can be called as `python -m semantic_asr.cli ...`.
+
+Model queries:
+
+```bash
+semantic-asr models yue_hk --role punc
+semantic-asr model-languages qwen3_asr_1_7b --role asr
+```
+
 ## Run A Config
 
 ```bash
