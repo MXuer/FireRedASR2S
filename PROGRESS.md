@@ -148,6 +148,19 @@ Current state:
 
 Recent validation:
 
+- Korean demo job `2e472ebc81214ede9818f2a2e7c09a29` exposed a timestamp/text
+  drift in `asr_text` punctuation mapping. The reported sentence
+  `감회가 새롭습니다.` has text that should span `감` through `다`
+  (`23660-24961ms`), but `split_text_by_punctuation()` uses
+  `sentence_text.split()` to estimate token count. Because MMS Korean
+  timestamps are character-level, the sentence consumed only two timestamp
+  tokens (`감`, `회`) and was assigned `23660-24040ms`. Boundary fusion then
+  kept the VAD silence boundary at `23435ms`, and `add_sentence_cut_segments()`
+  intersected it with padded output VAD `23460-43270ms`, producing
+  `cut_start_ms=23460` and `cut_end_ms=24040`. The main fix should replace
+  whitespace token-count mapping in `asr_text` with normalized timestamp-token
+  matching for CJK/no-space scripts.
+
 - Fixed authenticated artifact downloads in the web demo. The page no longer
   renders raw artifact `<a href>` links, because browser link clicks do not
   include `Authorization: Bearer ...` headers. Artifact controls now fetch the

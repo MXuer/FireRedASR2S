@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: analyze why job `2e472ebc81214ede9818f2a2e7c09a29` has `cut_start_ms` later than sentence `start_ms` for Korean segment `감회가 새롭습니다.`
+- [x] Current work: inspect the job JSON, raw/output VAD segments, timestamp words and config around `23435-24040ms`.
+- [x] Current work: trace the code path that assigns `cut_segments_ms` and explain the root cause before changing code.
+
+Review:
+- Job `2e472ebc81214ede9818f2a2e7c09a29` used profile `ko_kr` with `whisper_large + mms_forced_aligner + asr_text` punctuation.
+- Around the reported segment, raw VAD is `20700-23210ms` and `23660-43070ms`; padded output VAD is `0-23410ms` and `23460-43270ms`.
+- The sentence-boundary fusion kept the VAD silence boundary between the previous sentence and the Korean sentence at `23435ms`, derived from previous token end `23190ms` and current token start `23660ms`.
+- `cut_segments_ms` is then intersected with output VAD in `add_sentence_cut_segments()`, so the reported sentence gets `cut_start_ms=23460`, the start of the padded second output VAD island.
+- The larger root cause is earlier in `semantic_asr.punctuation.split_text_by_punctuation()`: `asr_text` computes sentence token counts with `sentence_text.split()`, but Korean MMS timestamps are character-level. For `감회가 새롭습니다.`, this consumes only two timestamp tokens (`감`, `회`) and assigns the sentence `23660-24040ms` even though the text continues through `다` at `24961ms`.
+- Because the text/time mapping is already drifted, the exported `cut_end_ms=24040` cuts inside the spoken phrase. The fix should make `asr_text` align sentence text to timestamp tokens by normalized character/token matching for CJK/no-space scripts instead of whitespace token count.
+
 - [x] Current work: fix web demo artifact downloads so they include the bearer token.
 - [x] Current work: add regression coverage that the demo uses authenticated JS downloads instead of raw links.
 - [x] Current work: validate service tests and record the fix.
