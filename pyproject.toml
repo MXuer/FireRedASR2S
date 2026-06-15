@@ -10,6 +10,8 @@ requires-python = ">=3.10"
 
 [project.scripts]
 semantic-asr = "semantic_asr.cli:main"
+semantic-asr-server = "semantic_asr_service.app:main"
+semantic-asr-worker = "semantic_asr_service.worker:main"
 
 [tool.setuptools.packages.find]
-include = ["semantic_asr*"]
+include = ["semantic_asr*", "semantic_asr_service*"]

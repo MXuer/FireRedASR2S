@@ -137,8 +137,22 @@ Current state:
 - External users can also use the unified CLI `semantic-asr` after editable
   install. It wraps the SDK with `transcribe`, `batch`, `models` and
   `model-languages` subcommands.
+- External remote users can now call an asynchronous FastAPI service. The API
+  accepts uploads, records SQLite jobs, and separate worker processes claim jobs
+  and run `SemanticASR` on assigned GPUs.
 
 Recent validation:
+
+- Added `semantic_asr_service`:
+  - FastAPI routes for `POST /v1/jobs`, job status, JSON result download,
+    artifact download, model queries and health checks;
+  - API-key bearer auth with owner/admin job access, config allowlist, upload
+    extension/size checks and optional audio-duration limit;
+  - SQLite-backed queue and worker loop with `semantic-asr-server` and
+    `semantic-asr-worker` console scripts.
+  Validation passed: focused service/CLI/API tests, worker help/import smoke,
+  full unit discover (148 tests), `compileall semantic_asr semantic_asr_service
+  tests examples`, and `git diff --check`.
 
 - Added unified external CLI:
   - `semantic-asr transcribe` wraps `SemanticASR.transcribe()` and exposes

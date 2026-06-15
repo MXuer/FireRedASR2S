@@ -1,5 +1,20 @@
 # Todo
 
+- [x] Current work: implement FastAPI async job service with API-key auth and SQLite-backed job queue.
+- [x] Current work: implement service worker that claims queued jobs and runs `SemanticASR` into per-job output dirs.
+- [x] Current work: expose `semantic-asr-server` and `semantic-asr-worker` commands plus service docs and requirements.
+- [x] Current work: add unit/API tests for auth, submit/status/download, allowlist, worker success/failure, and artifact 404.
+- [x] Current work: run validation, update progress, and commit only service-related files.
+
+Review:
+- Added `semantic_asr_service` with FastAPI app, SQLite job store, artifact helpers, settings, schemas, and worker loop.
+- API supports async job submission, status lookup, JSON result download, artifact download, model query, and health check.
+- Service uses API-key bearer auth, config allowlist, upload extension/size limits, optional audio-duration limit, and owner/admin job access checks.
+- Worker claims queued jobs, marks running/succeeded/failed, and runs `SemanticASR.from_config(...).transcribe(...)` into per-job output dirs.
+- Added console scripts `semantic-asr-server` and `semantic-asr-worker`; documented API/worker deployment and curl examples.
+- Added service tests for auth, allowlist, queued jobs, owner/admin access, artifact response shape, upload limits, worker success/failure, and model endpoint core behavior.
+- Validation passed: focused service/CLI/API tests, worker help/import smoke, full unit discover with 148 tests, `compileall semantic_asr semantic_asr_service tests examples`, and `git diff --check`.
+
 - [x] Current work: add unified external CLI on top of the `SemanticASR` SDK.
 - [x] Current work: expose `--num-workers` and `--devices` in batch CLI, and expose `--devices` in single-file CLI before model loading.
 - [x] Current work: add console-script packaging metadata plus CLI tests/docs.

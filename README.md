@@ -158,6 +158,40 @@ semantic-asr models yue_hk --role punc
 semantic-asr model-languages qwen3_asr_1_7b --role asr
 ```
 
+## HTTP Service
+
+For ordinary remote users who cannot access this machine directly, run the
+asynchronous HTTP service. The API process receives uploads and records jobs;
+separate worker processes claim queued jobs and run ASR on assigned GPUs.
+
+```bash
+export SEMANTIC_ASR_API_KEYS='user-token:user,admin-token:admin:admin'
+export SEMANTIC_ASR_ALLOWED_CONFIGS=zh_cn,ar_sa,hakka
+
+semantic-asr-server
+```
+
+Start workers on the GPU machine:
+
+```bash
+semantic-asr-worker --device 4
+semantic-asr-worker --device 5
+semantic-asr-worker --device 6
+semantic-asr-worker --device 7
+```
+
+Submit a remote job:
+
+```bash
+curl -X POST http://server:8000/v1/jobs \
+  -H "Authorization: Bearer user-token" \
+  -F "audio=@demo.wav" \
+  -F "config=zh_cn" \
+  -F "formats=json,srt,csv,textgrid"
+```
+
+See `semantic_asr_service/README.md` for status and download endpoints.
+
 ## Run A Config
 
 ```bash

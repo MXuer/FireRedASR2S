@@ -11,4 +11,6 @@ pretrained_models/
 *.swo
 data/
 output/
+service_data/
+*.egg-info/
 qwen_api.md
