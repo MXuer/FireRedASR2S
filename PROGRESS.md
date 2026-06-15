@@ -144,6 +144,17 @@ Current state:
 
 Recent validation:
 
+- Real asynchronous HTTP service smoke passed for Vietnamese `vi_vn`.
+  The service ran on port `10086` with `SEMANTIC_ASR_ALLOWED_CONFIGS=vi_vn`,
+  a dedicated data dir `service_data/vi_vn_smoke`, and one worker bound to GPU
+  4. Submitted
+  `/data/duhu/FireRedASR2S/data/vi_vn/98e27c7d-561c-4a4f-a607-e54cd6d06c9d.wav`
+  through `POST /v1/jobs`; job
+  `c818c05a1f434c959a952addb68120d6` completed with status `succeeded`.
+  Outputs were generated and downloadable through the API: JSON, SRT, CSV and
+  TextGrid. The JSON result reports `300.299s` duration, 57 sentences and 775
+  words. The smoke service and worker processes were stopped after validation.
+
 - Changed the HTTP service default port to `10086`. `semantic-asr-server` now
   reads `SEMANTIC_ASR_SERVICE_HOST` and `SEMANTIC_ASR_SERVICE_PORT`, defaulting
   to `0.0.0.0:10086`. README examples were updated from port 8000 to 10086.

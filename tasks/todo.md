@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: start the HTTP service on port 10086 with `vi_vn` allowed and a dedicated smoke-test data dir.
+- [x] Current work: start one worker on GPU 4 and submit `/data/duhu/FireRedASR2S/data/vi_vn/98e27c7d-561c-4a4f-a607-e54cd6d06c9d.wav`.
+- [x] Current work: poll the job until completion/failure and inspect generated JSON/SRT/CSV/TextGrid artifacts.
+- [x] Current work: record the service smoke result in progress and commit the test record if files change.
+
+Review:
+- Real HTTP service smoke passed on port `10086` with `SEMANTIC_ASR_ALLOWED_CONFIGS=vi_vn`, API key auth and `SEMANTIC_ASR_SERVICE_DATA_DIR=service_data/vi_vn_smoke`.
+- Started one worker on GPU 4 and submitted `/data/duhu/FireRedASR2S/data/vi_vn/98e27c7d-561c-4a4f-a607-e54cd6d06c9d.wav` through `POST /v1/jobs`.
+- Job `c818c05a1f434c959a952addb68120d6` reached `succeeded`; status API returned JSON/SRT/CSV/TextGrid artifact URLs.
+- Generated artifacts were present under `service_data/vi_vn_smoke/jobs/c818c05a1f434c959a952addb68120d6/outputs/`: JSON `1120173` bytes, SRT `6035` bytes, CSV `7062` bytes, TextGrid `9613` bytes.
+- JSON inspection found duration `300.299s`, `57` sentences and `775` words. Artifact download endpoints for `json`, `srt`, `csv` and `textgrid` all returned valid files.
+- The service and worker processes were stopped after the smoke test.
+
 - [x] Current work: change HTTP service default port from 8000 to 10086 and make it configurable.
 - [x] Current work: update service/README examples from 8000 to 10086.
 - [x] Current work: smoke test the service on port 10086 with `/health`.
