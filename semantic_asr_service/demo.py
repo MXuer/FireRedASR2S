@@ -276,6 +276,10 @@ DEMO_HTML = """<!doctype html>
   <main>
     <section class="controls">
       <div class="field">
+        <label for="user-name">User Name</label>
+        <input id="user-name" type="text" value="dev" autocomplete="off">
+      </div>
+      <div class="field">
         <label for="token">API Token</label>
         <input id="token" type="password" value="dev-token" autocomplete="off">
       </div>
@@ -350,7 +354,8 @@ DEMO_HTML = """<!doctype html>
     </section>
   </main>
   <script>
-    const state = { jobs: [], timer: null, review: null, waveDrag: null };
+    const state = { jobs: [], timer: null, review: null, waveDrag: null, translationsByJob: {}, translatingByJob: {} };
+    const userNameInput = document.getElementById("user-name");
     const tokenInput = document.getElementById("token");
     const configSelect = document.getElementById("config");
     const fileInput = document.getElementById("audio");
@@ -373,7 +378,8 @@ DEMO_HTML = """<!doctype html>
     const translateButton = document.getElementById("translate");
 
     function authHeaders() {
-      return { Authorization: `Bearer ${tokenInput.value.trim()}` };
+      const token = tokenInput.value.trim() || userNameInput.value.trim();
+      return { Authorization: `Bearer ${token}` };
     }
 
     async function apiFetch(url, options = {}) {
@@ -398,6 +404,10 @@ DEMO_HTML = """<!doctype html>
       });
       if (data.configs.includes("vi_vn")) {
         configSelect.value = "vi_vn";
+      }
+      const savedConfig = localStorage.getItem("semanticAsrDemo.config");
+      if (savedConfig && data.configs.includes(savedConfig)) {
+        configSelect.value = savedConfig;
       }
     }
 
@@ -454,13 +464,16 @@ DEMO_HTML = """<!doctype html>
           const job = await response.json();
           state.jobs.unshift({
             file: file.name,
+            filename: file.name,
             fileObject: file,
             job_id: job.job_id,
             status: job.status,
+            config: configSelect.value,
             progress: {},
             artifacts: {},
           });
         }
+        savePreferences();
         renderJobs();
         startPolling();
         message.textContent = `已提交 ${files.length} 个任务。`;
@@ -491,6 +504,36 @@ DEMO_HTML = """<!doctype html>
       }
     }
 
+    async function loadJobs() {
+      message.textContent = "";
+      message.className = "message";
+      try {
+        const response = await apiFetch("/v1/jobs");
+        const data = await response.json();
+        mergeJobs(data.jobs || []);
+        renderJobs();
+        if (state.jobs.some((item) => item.status === "queued" || item.status === "running")) {
+          startPolling();
+        }
+      } catch (error) {
+        message.textContent = error.message;
+        message.className = "message error";
+      }
+    }
+
+    function mergeJobs(jobs) {
+      const existing = new Map(state.jobs.map((item) => [item.job_id, item]));
+      jobs.forEach((job) => {
+        const current = existing.get(job.job_id) || {};
+        existing.set(job.job_id, Object.assign({}, current, job, {
+          file: current.file || job.filename || job.job_id,
+          filename: job.filename || current.filename || "",
+          fileObject: current.fileObject || null,
+        }));
+      });
+      state.jobs = Array.from(existing.values()).sort((a, b) => String(b.created_at || "").localeCompare(String(a.created_at || "")));
+    }
+
     function startPolling() {
       stopPolling();
       state.timer = setInterval(refreshJobs, 3000);
@@ -509,7 +552,7 @@ DEMO_HTML = """<!doctype html>
       state.jobs.forEach((job) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${escapeHtml(job.file || "")}</td>
+          <td>${escapeHtml(job.file || job.filename || "")}<br><span class="message">${escapeHtml(job.config || "")}</span></td>
           <td>${escapeHtml(job.job_id || "")}</td>
           <td><span class="status ${escapeHtml(job.status || "")}">${escapeHtml(job.status || "")}</span></td>
           <td>${escapeHtml((job.progress && job.progress.stage) || "")}</td>
@@ -554,34 +597,31 @@ DEMO_HTML = """<!doctype html>
       if (!job) {
         return;
       }
-      if (!job.fileObject) {
-        message.textContent = "浏览器没有保留该任务的本地音频文件，请重新选择并提交音频后查看波形。";
-        message.className = "message error";
-        return;
-      }
       message.textContent = "";
       message.className = "message";
       review.hidden = false;
-      reviewTitle.textContent = `Review - ${job.file}`;
+      reviewTitle.textContent = `Review - ${job.file || job.filename || job.job_id}`;
       reviewMessage.textContent = "Loading waveform...";
+      reviewMessage.className = "message";
       segmentList.innerHTML = "";
 
       const resultResponse = await apiFetch(`/v1/jobs/${jobId}/result`);
       const result = await resultResponse.json();
-      const audioUrl = URL.createObjectURL(job.fileObject);
+      const audioFile = await audioFileForJob(job);
+      const audioUrl = URL.createObjectURL(audioFile);
       if (reviewAudio.src) {
         URL.revokeObjectURL(reviewAudio.src);
       }
       reviewAudio.src = audioUrl;
-      const buffer = await decodeAudioFile(job.fileObject);
+      const buffer = await decodeAudioFile(audioFile);
       const segments = normalizeSegments(result.sentences || []);
       state.review = {
         jobId,
-        file: job.fileObject,
+        file: audioFile,
         audioBuffer: buffer,
         duration: result.dur_s || buffer.duration,
         segments,
-        translations: {},
+        translations: translationsForJob(jobId, translationTarget.value),
         displayMode: textMode.value,
         zoom: Number(waveZoom.value || 1),
         peaksByWidth: new Map(),
@@ -590,7 +630,18 @@ DEMO_HTML = """<!doctype html>
       resizeWaveformForZoom();
       drawWaveform();
       reviewMessage.textContent = `${segments.length} segments loaded.`;
+      updateTranslationUi();
       review.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function audioFileForJob(job) {
+      if (job.fileObject) {
+        return job.fileObject;
+      }
+      const response = await apiFetch(`/v1/jobs/${job.job_id}/audio`);
+      const blob = await response.blob();
+      const name = job.filename || `${job.job_id}.wav`;
+      return new File([blob], name, { type: blob.type || "audio/wav" });
     }
 
     async function decodeAudioFile(file) {
@@ -643,29 +694,78 @@ DEMO_HTML = """<!doctype html>
         return;
       }
       const target = translationTarget.value;
-      translateButton.disabled = true;
+      const jobId = reviewState.jobId;
+      const key = translationKey(jobId, target);
+      state.translatingByJob[key] = true;
+      updateTranslationUi();
       reviewMessage.textContent = "Translating...";
+      reviewMessage.className = "message";
       try {
-        const response = await apiFetch(`/v1/jobs/${reviewState.jobId}/translations`, {
+        const response = await apiFetch(`/v1/jobs/${jobId}/translations`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ target_language: target }),
         });
         const result = await response.json();
-        reviewState.translations = {};
+        const translations = {};
         (result.sentences || []).forEach((sentence) => {
-          reviewState.translations[Number(sentence.index)] = sentence.translation || "";
+          translations[Number(sentence.index)] = sentence.translation || "";
         });
-        textMode.value = "bilingual";
-        reviewState.displayMode = textMode.value;
-        renderSegmentList(reviewState.segments);
-        reviewMessage.textContent = `Translation loaded: ${target}`;
+        state.translationsByJob[key] = translations;
+        if (state.review && state.review.jobId === jobId) {
+          state.review.translations = translations;
+          textMode.value = "bilingual";
+          state.review.displayMode = textMode.value;
+          renderSegmentList(state.review.segments);
+          reviewMessage.textContent = `Translation loaded: ${target}`;
+          reviewMessage.className = "message";
+        }
       } catch (error) {
-        reviewMessage.textContent = error.message;
-        reviewMessage.className = "message error";
+        if (state.review && state.review.jobId === jobId) {
+          reviewMessage.textContent = error.message;
+          reviewMessage.className = "message error";
+        }
       } finally {
-        translateButton.disabled = false;
+        delete state.translatingByJob[key];
+        updateTranslationUi();
       }
+    }
+
+    function translationKey(jobId, target) {
+      return `${jobId}:${target}`;
+    }
+
+    function translationsForJob(jobId, target) {
+      return state.translationsByJob[translationKey(jobId, target)] || {};
+    }
+
+    function updateTranslationUi() {
+      const reviewState = state.review;
+      if (!reviewState) {
+        translateButton.disabled = true;
+        return;
+      }
+      const key = translationKey(reviewState.jobId, translationTarget.value);
+      const translating = Boolean(state.translatingByJob[key]);
+      translateButton.disabled = translating;
+      translateButton.textContent = translating ? "Translating..." : "Translate";
+      if (translating) {
+        reviewMessage.textContent = "Translating...";
+        reviewMessage.className = "message";
+      }
+    }
+
+    function savePreferences() {
+      localStorage.setItem("semanticAsrDemo.userName", userNameInput.value.trim());
+      localStorage.setItem("semanticAsrDemo.token", tokenInput.value.trim());
+      localStorage.setItem("semanticAsrDemo.config", configSelect.value);
+    }
+
+    function loadPreferences() {
+      const userName = localStorage.getItem("semanticAsrDemo.userName");
+      const token = localStorage.getItem("semanticAsrDemo.token");
+      if (userName) userNameInput.value = userName;
+      if (token) tokenInput.value = token;
     }
 
     function drawWaveform() {
@@ -875,7 +975,7 @@ DEMO_HTML = """<!doctype html>
     }
 
     document.getElementById("submit").addEventListener("click", submitJobs);
-    document.getElementById("refresh").addEventListener("click", refreshJobs);
+    document.getElementById("refresh").addEventListener("click", loadJobs);
     jobsBody.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-download-job]");
       if (!button) {
@@ -909,6 +1009,14 @@ DEMO_HTML = """<!doctype html>
       state.review.displayMode = textMode.value;
       renderSegmentList(state.review.segments);
       updateActiveSegment(reviewAudio.currentTime * 1000);
+    });
+    translationTarget.addEventListener("change", () => {
+      if (!state.review) {
+        return;
+      }
+      state.review.translations = translationsForJob(state.review.jobId, translationTarget.value);
+      renderSegmentList(state.review.segments);
+      updateTranslationUi();
     });
     translateButton.addEventListener("click", translateReview);
     waveWrap.addEventListener("scroll", updateVisibleWindow);
@@ -975,9 +1083,21 @@ DEMO_HTML = """<!doctype html>
       } catch (_error) {
       }
     }
-    tokenInput.addEventListener("change", loadConfigs);
+    userNameInput.addEventListener("change", () => {
+      savePreferences();
+      loadJobs();
+    });
+    tokenInput.addEventListener("change", () => {
+      savePreferences();
+      Promise.all([loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
+        message.textContent = error.message;
+        message.className = "message error";
+      });
+    });
+    configSelect.addEventListener("change", savePreferences);
+    loadPreferences();
     checkHealth();
-    Promise.all([loadConfigs(), loadTranslationTargets()]).catch((error) => {
+    Promise.all([loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
       message.textContent = error.message;
       message.className = "message error";
     });

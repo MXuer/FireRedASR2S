@@ -27,6 +27,7 @@ class JobStore:
                     job_id TEXT PRIMARY KEY,
                     user_id TEXT NOT NULL,
                     config TEXT NOT NULL,
+                    filename TEXT,
                     wav_path TEXT NOT NULL,
                     outdir TEXT NOT NULL,
                     formats TEXT NOT NULL,
@@ -39,6 +40,9 @@ class JobStore:
                 )
                 """
             )
+            columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
+            if "filename" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN filename TEXT")
 
     def create_job(
         self,
@@ -48,18 +52,29 @@ class JobStore:
         wav_path: str,
         outdir: str,
         formats: list[str],
+        filename: str = "",
     ) -> dict[str, Any]:
         now = _utc_now()
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO jobs (
-                    job_id, user_id, config, wav_path, outdir, formats, status,
+                    job_id, user_id, config, filename, wav_path, outdir, formats, status,
                     progress, error, created_at, started_at, finished_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, NULL, NULL)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, NULL, NULL)
                 """,
-                (job_id, user_id, config, wav_path, outdir, json.dumps(formats), json.dumps({"stage": "queued"}), now),
+                (
+                    job_id,
+                    user_id,
+                    config,
+                    filename,
+                    wav_path,
+                    outdir,
+                    json.dumps(formats),
+                    json.dumps({"stage": "queued"}),
+                    now,
+                ),
             )
         return self.get_job(job_id)
 
@@ -67,6 +82,21 @@ class JobStore:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
         return _row_to_job(row) if row else None
+
+    def list_jobs(self, user_id: str, include_all: bool = False, limit: int = 100) -> list[dict[str, Any]]:
+        limit = max(1, min(500, int(limit)))
+        with self.connect() as conn:
+            if include_all:
+                rows = conn.execute(
+                    "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
+                    (limit,),
+                ).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
+                    (user_id, limit),
+                ).fetchall()
+        return [_row_to_job(row) for row in rows]
 
     def claim_next_job(self) -> dict[str, Any] | None:
         now = _utc_now()

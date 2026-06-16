@@ -1,5 +1,21 @@
 # Todo
 
+- [x] Current work: add a single demo startup script that starts API plus worker processes together.
+- [x] Current work: make service workers claim jobs before model loading and print startup/claim/completion logs.
+- [x] Current work: fix web demo translation state so switching jobs does not leave the translate button disabled or silent.
+- [x] Current work: add a user-history flow so the demo can reload previous jobs after page refresh or service restart.
+- [x] Current work: document systemd/supervisor tradeoffs, validate with tests and commit.
+
+Review:
+- Added `scripts/start_demo_service.sh` to start the demo API plus two default GPU 7 workers under the same `service_data/demo` queue.
+- Worker startup now logs its DB/device, claims jobs before loading `SemanticASR`, and logs claim/loading/running/success/failure events.
+- Added `GET /v1/jobs` and `GET /v1/jobs/{job_id}/audio`; the demo reloads the authenticated user's historical jobs and can review prior uploaded audio without re-uploading.
+- The demo stores user name, token and selected profile in browser local storage.
+- Translation UI state is tracked per `job_id:target`, so switching jobs no longer leaves the translate button globally disabled or silent.
+- Added `SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single` for one-sentence-per-request concurrent translation; `json_batch` remains available.
+- Documented the startup script, translation modes, and what `systemd`/`supervisor` are.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, and `git diff --check`.
+
 - [x] Current work: add batched Hunyuan-MT translation for completed ASR sentence lists.
 - [x] Current work: make the batch prompt return structured JSON and validate sentence indexes before accepting it.
 - [x] Current work: keep per-sentence fallback when batch output is malformed.

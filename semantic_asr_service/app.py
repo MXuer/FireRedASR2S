@@ -49,6 +49,11 @@ def create_app(
     def get_translation_targets(user=Depends(_require_user)):
         return {"targets": sorted(settings.translation_targets)}
 
+    @app.get("/v1/jobs")
+    def list_jobs(limit: int = 100, user=Depends(_require_user)):
+        jobs = store.list_jobs(user["user_id"], include_all=user["is_admin"], limit=limit)
+        return {"jobs": [_job_response(job) for job in jobs]}
+
     @app.post("/v1/jobs", response_model=JobCreateResponse)
     def create_job(
         audio: UploadFile = File(...),
@@ -78,6 +83,7 @@ def create_app(
             wav_path=wav_path,
             outdir=outdir,
             formats=selected_formats,
+            filename=audio.filename or "",
         )
         return {"job_id": job["job_id"], "status": job["status"]}
 
@@ -93,6 +99,14 @@ def create_app(
         if not os.path.exists(path):
             raise HTTPException(status_code=404, detail="Result JSON is not available")
         return FileResponse(path, media_type="application/json", filename=f"{job_id}.json")
+
+    @app.get("/v1/jobs/{job_id}/audio")
+    def get_audio(job_id: str, user=Depends(_require_user)):
+        job = _get_authorized_job(store, job_id, user)
+        if not os.path.exists(job["wav_path"]):
+            raise HTTPException(status_code=404, detail="Uploaded audio is not available")
+        filename = job.get("filename") or os.path.basename(job["wav_path"])
+        return FileResponse(job["wav_path"], filename=filename)
 
     @app.get("/v1/jobs/{job_id}/artifacts/{artifact_format}")
     def get_artifact(job_id: str, artifact_format: str, user=Depends(_require_user)):
@@ -160,6 +174,10 @@ def _job_response(job: dict) -> dict:
         "job_id": job["job_id"],
         "status": job["status"],
         "config": job["config"],
+        "filename": job.get("filename") or "",
+        "created_at": job.get("created_at"),
+        "started_at": job.get("started_at"),
+        "finished_at": job.get("finished_at"),
         "progress": job["progress"],
         "error": job.get("error"),
         "artifacts": artifact_urls(job["job_id"], job["formats"]) if job["status"] == "succeeded" else {},

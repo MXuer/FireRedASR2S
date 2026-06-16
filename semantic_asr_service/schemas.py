@@ -10,6 +10,10 @@ class JobStatusResponse(BaseModel):
     job_id: str
     status: str
     config: str
+    filename: str | None = None
+    created_at: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
     progress: dict
     error: str | None = None
     artifacts: dict[str, str] = {}

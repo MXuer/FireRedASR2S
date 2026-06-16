@@ -27,6 +27,7 @@ export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
 export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
 export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
 export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16
+export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=json_batch
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -114,10 +115,26 @@ The same API service also serves a browser demo at:
 http://server:10086/demo
 ```
 
+For local demo use, start the API and workers together:
+
+```bash
+scripts/start_demo_service.sh
+```
+
+The script starts one API process and `SEMANTIC_ASR_DEMO_WORKER_COUNT`
+workers on `SEMANTIC_ASR_DEMO_WORKER_DEVICE`. Defaults are two workers on GPU
+7. It also checks whether the configured translation service is reachable.
+
 The page lets a user enter an API token, choose an allowed language/profile,
 upload one or more local audio files, submit jobs, poll status and download
 JSON/SRT/CSV/TextGrid artifacts. It calls the existing `/v1/jobs` endpoints;
 there is no separate backend.
+
+The demo persists the entered user name, API token and selected profile in the
+browser. It also reloads the authenticated user's previous jobs from
+`GET /v1/jobs` after refresh or service restart. Completed historical jobs can
+be reviewed without re-uploading because the browser fetches the original
+uploaded audio from `GET /v1/jobs/{job_id}/audio`.
 
 After a job succeeds, click `View` to review the result in the browser. The
 demo decodes the local uploaded audio file, draws a waveform, overlays sentence
@@ -140,6 +157,15 @@ Completed ASR sentences are translated in batches by default. The service sends
 up to `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` sentence texts in one structured JSON
 prompt, validates that the model returns the same sentence indexes, and falls
 back to per-sentence translation for that batch if the JSON is malformed.
+Set `SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single` to instead send
+one sentence per request while dispatching up to
+`SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` requests concurrently.
+
+`systemd` and `supervisor` are process managers. They are useful when this
+service should survive SSH logout, machine reboot, or crashes. The startup
+script is simpler and better for experiments; a production deployment should
+wrap the same API/worker commands in `systemd` units or a `supervisord`
+program group.
 
 Example Hunyuan-MT-7B-fp8 OpenAI-compatible service:
 

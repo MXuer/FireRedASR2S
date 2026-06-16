@@ -92,11 +92,14 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('apiFetch("/v1/jobs"', demo)
         self.assertIn("`/v1/jobs/${item.job_id}`", demo)
         self.assertIn("/v1/configs", demo)
+        self.assertIn('id="user-name"', demo)
+        self.assertIn('apiFetch("/v1/jobs")', demo)
         self.assertIn("downloadArtifact(button.dataset.downloadJob", demo)
         self.assertIn('data-download-format="${escapeHtml(name)}"', demo)
         self.assertNotIn('target="_blank" rel="noopener"', demo)
         self.assertIn('id="waveform"', demo)
-        self.assertIn("decodeAudioFile(job.fileObject)", demo)
+        self.assertIn("audioFileForJob(job)", demo)
+        self.assertIn("`/v1/jobs/${job.job_id}/audio`", demo)
         self.assertIn("normalizeSegments(result.sentences || [])", demo)
         self.assertIn("drawWaveform()", demo)
         self.assertIn("seekSegment(button.dataset.segmentIndex)", demo)
@@ -108,7 +111,9 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('id="translation-target"', demo)
         self.assertIn('id="text-mode"', demo)
         self.assertIn('id="translate"', demo)
-        self.assertIn('apiFetch(`/v1/jobs/${reviewState.jobId}/translations`', demo)
+        self.assertIn('apiFetch(`/v1/jobs/${jobId}/translations`', demo)
+        self.assertIn("state.translatingByJob[key] = true", demo)
+        self.assertIn("updateTranslationUi()", demo)
         self.assertIn("segmentTextHtml(segment)", demo)
 
     def test_configs_route_returns_allowed_profiles(self):
@@ -126,6 +131,41 @@ class SemanticAsrServiceTest(unittest.TestCase):
         response = self._route_endpoint(app, "/v1/translation-targets")(user={"user_id": "alice"})
 
         self.assertEqual(response, {"targets": ["en_us", "zh_cn"]})
+
+    def test_jobs_route_lists_only_current_user_unless_admin(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            app = create_app(settings=settings, store=JobStore(settings.db_path))
+            store = app.state.store
+            store.create_job(
+                "alice-job",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "alice-job", "outputs"),
+                ["json"],
+                filename="alice.wav",
+            )
+            store.create_job(
+                "bob-job",
+                "bob",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "bob-job", "outputs"),
+                ["json"],
+                filename="bob.wav",
+            )
+
+            alice_response = self._route_endpoint(app, "/v1/jobs")(
+                user={"user_id": "alice", "is_admin": False},
+            )
+            admin_response = self._route_endpoint(app, "/v1/jobs")(
+                user={"user_id": "admin", "is_admin": True},
+            )
+
+        self.assertEqual([job["job_id"] for job in alice_response["jobs"]], ["alice-job"])
+        self.assertEqual({job["job_id"] for job in admin_response["jobs"]}, {"alice-job", "bob-job"})
+        self.assertEqual(alice_response["jobs"][0]["filename"], "alice.wav")
 
     def test_submit_job_core_creates_queued_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -196,6 +236,29 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("json", succeeded_response["artifacts"])
         self.assertIn("srt", succeeded_response["artifacts"])
 
+    def test_audio_route_returns_uploaded_audio_for_authorized_job(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            app = create_app(settings=settings, store=JobStore(settings.db_path))
+            wav_path = self._write_wav(tmpdir)
+            job = app.state.store.create_job(
+                "job1",
+                "alice",
+                "zh_cn",
+                wav_path,
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+                filename="demo.wav",
+            )
+
+            response = self._route_endpoint(app, "/v1/jobs/{job_id}/audio")(
+                job["job_id"],
+                user={"user_id": "alice", "is_admin": False},
+            )
+
+        self.assertEqual(response.path, wav_path)
+        self.assertEqual(response.filename, "demo.wav")
+
     def test_artifact_path_and_missing_file_detection(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             path = artifact_path(tmpdir, "job1", "json")
@@ -240,6 +303,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
             )
 
             def ok_runner(job, _settings):
+                self.assertEqual(store.get_job(job["job_id"])["status"], "running")
                 os.makedirs(job["outdir"], exist_ok=True)
                 with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
                     json.dump({"job_id": job["job_id"]}, fout)
@@ -313,6 +377,26 @@ class SemanticAsrServiceTest(unittest.TestCase):
 
         self.assertEqual([item["translation"] for item in translated], ["Chinese::مرحبا", "Chinese::كيف الحال؟"])
         self.assertEqual(translator.batch_calls, 1)
+        self.assertEqual(translator.fallback_calls, 2)
+
+    def test_translate_sentences_batched_supports_concurrent_single_mode(self):
+        sentences = [
+            {"index": 1, "text": "hello"},
+            {"index": 2, "text": "world"},
+        ]
+        translator = self.FakeTranslator()
+
+        translated = translate_sentences_batched(
+            sentences,
+            translator,
+            "English",
+            "Chinese",
+            batch_size=2,
+            request_mode="concurrent_single",
+        )
+
+        self.assertEqual([item["translation"] for item in translated], ["Chinese::hello", "Chinese::world"])
+        self.assertEqual(translator.calls, 0)
         self.assertEqual(translator.fallback_calls, 2)
 
     def test_translate_job_result_rejects_disallowed_target(self):

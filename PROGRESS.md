@@ -148,6 +148,24 @@ Current state:
 
 Recent validation:
 
+- The HTTP demo now has a unified startup script:
+  `scripts/start_demo_service.sh`. It starts the API and the configured number
+  of workers together against the same `service_data/demo` SQLite queue, so the
+  demo no longer comes up with a green `/health` but no job consumers. Workers
+  now lazy-import `SemanticASR` after claiming a job, update the job to
+  `running` before model loading, and print startup/claim/loading/running/
+  success/failure logs. The web demo now persists user name, token and selected
+  profile, reloads historical jobs from `GET /v1/jobs`, and can fetch the
+  original uploaded audio through `GET /v1/jobs/{job_id}/audio` for waveform
+  review after page refresh or service restart. Translation button state is
+  tracked per `job_id:target`, so switching jobs while a translation is running
+  no longer disables translation globally. Added
+  `SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single` for the
+  one-sentence-per-request concurrent translation style; `json_batch` remains
+  supported. Validation passed: `tests.test_service`, `compileall
+  semantic_asr_service tests/test_service.py`, `bash -n
+  scripts/start_demo_service.sh`, and `git diff --check`.
+
 - Hunyuan-MT translation now supports batch translation after ASR completion.
   `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` defaults to `16`; each batch sends a
   JSON array of sentence `index/text` records to the OpenAI-compatible Hunyuan

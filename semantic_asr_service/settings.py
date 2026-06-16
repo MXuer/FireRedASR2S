@@ -22,6 +22,7 @@ class ServiceSettings:
     translation_api_key: str = ""
     translation_targets: set[str] = field(default_factory=lambda: {"zh_cn", "en_us"})
     translation_batch_size: int = 16
+    translation_request_mode: str = "json_batch"
 
     @property
     def db_path(self) -> str:
@@ -70,6 +71,7 @@ def load_settings() -> ServiceSettings:
         translation_api_key=os.environ.get("SEMANTIC_ASR_TRANSLATION_API_KEY", ""),
         translation_targets=_env_set("SEMANTIC_ASR_TRANSLATION_TARGETS") or {"zh_cn", "en_us"},
         translation_batch_size=int(os.environ.get("SEMANTIC_ASR_TRANSLATION_BATCH_SIZE", "16")),
+        translation_request_mode=os.environ.get("SEMANTIC_ASR_TRANSLATION_REQUEST_MODE", "json_batch"),
     )
 
 

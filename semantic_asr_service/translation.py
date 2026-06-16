@@ -2,6 +2,7 @@ import json
 import os
 import re
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -124,6 +125,7 @@ def translate_job_result(
         source_name,
         target_name,
         max(1, int(settings.translation_batch_size)),
+        settings.translation_request_mode,
     )
 
     payload = {
@@ -153,19 +155,42 @@ def translate_sentences_batched(
     source_language: str,
     target_language: str,
     batch_size: int = 16,
+    request_mode: str = "json_batch",
 ) -> list[dict]:
     translated = []
     for start in range(0, len(sentences), batch_size):
         batch = sentences[start:start + batch_size]
-        try:
-            batch_translations = _translate_batch(batch, translator, source_language, target_language)
-        except Exception:
-            batch_translations = _translate_one_by_one(batch, translator, source_language, target_language)
+        if request_mode == "concurrent_single":
+            batch_translations = _translate_concurrent_single(batch, translator, source_language, target_language)
+        else:
+            try:
+                batch_translations = _translate_batch(batch, translator, source_language, target_language)
+            except Exception:
+                batch_translations = _translate_one_by_one(batch, translator, source_language, target_language)
         for sentence, translation in zip(batch, batch_translations):
             enriched = dict(sentence)
             enriched["translation"] = translation
             translated.append(enriched)
     return translated
+
+
+def _translate_concurrent_single(
+    batch: list[dict],
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+) -> list[str]:
+    if len(batch) <= 1:
+        return _translate_one_by_one(batch, translator, source_language, target_language)
+    try:
+        with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+            futures = [
+                executor.submit(_translate_sentence, sentence, translator, source_language, target_language)
+                for sentence in batch
+            ]
+            return [future.result() for future in futures]
+    except Exception:
+        return _translate_one_by_one(batch, translator, source_language, target_language)
 
 
 def _translate_batch(
@@ -199,9 +224,18 @@ def _translate_one_by_one(
 ) -> list[str]:
     translations = []
     for sentence in batch:
-        text = str(sentence.get("text") or "").strip()
-        translations.append(translator.translate(text, source_language, target_language) if text else "")
+        translations.append(_translate_sentence(sentence, translator, source_language, target_language))
     return translations
+
+
+def _translate_sentence(
+    sentence: dict,
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+) -> str:
+    text = str(sentence.get("text") or "").strip()
+    return translator.translate(text, source_language, target_language) if text else ""
 
 
 def build_translation_prompt(text: str, source_language: str, target_language: str) -> str:
