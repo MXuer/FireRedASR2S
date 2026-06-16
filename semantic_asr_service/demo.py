@@ -17,6 +17,7 @@ DEMO_HTML = """<!doctype html>
       --danger: #b42318;
       --ok: #067647;
       --warn: #b54708;
+      --top-panel-height: min(560px, calc(100vh - 104px));
     }
     * { box-sizing: border-box; }
     body {
@@ -52,8 +53,18 @@ DEMO_HTML = """<!doctype html>
       border: 1px solid var(--line);
       border-radius: 8px;
     }
-    .controls { padding: 18px; align-self: start; }
-    .jobs { overflow: hidden; }
+    .controls {
+      height: var(--top-panel-height);
+      padding: 18px;
+      align-self: start;
+      overflow: auto;
+    }
+    .jobs {
+      height: var(--top-panel-height);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
     label {
       display: block;
       margin: 0 0 6px;
@@ -114,6 +125,23 @@ DEMO_HTML = """<!doctype html>
       padding: 14px 16px;
       border-bottom: 1px solid var(--line);
     }
+    .job-filters {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--line);
+      align-items: end;
+    }
+    .job-filters .field {
+      margin-bottom: 0;
+    }
+    .job-filters button {
+      height: 38px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--brand);
+    }
     .pager {
       display: flex;
       align-items: center;
@@ -142,6 +170,10 @@ DEMO_HTML = """<!doctype html>
       width: 100%;
       border-collapse: collapse;
       table-layout: fixed;
+    }
+    .jobs-table-wrap {
+      flex: 1;
+      overflow: auto;
     }
     th, td {
       padding: 11px 12px;
@@ -283,6 +315,8 @@ DEMO_HTML = """<!doctype html>
       header { padding: 0 16px; }
       main { grid-template-columns: 1fr; padding: 14px; }
       .review-grid { grid-template-columns: 1fr; }
+      .controls, .jobs { height: auto; }
+      .job-filters { grid-template-columns: 1fr; }
       th:nth-child(2), td:nth-child(2) { display: none; }
     }
   </style>
@@ -327,18 +361,33 @@ DEMO_HTML = """<!doctype html>
         <h2>Jobs</h2>
         <button id="refresh" type="button">Refresh</button>
       </div>
-      <table>
-        <thead>
-          <tr>
-            <th style="width: 20%">File</th>
-            <th style="width: 25%">Job ID</th>
-            <th style="width: 14%">Status</th>
-            <th style="width: 17%">Stage</th>
-            <th>Artifacts</th>
-          </tr>
-        </thead>
-        <tbody id="jobs"></tbody>
-      </table>
+      <div class="job-filters">
+        <div class="field">
+          <label for="filter-config">Language / Profile</label>
+          <select id="filter-config">
+            <option value="">All languages</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="filter-user">PM / Username</label>
+          <input id="filter-user" type="text" placeholder="Current user">
+        </div>
+        <button id="clear-filters" type="button">Clear</button>
+      </div>
+      <div class="jobs-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 20%">File</th>
+              <th style="width: 25%">Job ID</th>
+              <th style="width: 14%">Status</th>
+              <th style="width: 17%">Stage</th>
+              <th>Artifacts</th>
+            </tr>
+          </thead>
+          <tbody id="jobs"></tbody>
+        </table>
+      </div>
       <div class="pager">
         <button id="prev-page" type="button">Prev</button>
         <span id="page-info">0-0 / 0</span>
@@ -386,6 +435,7 @@ DEMO_HTML = """<!doctype html>
       translationsByJob: {},
       translatingByJob: {},
       page: { offset: 0, limit: 8, total: 0 },
+      filters: { config: "", userId: "" },
     };
     const userNameInput = document.getElementById("user-name");
     const tokenInput = document.getElementById("token");
@@ -411,6 +461,9 @@ DEMO_HTML = """<!doctype html>
     const pageInfo = document.getElementById("page-info");
     const prevPage = document.getElementById("prev-page");
     const nextPage = document.getElementById("next-page");
+    const filterConfig = document.getElementById("filter-config");
+    const filterUser = document.getElementById("filter-user");
+    const clearFilters = document.getElementById("clear-filters");
 
     function authHeaders() {
       const token = tokenInput.value.trim() || userNameInput.value.trim();
@@ -434,11 +487,13 @@ DEMO_HTML = """<!doctype html>
       const response = await apiFetch("/v1/configs");
       const data = await response.json();
       configSelect.innerHTML = "";
+      filterConfig.innerHTML = '<option value="">All languages</option>';
       data.configs.forEach((name) => {
         const option = document.createElement("option");
         option.value = name;
         option.textContent = name;
         configSelect.appendChild(option);
+        filterConfig.appendChild(option.cloneNode(true));
       });
       if (data.configs.includes("vi_vn")) {
         configSelect.value = "vi_vn";
@@ -549,7 +604,7 @@ DEMO_HTML = """<!doctype html>
       message.textContent = "";
       message.className = "message";
       try {
-        const response = await apiFetch(`/v1/jobs?limit=${state.page.limit}&offset=${state.page.offset}`);
+        const response = await apiFetch(jobsUrl());
         const data = await response.json();
         state.page.total = Number(data.total || 0);
         state.page.limit = Number(data.limit || state.page.limit);
@@ -574,6 +629,32 @@ DEMO_HTML = """<!doctype html>
 
     function resetToFirstPage() {
       state.page.offset = 0;
+    }
+
+    function jobsUrl() {
+      const params = new URLSearchParams();
+      params.set("limit", String(state.page.limit));
+      params.set("offset", String(state.page.offset));
+      if (state.filters.config) {
+        params.set("config", state.filters.config);
+      }
+      if (state.filters.userId) {
+        params.set("user_id", state.filters.userId);
+      }
+      return `/v1/jobs?${params.toString()}`;
+    }
+
+    function applyJobFilters() {
+      state.filters.config = filterConfig.value;
+      state.filters.userId = filterUser.value.trim();
+      resetToFirstPage();
+      loadJobs();
+    }
+
+    function clearJobFilters() {
+      filterConfig.value = "";
+      filterUser.value = "";
+      applyJobFilters();
     }
 
     function replaceJobs(jobs) {
@@ -1124,6 +1205,14 @@ DEMO_HTML = """<!doctype html>
 
     document.getElementById("submit").addEventListener("click", submitJobs);
     document.getElementById("refresh").addEventListener("click", loadJobs);
+    filterConfig.addEventListener("change", applyJobFilters);
+    filterUser.addEventListener("change", applyJobFilters);
+    filterUser.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        applyJobFilters();
+      }
+    });
+    clearFilters.addEventListener("click", clearJobFilters);
     prevPage.addEventListener("click", () => {
       state.page.offset = Math.max(0, state.page.offset - state.page.limit);
       loadJobs();

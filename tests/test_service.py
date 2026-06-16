@@ -99,7 +99,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("`/v1/jobs/${item.job_id}`", demo)
         self.assertIn("/v1/configs", demo)
         self.assertIn('id="user-name"', demo)
-        self.assertIn('apiFetch(`/v1/jobs?limit=${state.page.limit}&offset=${state.page.offset}`)', demo)
+        self.assertIn("apiFetch(jobsUrl())", demo)
         self.assertIn("downloadArtifact(button.dataset.downloadJob", demo)
         self.assertIn('data-download-format="${escapeHtml(name)}"', demo)
         self.assertNotIn('target="_blank" rel="noopener"', demo)
@@ -125,6 +125,13 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('"X-Semantic-ASR-User"', demo)
         self.assertIn('id="prev-page"', demo)
         self.assertIn('id="next-page"', demo)
+        self.assertIn('id="filter-config"', demo)
+        self.assertIn('id="filter-user"', demo)
+        self.assertIn("jobsUrl()", demo)
+        self.assertIn('params.set("config", state.filters.config)', demo)
+        self.assertIn('params.set("user_id", state.filters.userId)', demo)
+        self.assertIn('class="jobs-table-wrap"', demo)
+        self.assertIn("--top-panel-height", demo)
         self.assertIn("playUntilMs", demo)
         self.assertIn("handleAudioTimeUpdate", demo)
         self.assertIn("review.hidden = true", demo)
@@ -173,11 +180,19 @@ class SemanticAsrServiceTest(unittest.TestCase):
             store.create_job(
                 "bob-job",
                 "bob",
-                "zh_cn",
+                "vi_vn",
                 self._write_wav(tmpdir),
                 os.path.join(tmpdir, "jobs", "bob-job", "outputs"),
                 ["json"],
                 filename="bob.wav",
+            )
+            store.create_job(
+                "translation_smoke_hidden",
+                "alice",
+                "ko_kr",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "translation_smoke_hidden", "outputs"),
+                ["json"],
             )
             store.create_job(
                 "alice-job-2",
@@ -202,11 +217,27 @@ class SemanticAsrServiceTest(unittest.TestCase):
             admin_response = self._route_endpoint(app, "/v1/jobs")(
                 user={"user_id": "admin", "is_admin": True},
             )
+            admin_bob_response = self._route_endpoint(app, "/v1/jobs")(
+                config="vi_vn",
+                user_id="bob",
+                user={"user_id": "admin", "is_admin": True},
+            )
+            alice_vi_response = self._route_endpoint(app, "/v1/jobs")(
+                config="vi_vn",
+                user={"user_id": "alice", "is_admin": False},
+            )
+            alice_bob_response = self._route_endpoint(app, "/v1/jobs")(
+                user_id="bob",
+                user={"user_id": "alice", "is_admin": False},
+            )
 
         self.assertEqual(len(alice_response["jobs"]), 1)
         self.assertEqual(len(alice_page_2["jobs"]), 1)
         self.assertEqual({alice_response["jobs"][0]["job_id"], alice_page_2["jobs"][0]["job_id"]}, {"alice-job", "alice-job-2"})
         self.assertEqual({job["job_id"] for job in admin_response["jobs"]}, {"alice-job", "alice-job-2", "bob-job"})
+        self.assertEqual([job["job_id"] for job in admin_bob_response["jobs"]], ["bob-job"])
+        self.assertEqual(alice_vi_response["jobs"], [])
+        self.assertEqual(alice_bob_response["jobs"], [])
         first_alice = next(job for job in [*alice_response["jobs"], *alice_page_2["jobs"]] if job["job_id"] == "alice-job")
         self.assertEqual(first_alice["filename"], "alice.wav")
         self.assertEqual(first_alice["local_path"], "/audio/alice.wav")

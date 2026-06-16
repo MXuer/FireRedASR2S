@@ -2,6 +2,16 @@
 
 Current state:
 
+- The web demo job panel now matches the upload panel height, scrolls the table
+  inside the panel, and provides `Language / Profile` plus `PM / Username`
+  filters. `GET /v1/jobs` supports optional `config` and `user_id` filters
+  while preserving normal-user scoping; admin tokens can filter across PMs.
+- Internal smoke-test jobs whose ids start with `translation_smoke_` are hidden
+  from job lists and counts. The visible `translation_smoke_hunyuan_mt` entry
+  was a hand-created Hunyuan-MT smoke validation row in `service_data/demo`.
+- `scripts/start_demo_service.sh` now uses a short timeout for the translation
+  service health check so an unhealthy translation endpoint cannot block ASR
+  demo API/worker startup.
 - MMS runtime now normalizes uroman token whitespace before both CTC alignment
   and span reconstruction, then drops alignment items whose normalized uroman
   token is empty. This prevents repeated/edge spaces or empty uroman outputs
@@ -147,6 +157,16 @@ Current state:
   JSON/SRT/CSV/TextGrid artifacts.
 
 Recent validation:
+
+- The demo jobs panel now matches the upload/control panel height. The table
+  scrolls inside the jobs panel and pagination remains fixed at the bottom, so
+  the right side no longer grows taller than the left side. Internal translation
+  smoke-test jobs are hidden from `GET /v1/jobs` and its `total` count using
+  the `translation_smoke_` prefix. The previously visible
+  `translation_smoke_hunyuan_mt` record was a hand-created Hunyuan-MT smoke job
+  in `service_data/demo` under `user_id=dev`, not a user upload. Validation
+  passed: `tests.test_service`, `compileall semantic_asr_service
+  tests/test_service.py`, and `git diff --check`.
 
 - Demo user switching now uses the `User Name` field as the effective per-PM
   job namespace for normal tokens. The API token remains the access gate, and

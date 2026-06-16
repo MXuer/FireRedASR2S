@@ -37,7 +37,7 @@ echo "[demo] api=http://${HOST}:${PORT}/demo"
 echo "[demo] workers=${WORKER_COUNT} device=${WORKER_DEVICE}"
 
 if command -v curl >/dev/null 2>&1; then
-  if curl -fsS "${TRANSLATION_BASE_URL}/health" >/dev/null 2>&1; then
+  if curl -fsS --max-time 2 "${TRANSLATION_BASE_URL}/health" >/dev/null 2>&1; then
     echo "[demo] translation service reachable at ${TRANSLATION_BASE_URL}"
   else
     echo "[demo] translation service is not reachable at ${TRANSLATION_BASE_URL}; ASR still works, translation will return 503"

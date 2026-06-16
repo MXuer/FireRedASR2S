@@ -1,5 +1,27 @@
 # Todo
 
+- [x] Current work: add language/profile and PM username filters to the demo job list.
+- [x] Current work: keep hidden internal smoke jobs out of filtered job results.
+- [x] Current work: validate service tests, restart/check the demo, and commit.
+
+Review:
+- The demo job list now has `Language / Profile` and `PM / Username` filters above the table.
+- `GET /v1/jobs` now accepts optional `config` and `user_id` filters; normal users remain scoped to their effective User Name, while admin tokens can filter across PMs.
+- Internal jobs with prefix `translation_smoke_` remain hidden even when filters are applied.
+- `translation_smoke_hunyuan_mt` was a hand-created Hunyuan-MT smoke-test job in `service_data/demo` (`user_id=dev`, `config=ko_kr`, dummy upload), so it appeared before we hid internal smoke jobs.
+- Fixed `scripts/start_demo_service.sh` so translation health checks use a short timeout and cannot block API/worker startup.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, `git diff --check`, and HTTP smoke on `/demo` plus filtered `/v1/jobs`.
+
+- [x] Current work: align the jobs panel height with the upload/control panel height.
+- [x] Current work: hide internal translation smoke jobs from the demo job list.
+- [x] Current work: explain why `translation_smoke_hunyuan_mt` appeared and validate the fix.
+
+Review:
+- The top jobs panel now uses the same fixed responsive height as the upload/control panel, with the job table scrolling inside that panel and pagination fixed at the bottom.
+- `translation_smoke_hunyuan_mt` appeared because it was a hand-created Hunyuan-MT smoke-test job stored in `service_data/demo` with `user_id=dev`.
+- Internal jobs with prefix `translation_smoke_` are now hidden from `GET /v1/jobs` and its total count, including admin lists, so smoke artifacts no longer pollute the demo file list.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, and `git diff --check`.
+
 - [x] Current work: make demo User Name the effective per-PM job namespace while keeping API token as access control.
 - [x] Current work: add `/v1/me` and paginated `/v1/jobs` results.
 - [x] Current work: update the web demo to switch users by name and paginate jobs.

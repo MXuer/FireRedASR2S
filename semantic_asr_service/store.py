@@ -6,6 +6,7 @@ from typing import Any
 
 
 TERMINAL_STATUSES = {"succeeded", "failed", "canceled"}
+INTERNAL_JOB_PREFIXES = ("translation_smoke_",)
 
 
 class JobStore:
@@ -94,29 +95,56 @@ class JobStore:
         include_all: bool = False,
         limit: int = 100,
         offset: int = 0,
+        config: str | None = None,
+        filter_user_id: str | None = None,
     ) -> list[dict[str, Any]]:
         limit = max(1, min(500, int(limit)))
         offset = max(0, int(offset))
         with self.connect() as conn:
-            if include_all:
-                rows = conn.execute(
-                    "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    (limit, offset),
-                ).fetchall()
-            else:
-                rows = conn.execute(
-                    "SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    (user_id, limit, offset),
-                ).fetchall()
+            where_clause, params = self._list_filter(user_id, include_all, config, filter_user_id)
+            rows = conn.execute(
+                f"SELECT * FROM jobs WHERE {where_clause} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (*params, limit, offset),
+            ).fetchall()
         return [_row_to_job(row) for row in rows]
 
-    def count_jobs(self, user_id: str, include_all: bool = False) -> int:
+    def count_jobs(
+        self,
+        user_id: str,
+        include_all: bool = False,
+        config: str | None = None,
+        filter_user_id: str | None = None,
+    ) -> int:
         with self.connect() as conn:
-            if include_all:
-                row = conn.execute("SELECT COUNT(*) AS count FROM jobs").fetchone()
-            else:
-                row = conn.execute("SELECT COUNT(*) AS count FROM jobs WHERE user_id = ?", (user_id,)).fetchone()
+            where_clause, params = self._list_filter(user_id, include_all, config, filter_user_id)
+            row = conn.execute(f"SELECT COUNT(*) AS count FROM jobs WHERE {where_clause}", params).fetchone()
         return int(row["count"])
+
+    def _list_filter(
+        self,
+        user_id: str,
+        include_all: bool,
+        config: str | None,
+        filter_user_id: str | None,
+    ) -> tuple[str, tuple[str, ...]]:
+        clauses = []
+        params: list[str] = []
+        if include_all:
+            if filter_user_id:
+                clauses.append("user_id = ?")
+                params.append(filter_user_id)
+        else:
+            clauses.append("user_id = ?")
+            params.append(user_id)
+            if filter_user_id and filter_user_id != user_id:
+                clauses.append("0 = 1")
+        if config:
+            clauses.append("config = ?")
+            params.append(config)
+        hidden_clause, hidden_params = _hidden_jobs_filter()
+        clauses.append(hidden_clause)
+        params.extend(hidden_params)
+        return " AND ".join(clauses), tuple(params)
 
     def claim_next_job(self) -> dict[str, Any] | None:
         now = _utc_now()
@@ -181,3 +209,9 @@ def _row_to_job(row: sqlite3.Row) -> dict[str, Any]:
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _hidden_jobs_filter() -> tuple[str, tuple[str, ...]]:
+    clause = " AND ".join("job_id NOT LIKE ?" for _ in INTERNAL_JOB_PREFIXES) or "1 = 1"
+    params = tuple(f"{prefix}%" for prefix in INTERNAL_JOB_PREFIXES)
+    return clause, params

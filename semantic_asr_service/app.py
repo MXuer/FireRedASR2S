@@ -56,9 +56,29 @@ def create_app(
         return {"user_id": user["user_id"], "is_admin": user["is_admin"]}
 
     @app.get("/v1/jobs")
-    def list_jobs(limit: int = 10, offset: int = 0, user=Depends(_require_user)):
-        jobs = store.list_jobs(user["user_id"], include_all=user["is_admin"], limit=limit, offset=offset)
-        total = store.count_jobs(user["user_id"], include_all=user["is_admin"])
+    def list_jobs(
+        limit: int = 10,
+        offset: int = 0,
+        config: str | None = None,
+        user_id: str | None = None,
+        user=Depends(_require_user),
+    ):
+        config_filter = _clean_optional_filter(config)
+        user_filter = _clean_optional_filter(user_id)
+        jobs = store.list_jobs(
+            user["user_id"],
+            include_all=user["is_admin"],
+            limit=limit,
+            offset=offset,
+            config=config_filter,
+            filter_user_id=user_filter,
+        )
+        total = store.count_jobs(
+            user["user_id"],
+            include_all=user["is_admin"],
+            config=config_filter,
+            filter_user_id=user_filter,
+        )
         return {
             "jobs": [_job_response(job) for job in jobs],
             "total": total,
@@ -288,6 +308,13 @@ def _sanitize_demo_user(value: str) -> str:
     if not cleaned:
         return "dev"
     return cleaned[:80]
+
+
+def _clean_optional_filter(value: str | None) -> str | None:
+    if not isinstance(value, str):
+        return None
+    cleaned = value.strip()
+    return cleaned or None
 
 
 app = create_app()
