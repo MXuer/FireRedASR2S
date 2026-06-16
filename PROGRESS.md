@@ -148,6 +148,22 @@ Current state:
 
 Recent validation:
 
+- Hunyuan-MT-7B-fp8 real local serving is working. The downloaded model lives at
+  `/home/duhu/.cache/huggingface/hub/models--tencent--Hunyuan-MT-7B-fp8/snapshots/81e5a3f7199524570ba75e61360e990ba88665e4`.
+  Since `fireredasr2s` has no vLLM and its transformers import is broken, the
+  separate `llm` conda environment was updated to `transformers==4.56.0` and
+  `compressed-tensors==0.11.0`. Added
+  `semantic_asr_service.hunyuan_mt_server`, a minimal transformers-based
+  OpenAI-compatible wrapper that patches the FP8 config into
+  `service_data/hunyuan_mt_fp8_patched` and serves `/v1/chat/completions` on
+  `127.0.0.1:10087` using GPU 6. Direct smoke passed:
+  `It is on the house.` -> `这顿饭由我们公司来买单。` Semantic ASR API smoke
+  passed on short job `translation_smoke_hunyuan_mt`: Korean sentences
+  translated to Chinese and were readable via
+  `/v1/jobs/{job_id}/translations/zh_cn`. Translating a full long Korean job
+  synchronously was too slow, so the next translation iteration should make
+  translation asynchronous or add batching/progress for long recordings.
+
 - Added Hunyuan-MT translation scaffolding for the HTTP service and web demo.
   Translation is a post-ASR sidecar: completed jobs can be translated through
   `POST /v1/jobs/{job_id}/translations`, cached under

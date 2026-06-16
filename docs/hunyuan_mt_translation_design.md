@@ -74,7 +74,49 @@ Recommended GPU allocation:
 - Keep current ASR demo workers on GPU 7.
 - Put translation on GPU 6 first.
 - If translation and ASR contend for memory, keep translation as a separate
-  service and reduce translation concurrency.
+service and reduce translation concurrency.
+
+### Current Local Smoke Setup
+
+The downloaded model path is:
+
+```text
+/home/duhu/.cache/huggingface/hub/models--tencent--Hunyuan-MT-7B-fp8/snapshots/81e5a3f7199524570ba75e61360e990ba88665e4
+```
+
+`fireredasr2s` does not include vLLM, and its transformers/torch versions are
+not compatible with the model. The local `llm` conda environment was updated to
+`transformers==4.56.0` and `compressed-tensors==0.11.0`, matching the model
+card requirement. This conflicts with the installed LLaMAFactory package in
+that environment, so use the environment for the Hunyuan-MT service only.
+
+Current working startup command:
+
+```bash
+export MODEL_PATH=/home/duhu/.cache/huggingface/hub/models--tencent--Hunyuan-MT-7B-fp8/snapshots/81e5a3f7199524570ba75e61360e990ba88665e4
+CUDA_VISIBLE_DEVICES=6 conda run -n llm python -m semantic_asr_service.hunyuan_mt_server \
+  --model-path "${MODEL_PATH}" \
+  --runtime-model-path service_data/hunyuan_mt_fp8_patched \
+  --served-model-name hunyuan-mt \
+  --host 127.0.0.1 \
+  --port 10087
+```
+
+The service listens only on `127.0.0.1:10087`; the public browser talks to the
+normal Semantic ASR service on `10086`, and that server calls translation
+locally.
+
+Smoke result:
+
+- Direct `/v1/chat/completions`: `It is on the house.` -> `这顿饭由我们公司来买单。`
+- Semantic ASR translation API short job:
+  - `감회가 새롭습니다.` -> `再次重温这些往事，心中依然充满了感慨。`
+  - `오늘은 날씨가 좋습니다.` -> `今天天气很好。`
+
+The long Korean demo job was too slow with the current synchronous
+sentence-by-sentence translation endpoint. The next backend iteration should
+make translation asynchronous or add progress/batching before translating
+entire long recordings interactively.
 
 ## Prompt Policy
 

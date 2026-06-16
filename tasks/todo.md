@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: start a real Hunyuan-MT-7B-fp8 OpenAI-compatible translation service on port `10087`.
+- [x] Current work: smoke test direct Hunyuan-MT chat completion with the downloaded model.
+- [x] Current work: smoke test the Semantic ASR translation API against an existing completed job.
+- [x] Current work: update docs/progress with the verified model path/start command and commit.
+
+Review:
+- `fireredasr2s` has no vLLM and its transformers import is broken, so Hunyuan-MT was deployed from the separate `llm` conda environment.
+- Installed `transformers==4.56.0` and `compressed-tensors==0.11.0` into `llm`, matching the Hunyuan-MT FP8 model card. This conflicts with LLaMAFactory constraints in that env, so it should be treated as the translation-serving env for now.
+- Added `semantic_asr_service.hunyuan_mt_server`, a minimal OpenAI-compatible `/v1/chat/completions` wrapper around transformers loading.
+- Started Hunyuan-MT-7B-fp8 on GPU 6 at `127.0.0.1:10087`, using runtime-patched config under `service_data/hunyuan_mt_fp8_patched`.
+- Direct smoke passed: `It is on the house.` -> `这顿饭由我们公司来买单。`
+- Semantic ASR translation API smoke passed on short job `translation_smoke_hunyuan_mt`: Korean sentences translated to Chinese and were readable through `GET /v1/jobs/{job_id}/translations/zh_cn`.
+- Full long Korean job synchronous translation was too slow, so the next iteration should make translation asynchronous or add batching/progress before translating entire long recordings.
+
 - [x] Current work: implement Hunyuan-MT translation settings and OpenAI-compatible client scaffolding.
 - [x] Current work: add translation cache/API endpoints for completed ASR jobs.
 - [x] Current work: add web demo controls for target language and original/translation/bilingual display.

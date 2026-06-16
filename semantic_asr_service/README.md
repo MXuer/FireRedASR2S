@@ -148,6 +148,24 @@ CUDA_VISIBLE_DEVICES=6 python -m vllm.entrypoints.openai.api_server \
   --dtype bfloat16
 ```
 
+On this machine, vLLM is not installed in the ASR environment. A minimal
+transformers-based OpenAI-compatible wrapper is available instead:
+
+```bash
+export MODEL_PATH=/home/duhu/.cache/huggingface/hub/models--tencent--Hunyuan-MT-7B-fp8/snapshots/81e5a3f7199524570ba75e61360e990ba88665e4
+CUDA_VISIBLE_DEVICES=6 conda run -n llm python -m semantic_asr_service.hunyuan_mt_server \
+  --model-path "${MODEL_PATH}" \
+  --runtime-model-path service_data/hunyuan_mt_fp8_patched \
+  --served-model-name hunyuan-mt \
+  --host 127.0.0.1 \
+  --port 10087
+```
+
+The wrapper prepares a local runtime copy of the FP8 config because the
+Hunyuan-MT model card requires renaming `ignored_layers` to `ignore` when using
+the FP8 model with transformers/compressed-tensors. It keeps large safetensors
+files as symlinks to the Hugging Face cache.
+
 For a demo backed by GPU 7 with two workers:
 
 ```bash
