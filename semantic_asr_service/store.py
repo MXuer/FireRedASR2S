@@ -88,20 +88,35 @@ class JobStore:
             row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
         return _row_to_job(row) if row else None
 
-    def list_jobs(self, user_id: str, include_all: bool = False, limit: int = 100) -> list[dict[str, Any]]:
+    def list_jobs(
+        self,
+        user_id: str,
+        include_all: bool = False,
+        limit: int = 100,
+        offset: int = 0,
+    ) -> list[dict[str, Any]]:
         limit = max(1, min(500, int(limit)))
+        offset = max(0, int(offset))
         with self.connect() as conn:
             if include_all:
                 rows = conn.execute(
-                    "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ?",
-                    (limit,),
+                    "SELECT * FROM jobs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (limit, offset),
                 ).fetchall()
             else:
                 rows = conn.execute(
-                    "SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-                    (user_id, limit),
+                    "SELECT * FROM jobs WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    (user_id, limit, offset),
                 ).fetchall()
         return [_row_to_job(row) for row in rows]
+
+    def count_jobs(self, user_id: str, include_all: bool = False) -> int:
+        with self.connect() as conn:
+            if include_all:
+                row = conn.execute("SELECT COUNT(*) AS count FROM jobs").fetchone()
+            else:
+                row = conn.execute("SELECT COUNT(*) AS count FROM jobs WHERE user_id = ?", (user_id,)).fetchone()
+        return int(row["count"])
 
     def claim_next_job(self) -> dict[str, Any] | None:
         now = _utc_now()

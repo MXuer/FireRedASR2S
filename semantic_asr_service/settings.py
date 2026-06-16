@@ -23,6 +23,7 @@ class ServiceSettings:
     translation_targets: set[str] = field(default_factory=lambda: {"zh_cn", "en_us"})
     translation_batch_size: int = 16
     translation_request_mode: str = "json_batch"
+    demo_user_header_enabled: bool = True
 
     @property
     def db_path(self) -> str:
@@ -72,6 +73,7 @@ def load_settings() -> ServiceSettings:
         translation_targets=_env_set("SEMANTIC_ASR_TRANSLATION_TARGETS") or {"zh_cn", "en_us"},
         translation_batch_size=int(os.environ.get("SEMANTIC_ASR_TRANSLATION_BATCH_SIZE", "16")),
         translation_request_mode=os.environ.get("SEMANTIC_ASR_TRANSLATION_REQUEST_MODE", "json_batch"),
+        demo_user_header_enabled=_env_bool("SEMANTIC_ASR_DEMO_USER_HEADER", True),
     )
 
 
@@ -82,6 +84,13 @@ def _discover_configs(configs_dir: str) -> set[str]:
 def _env_set(name: str) -> set[str]:
     raw = os.environ.get(name, "").strip()
     return {item.strip() for item in raw.split(",") if item.strip()}
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _parse_api_keys(raw: str) -> tuple[dict[str, str], set[str]]:

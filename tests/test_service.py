@@ -39,8 +39,13 @@ class SemanticAsrServiceTest(unittest.TestCase):
         request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(settings=settings)))
 
         user = _require_user(request, "Bearer token-a")
+        demo_user = _require_user(request, "Bearer token-a", "pm-alice")
+        admin = _require_user(request, "Bearer admin-token", "pm-alice")
 
         self.assertEqual(user["user_id"], "alice")
+        self.assertEqual(demo_user["user_id"], "pm-alice")
+        self.assertEqual(admin["user_id"], "admin")
+        self.assertTrue(admin["is_admin"])
         with self.assertRaises(HTTPException) as missing:
             _require_user(request, None)
         with self.assertRaises(HTTPException) as invalid:
@@ -94,7 +99,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("`/v1/jobs/${item.job_id}`", demo)
         self.assertIn("/v1/configs", demo)
         self.assertIn('id="user-name"', demo)
-        self.assertIn('apiFetch("/v1/jobs")', demo)
+        self.assertIn('apiFetch(`/v1/jobs?limit=${state.page.limit}&offset=${state.page.offset}`)', demo)
         self.assertIn("downloadArtifact(button.dataset.downloadJob", demo)
         self.assertIn('data-download-format="${escapeHtml(name)}"', demo)
         self.assertNotIn('target="_blank" rel="noopener"', demo)
@@ -117,6 +122,12 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("readTranslationStream(response, jobId, target)", demo)
         self.assertIn('form.append("local_path", localPath)', demo)
         self.assertIn("displayJobName(job)", demo)
+        self.assertIn('"X-Semantic-ASR-User"', demo)
+        self.assertIn('id="prev-page"', demo)
+        self.assertIn('id="next-page"', demo)
+        self.assertIn("playUntilMs", demo)
+        self.assertIn("handleAudioTimeUpdate", demo)
+        self.assertIn("review.hidden = true", demo)
         self.assertIn("updateTranslationUi()", demo)
         self.assertIn("segmentTextHtml(segment)", demo)
 
@@ -135,6 +146,14 @@ class SemanticAsrServiceTest(unittest.TestCase):
         response = self._route_endpoint(app, "/v1/translation-targets")(user={"user_id": "alice"})
 
         self.assertEqual(response, {"targets": ["en_us", "zh_cn"]})
+
+    def test_me_route_returns_effective_demo_user(self):
+        settings = self._settings(tempfile.mkdtemp())
+        app = create_app(settings=settings, store=JobStore(settings.db_path))
+
+        response = self._route_endpoint(app, "/v1/me")(user={"user_id": "pm-alice", "is_admin": False})
+
+        self.assertEqual(response, {"user_id": "pm-alice", "is_admin": False})
 
     def test_jobs_route_lists_only_current_user_unless_admin(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -160,18 +179,40 @@ class SemanticAsrServiceTest(unittest.TestCase):
                 ["json"],
                 filename="bob.wav",
             )
+            store.create_job(
+                "alice-job-2",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "alice-job-2", "outputs"),
+                ["json"],
+                filename="alice2.wav",
+            )
 
             alice_response = self._route_endpoint(app, "/v1/jobs")(
+                limit=1,
+                offset=0,
+                user={"user_id": "alice", "is_admin": False},
+            )
+            alice_page_2 = self._route_endpoint(app, "/v1/jobs")(
+                limit=1,
+                offset=1,
                 user={"user_id": "alice", "is_admin": False},
             )
             admin_response = self._route_endpoint(app, "/v1/jobs")(
                 user={"user_id": "admin", "is_admin": True},
             )
 
-        self.assertEqual([job["job_id"] for job in alice_response["jobs"]], ["alice-job"])
-        self.assertEqual({job["job_id"] for job in admin_response["jobs"]}, {"alice-job", "bob-job"})
-        self.assertEqual(alice_response["jobs"][0]["filename"], "alice.wav")
-        self.assertEqual(alice_response["jobs"][0]["local_path"], "/audio/alice.wav")
+        self.assertEqual(len(alice_response["jobs"]), 1)
+        self.assertEqual(len(alice_page_2["jobs"]), 1)
+        self.assertEqual({alice_response["jobs"][0]["job_id"], alice_page_2["jobs"][0]["job_id"]}, {"alice-job", "alice-job-2"})
+        self.assertEqual({job["job_id"] for job in admin_response["jobs"]}, {"alice-job", "alice-job-2", "bob-job"})
+        first_alice = next(job for job in [*alice_response["jobs"], *alice_page_2["jobs"]] if job["job_id"] == "alice-job")
+        self.assertEqual(first_alice["filename"], "alice.wav")
+        self.assertEqual(first_alice["local_path"], "/audio/alice.wav")
+        self.assertEqual(alice_response["total"], 2)
+        self.assertEqual(alice_response["limit"], 1)
+        self.assertEqual(alice_response["offset"], 0)
 
     def test_submit_job_core_creates_queued_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:

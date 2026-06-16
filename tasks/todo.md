@@ -1,5 +1,20 @@
 # Todo
 
+- [x] Current work: make demo User Name the effective per-PM job namespace while keeping API token as access control.
+- [x] Current work: add `/v1/me` and paginated `/v1/jobs` results.
+- [x] Current work: update the web demo to switch users by name and paginate jobs.
+- [x] Current work: increase default translation concurrency for the demo startup script.
+- [x] Current work: stop playback at the clicked segment end instead of continuing into the next segment.
+- [x] Current work: update tests/docs, validate, restart demo and commit.
+
+Review:
+- Normal demo requests now send `X-Semantic-ASR-User` from the User Name field; the API token remains the access gate, while User Name is the PM/job namespace. Admin tokens ignore the header and can see all jobs.
+- Added `GET /v1/me` and paginated `GET /v1/jobs?limit=&offset=`.
+- The demo job table now shows 8 jobs per page with Prev/Next controls, and clears the review panel when switching user/token.
+- Segment-click playback now stops at the clicked segment end instead of continuing into the next segment.
+- `scripts/start_demo_service.sh` now defaults translation concurrency to `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=32`.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, and `git diff --check`.
+
 - [x] Current work: change demo startup default translation mode to `concurrent_single`.
 - [x] Current work: add streaming translation so each completed sentence can appear in the page immediately.
 - [x] Current work: store an upload-time local path hint and show it in the jobs/review UI.

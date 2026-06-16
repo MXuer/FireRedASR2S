@@ -114,6 +114,25 @@ DEMO_HTML = """<!doctype html>
       padding: 14px 16px;
       border-bottom: 1px solid var(--line);
     }
+    .pager {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      padding: 10px 16px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .pager button {
+      height: 30px;
+      padding: 0 10px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--brand);
+      font-size: 12px;
+    }
     .toolbar h2 {
       margin: 0;
       font-size: 16px;
@@ -320,6 +339,11 @@ DEMO_HTML = """<!doctype html>
         </thead>
         <tbody id="jobs"></tbody>
       </table>
+      <div class="pager">
+        <button id="prev-page" type="button">Prev</button>
+        <span id="page-info">0-0 / 0</span>
+        <button id="next-page" type="button">Next</button>
+      </div>
     </section>
     <section class="review" id="review" hidden>
       <h2 id="review-title">Review</h2>
@@ -354,7 +378,15 @@ DEMO_HTML = """<!doctype html>
     </section>
   </main>
   <script>
-    const state = { jobs: [], timer: null, review: null, waveDrag: null, translationsByJob: {}, translatingByJob: {} };
+    const state = {
+      jobs: [],
+      timer: null,
+      review: null,
+      waveDrag: null,
+      translationsByJob: {},
+      translatingByJob: {},
+      page: { offset: 0, limit: 8, total: 0 },
+    };
     const userNameInput = document.getElementById("user-name");
     const tokenInput = document.getElementById("token");
     const configSelect = document.getElementById("config");
@@ -376,10 +408,16 @@ DEMO_HTML = """<!doctype html>
     const textMode = document.getElementById("text-mode");
     const translationTarget = document.getElementById("translation-target");
     const translateButton = document.getElementById("translate");
+    const pageInfo = document.getElementById("page-info");
+    const prevPage = document.getElementById("prev-page");
+    const nextPage = document.getElementById("next-page");
 
     function authHeaders() {
       const token = tokenInput.value.trim() || userNameInput.value.trim();
-      return { Authorization: `Bearer ${token}` };
+      return {
+        Authorization: `Bearer ${token}`,
+        "X-Semantic-ASR-User": userNameInput.value.trim() || "dev",
+      };
     }
 
     async function apiFetch(url, options = {}) {
@@ -511,9 +549,12 @@ DEMO_HTML = """<!doctype html>
       message.textContent = "";
       message.className = "message";
       try {
-        const response = await apiFetch("/v1/jobs");
+        const response = await apiFetch(`/v1/jobs?limit=${state.page.limit}&offset=${state.page.offset}`);
         const data = await response.json();
-        mergeJobs(data.jobs || []);
+        state.page.total = Number(data.total || 0);
+        state.page.limit = Number(data.limit || state.page.limit);
+        state.page.offset = Number(data.offset || state.page.offset);
+        replaceJobs(data.jobs || []);
         renderJobs();
         if (state.jobs.some((item) => item.status === "queued" || item.status === "running")) {
           startPolling();
@@ -522,6 +563,25 @@ DEMO_HTML = """<!doctype html>
         message.textContent = error.message;
         message.className = "message error";
       }
+    }
+
+    async function loadMe() {
+      const response = await apiFetch("/v1/me");
+      const data = await response.json();
+      message.textContent = `Current user: ${data.user_id}${data.is_admin ? " (admin)" : ""}`;
+      message.className = "message";
+    }
+
+    function resetToFirstPage() {
+      state.page.offset = 0;
+    }
+
+    function replaceJobs(jobs) {
+      const currentFiles = new Map(state.jobs.map((item) => [item.job_id, item.fileObject]));
+      state.jobs = jobs.map((job) => Object.assign({}, job, {
+        file: job.local_path || job.filename || job.job_id,
+        fileObject: currentFiles.get(job.job_id) || null,
+      }));
     }
 
     function mergeJobs(jobs) {
@@ -564,6 +624,16 @@ DEMO_HTML = """<!doctype html>
         `;
         jobsBody.appendChild(row);
       });
+      renderPager();
+    }
+
+    function renderPager() {
+      const total = state.page.total;
+      const start = total ? state.page.offset + 1 : 0;
+      const end = Math.min(total, state.page.offset + state.page.limit);
+      pageInfo.textContent = `${start}-${end} / ${total}`;
+      prevPage.disabled = state.page.offset <= 0;
+      nextPage.disabled = state.page.offset + state.page.limit >= total;
     }
 
     function artifactControls(job) {
@@ -628,6 +698,7 @@ DEMO_HTML = """<!doctype html>
         translations: translationsForJob(jobId, translationTarget.value),
         displayMode: textMode.value,
         zoom: Number(waveZoom.value || 1),
+        playUntilMs: null,
         peaksByWidth: new Map(),
       };
       renderSegmentList(segments);
@@ -979,8 +1050,19 @@ DEMO_HTML = """<!doctype html>
         return;
       }
       reviewAudio.currentTime = segment.startMs / 1000;
+      reviewState.playUntilMs = segment.endMs;
       scrollToTime(segment.startMs);
       reviewAudio.play();
+      drawWaveform();
+    }
+
+    function handleAudioTimeUpdate() {
+      const reviewState = state.review;
+      if (reviewState && reviewState.playUntilMs !== null && reviewAudio.currentTime * 1000 >= reviewState.playUntilMs) {
+        reviewAudio.pause();
+        reviewAudio.currentTime = reviewState.playUntilMs / 1000;
+        reviewState.playUntilMs = null;
+      }
       drawWaveform();
     }
 
@@ -1042,6 +1124,14 @@ DEMO_HTML = """<!doctype html>
 
     document.getElementById("submit").addEventListener("click", submitJobs);
     document.getElementById("refresh").addEventListener("click", loadJobs);
+    prevPage.addEventListener("click", () => {
+      state.page.offset = Math.max(0, state.page.offset - state.page.limit);
+      loadJobs();
+    });
+    nextPage.addEventListener("click", () => {
+      state.page.offset += state.page.limit;
+      loadJobs();
+    });
     jobsBody.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-download-job]");
       if (!button) {
@@ -1066,7 +1156,7 @@ DEMO_HTML = """<!doctype html>
       }
       seekSegment(button.dataset.segmentIndex);
     });
-    reviewAudio.addEventListener("timeupdate", drawWaveform);
+    reviewAudio.addEventListener("timeupdate", handleAudioTimeUpdate);
     waveZoom.addEventListener("input", () => setWaveZoom(Number(waveZoom.value)));
     textMode.addEventListener("change", () => {
       if (!state.review) {
@@ -1133,6 +1223,9 @@ DEMO_HTML = """<!doctype html>
       const rect = waveform.getBoundingClientRect();
       const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
       if (reviewAudio.duration) {
+        if (state.review) {
+          state.review.playUntilMs = null;
+        }
         reviewAudio.currentTime = ratio * reviewAudio.duration;
         drawWaveform();
       }
@@ -1151,11 +1244,22 @@ DEMO_HTML = """<!doctype html>
     }
     userNameInput.addEventListener("change", () => {
       savePreferences();
-      loadJobs();
+      resetToFirstPage();
+      state.jobs = [];
+      state.review = null;
+      review.hidden = true;
+      renderJobs();
+      Promise.all([loadMe(), loadJobs()]).catch((error) => {
+        message.textContent = error.message;
+        message.className = "message error";
+      });
     });
     tokenInput.addEventListener("change", () => {
       savePreferences();
-      Promise.all([loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
+      resetToFirstPage();
+      state.review = null;
+      review.hidden = true;
+      Promise.all([loadMe(), loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
         message.textContent = error.message;
         message.className = "message error";
       });
@@ -1163,7 +1267,7 @@ DEMO_HTML = """<!doctype html>
     configSelect.addEventListener("change", savePreferences);
     loadPreferences();
     checkHealth();
-    Promise.all([loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
+    Promise.all([loadMe(), loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
       message.textContent = error.message;
       message.className = "message error";
     });

@@ -148,6 +148,20 @@ Current state:
 
 Recent validation:
 
+- Demo user switching now uses the `User Name` field as the effective per-PM
+  job namespace for normal tokens. The API token remains the access gate, and
+  the browser sends `X-Semantic-ASR-User`; admin tokens ignore that header and
+  can still see all jobs. Added `GET /v1/me` and paginated
+  `GET /v1/jobs?limit=&offset=`, and the web demo now shows 8 jobs per page
+  with Prev/Next controls so the waveform review area is no longer pushed far
+  down by a long job table. Switching user/token clears the current review
+  panel. Segment-click playback now stops at the clicked segment's end instead
+  of continuing into the next segment. The demo startup script now defaults
+  translation concurrency to `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=32` while
+  keeping `concurrent_single` mode. Validation passed: `tests.test_service`,
+  `compileall semantic_asr_service tests/test_service.py`, `bash -n
+  scripts/start_demo_service.sh`, and `git diff --check`.
+
 - Demo translation now defaults to the one-sentence-per-request concurrent mode
   in `scripts/start_demo_service.sh`
   (`SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single`). Added

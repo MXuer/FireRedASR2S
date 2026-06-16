@@ -26,8 +26,9 @@ export SEMANTIC_ASR_SERVICE_PORT=10086
 export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
 export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
 export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
-export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16
+export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=32
 export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
+export SEMANTIC_ASR_DEMO_USER_HEADER=1
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -100,6 +101,7 @@ Available endpoints:
 
 - `POST /v1/jobs`
 - `GET /v1/jobs`
+- `GET /v1/me`
 - `GET /v1/jobs/{job_id}`
 - `GET /v1/jobs/{job_id}/result`
 - `GET /v1/jobs/{job_id}/audio`
@@ -134,19 +136,23 @@ JSON/SRT/CSV/TextGrid artifacts. It calls the existing `/v1/jobs` endpoints;
 there is no separate backend.
 
 The demo persists the entered user name, API token and selected profile in the
-browser. It also reloads the authenticated user's previous jobs from
-`GET /v1/jobs` after refresh or service restart. Uploads include a best-effort
-local-path hint (`webkitRelativePath` when available, otherwise the file name)
-so the job table can show a recognizable source name instead of only a job id.
-Browsers do not expose real absolute local paths and cannot reopen arbitrary
-local files by path after refresh. During the current page session the demo uses
-the browser `File` object first; after refresh it fetches the saved uploaded
-audio from `GET /v1/jobs/{job_id}/audio`.
+browser. In demo mode, the API token is the access gate and the `User Name`
+field is the per-PM job namespace sent as `X-Semantic-ASR-User`. Changing the
+name really switches the job list for normal tokens. Admin tokens ignore that
+header and can see all jobs. `GET /v1/jobs` is paginated so the review area does
+not get pushed far below a long table. Uploads include a best-effort local-path
+hint (`webkitRelativePath` when available, otherwise the file name) so the job
+table can show a recognizable source name instead of only a job id. Browsers do
+not expose real absolute local paths and cannot reopen arbitrary local files by
+path after refresh. During the current page session the demo uses the browser
+`File` object first; after refresh it fetches the saved uploaded audio from
+`GET /v1/jobs/{job_id}/audio`.
 
 After a job succeeds, click `View` to review the result in the browser. The
 demo decodes the selected or saved uploaded audio file, draws a waveform,
 overlays sentence cut intervals from the JSON result and lets the user click a
-segment to seek and play the corresponding audio.
+segment to seek and play the corresponding audio. Segment-click playback stops
+at that segment's end instead of continuing into the next segment.
 
 For long audio review, use the waveform zoom slider or mouse wheel over the
 waveform to zoom in and out. Drag the waveform horizontally to pan through the

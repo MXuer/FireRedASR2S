@@ -51,10 +51,20 @@ def create_app(
     def get_translation_targets(user=Depends(_require_user)):
         return {"targets": sorted(settings.translation_targets)}
 
+    @app.get("/v1/me")
+    def get_me(user=Depends(_require_user)):
+        return {"user_id": user["user_id"], "is_admin": user["is_admin"]}
+
     @app.get("/v1/jobs")
-    def list_jobs(limit: int = 100, user=Depends(_require_user)):
-        jobs = store.list_jobs(user["user_id"], include_all=user["is_admin"], limit=limit)
-        return {"jobs": [_job_response(job) for job in jobs]}
+    def list_jobs(limit: int = 10, offset: int = 0, user=Depends(_require_user)):
+        jobs = store.list_jobs(user["user_id"], include_all=user["is_admin"], limit=limit, offset=offset)
+        total = store.count_jobs(user["user_id"], include_all=user["is_admin"])
+        return {
+            "jobs": [_job_response(job) for job in jobs],
+            "total": total,
+            "limit": max(1, min(500, int(limit))),
+            "offset": max(0, int(offset)),
+        }
 
     @app.post("/v1/jobs", response_model=JobCreateResponse)
     def create_job(
@@ -176,7 +186,11 @@ def create_app(
     return app
 
 
-def _require_user(request: Request, authorization: str | None = Header(default=None)):
+def _require_user(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_semantic_asr_user: str | None = Header(default=None),
+):
     settings = request.app.state.settings
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing bearer token")
@@ -184,7 +198,10 @@ def _require_user(request: Request, authorization: str | None = Header(default=N
     user_id = settings.api_keys.get(token)
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid bearer token")
-    return {"user_id": user_id, "token": token, "is_admin": token in settings.admin_tokens}
+    is_admin = token in settings.admin_tokens
+    if settings.demo_user_header_enabled and isinstance(x_semantic_asr_user, str) and x_semantic_asr_user and not is_admin:
+        user_id = _sanitize_demo_user(x_semantic_asr_user)
+    return {"user_id": user_id, "token": token, "is_admin": is_admin}
 
 
 def _get_authorized_job(store: JobStore, job_id: str, user: dict) -> dict:
@@ -264,6 +281,13 @@ def _new_job_id() -> str:
 
 def json_dumps(value: dict) -> str:
     return json.dumps(value, ensure_ascii=False)
+
+
+def _sanitize_demo_user(value: str) -> str:
+    cleaned = value.strip()
+    if not cleaned:
+        return "dev"
+    return cleaned[:80]
 
 
 app = create_app()
