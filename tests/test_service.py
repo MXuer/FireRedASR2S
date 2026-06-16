@@ -35,7 +35,6 @@ from semantic_asr_service.translation import (
     translation_cache_path,
 )
 from semantic_asr_service.worker import run_worker_once
-import semantic_asr_service.worker as worker_module
 
 
 class SemanticAsrServiceTest(unittest.TestCase):
@@ -101,8 +100,10 @@ class SemanticAsrServiceTest(unittest.TestCase):
             translation_script = fin.read()
 
         self.assertIn('WORKER_DEVICES="${SEMANTIC_ASR_DEMO_WORKER_DEVICES:-6,7}"', demo_script)
-        self.assertIn('WORKERS_PER_DEVICE="${SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE:-4}"', demo_script)
+        self.assertIn('WORKERS_PER_DEVICE="${SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE:-2}"', demo_script)
         self.assertIn('DEVICE="${HUNYUAN_MT_DEVICE:-5}"', translation_script)
+        self.assertIn('MODEL_ID="${HUNYUAN_MT_MODEL_ID:-Tencent-Hunyuan/HY-MT1.5-1.8B-FP8}"', translation_script)
+        self.assertIn('MAX_CONCURRENT="${HUNYUAN_MT_MAX_CONCURRENT:-4}"', translation_script)
 
     def test_web_demo_route_uses_existing_job_api_and_multi_file_upload(self):
         settings = self._settings(tempfile.mkdtemp())
@@ -570,7 +571,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(failed_result["status"], "failed")
         self.assertIn("boom", failed_result["error"])
 
-    def test_worker_schedules_auto_translation_after_success(self):
+    def test_worker_translates_before_marking_success(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = self._settings(tmpdir)
             settings.translation_base_url = "http://translation.local"
@@ -591,27 +592,42 @@ class SemanticAsrServiceTest(unittest.TestCase):
                 with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
                     json.dump({"job_id": job["job_id"], "sentences": []}, fout)
 
-            with mock.patch("semantic_asr_service.worker._auto_translate_async") as translate_mock:
+            with mock.patch("semantic_asr_service.translation.translate_job_result") as translate_mock:
                 result = run_worker_once(settings, store, runner=ok_runner)
 
         self.assertEqual(result["status"], "succeeded")
         translate_mock.assert_called_once()
-        called_job, called_settings = translate_mock.call_args.args
+        called_job, called_settings, called_target = translate_mock.call_args.args
         self.assertEqual(called_job["job_id"], job["job_id"])
         self.assertIs(called_settings, settings)
+        self.assertEqual(called_target, "zh_cn")
 
-    def test_auto_translation_async_starts_daemon_thread(self):
-        settings = self._settings(tempfile.mkdtemp())
-        settings.auto_translate_targets = {"zh_cn"}
-        job = {"job_id": "job1"}
+    def test_worker_marks_failed_when_required_auto_translation_fails(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_base_url = "http://translation.local"
+            settings.translation_targets = {"zh_cn"}
+            settings.auto_translate_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            job = store.create_job(
+                "job1",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
 
-        with mock.patch("semantic_asr_service.worker.threading.Thread") as thread_cls:
-            thread = thread_cls.return_value
-            worker_module._auto_translate_async(job, settings)
+            def ok_runner(job, _settings):
+                os.makedirs(job["outdir"], exist_ok=True)
+                with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
+                    json.dump({"job_id": job["job_id"], "sentences": []}, fout)
 
-        thread_cls.assert_called_once()
-        self.assertTrue(thread_cls.call_args.kwargs["daemon"])
-        thread.start.assert_called_once()
+            with mock.patch("semantic_asr_service.translation.translate_job_result", side_effect=RuntimeError("translate boom")):
+                result = run_worker_once(settings, store, runner=ok_runner)
+
+        self.assertEqual(result["status"], "failed")
+        self.assertIn("translate boom", result["error"])
 
     def test_translate_job_result_writes_and_reuses_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:

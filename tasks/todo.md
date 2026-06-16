@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: switch translation defaults from Hunyuan-MT-7B-fp8 to HY-MT1.5-1.8B-FP8.
+- [x] Current work: increase translation client/server concurrency defaults for the smaller model.
+- [x] Current work: make the Hunyuan startup script discover the downloaded HY-MT1.5 snapshot path.
+- [x] Current work: make job success wait for configured auto translation to finish.
+- [ ] Current work: update docs/tests and validate without requiring the model download to be complete.
+
+Review:
+- `scripts/start_hunyuan_mt_service.sh` now defaults to `Tencent-Hunyuan/HY-MT1.5-1.8B-FP8` and discovers the latest HuggingFace snapshot under the local cache if `HUNYUAN_MT_MODEL_PATH` is not explicitly set.
+- Hunyuan-MT server/client translation concurrency defaults are raised to `4`; demo translation batch size defaults to `16`.
+- Worker success semantics now include configured auto translation: when `SEMANTIC_ASR_AUTO_TRANSLATE_TARGETS` is set, a job is marked `succeeded` only after those translations finish and the cache is written. Translation failures make the job `failed`, so Retry can rerun it.
+- This reintroduces waiting inside the ASR worker during translation by design, matching the UI requirement that `succeeded` means ASR plus translation are ready.
+
 - [ ] Current work: reduce demo ASR worker default to GPUs 6/7 with two workers per GPU.
 - [ ] Current work: restart 10086 demo/API workers without touching Hunyuan-MT on GPU 5.
 - [ ] Current work: verify service health and queue state after restart.

@@ -2,6 +2,13 @@
 
 Current state:
 
+- Translation defaults are being switched to `Tencent-Hunyuan/HY-MT1.5-1.8B-FP8`.
+  The Hunyuan startup script discovers the newest local HuggingFace snapshot for
+  that model unless `HUNYUAN_MT_MODEL_PATH` is set. Default translation
+  concurrency is raised to 4 and demo translation batch size to 16. Job success
+  now waits for configured auto translation to finish; translation failure
+  marks the job failed, so `succeeded` means ASR plus cached translation are
+  ready for the UI.
 - Failed/canceled demo jobs can be retried through
   `POST /v1/jobs/{job_id}/retry`; failed rows show compact Error/Retry buttons
   instead of dumping long traceback text into the Jobs table. Auto translation

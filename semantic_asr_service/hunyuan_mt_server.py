@@ -120,7 +120,7 @@ def main() -> None:
     parser.add_argument("--served-model-name", default="hunyuan-mt")
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=10087)
-    parser.add_argument("--max-concurrent", type=int, default=int(os.environ.get("HUNYUAN_MT_MAX_CONCURRENT", "1")))
+    parser.add_argument("--max-concurrent", type=int, default=int(os.environ.get("HUNYUAN_MT_MAX_CONCURRENT", "4")))
     args = parser.parse_args()
 
     model_path = args.model_path

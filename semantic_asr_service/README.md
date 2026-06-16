@@ -27,8 +27,8 @@ export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
 export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
 export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
 export SEMANTIC_ASR_AUTO_TRANSLATE_TARGETS=zh_cn
-export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=8
-export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=1
+export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16
+export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=4
 export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
 export SEMANTIC_ASR_DEMO_USER_HEADER=1
 export SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7
@@ -179,11 +179,11 @@ The Review panel defaults to bilingual display and tries to load the cached
 Text/Target/Translate controls. `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` controls
 how many sentences are processed per window, while
 `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY` controls how many requests may hit
-the translation service at the same time. Keep this low for a single
-transformers model server; too much concurrency can leave old `generate()`
-requests queued and make later translations appear stuck. `json_batch` remains
-available for programmatic translation requests, but the demo now relies on the
-precomputed cache.
+the translation service at the same time. The default is `4` for the smaller
+`HY-MT1.5-1.8B-FP8` model. If latency gets worse or GPU memory becomes tight,
+lower it with the environment variable. `json_batch` remains available for
+programmatic translation requests, but the demo now relies on the precomputed
+cache.
 
 `systemd` and `supervisor` are process managers. They are useful when this
 service should survive SSH logout, machine reboot, or crashes. The startup
@@ -191,10 +191,10 @@ script is simpler and better for experiments; a production deployment should
 wrap the same API/worker commands in `systemd` units or a `supervisord`
 program group.
 
-Example Hunyuan-MT-7B-fp8 OpenAI-compatible service:
+Example HY-MT1.5-1.8B-FP8 OpenAI-compatible service:
 
 ```bash
-export MODEL_PATH=/path/to/Hunyuan-MT-7B-fp8
+export MODEL_PATH=/path/to/HY-MT1.5-1.8B-FP8
 CUDA_VISIBLE_DEVICES=5 python -m vllm.entrypoints.openai.api_server \
   --host 0.0.0.0 \
   --port 10087 \
@@ -205,7 +205,9 @@ CUDA_VISIBLE_DEVICES=5 python -m vllm.entrypoints.openai.api_server \
 ```
 
 On this machine, vLLM is not installed in the ASR environment. A minimal
-transformers-based OpenAI-compatible wrapper is available instead:
+transformers-based OpenAI-compatible wrapper is available instead. It defaults
+to `Tencent-Hunyuan/HY-MT1.5-1.8B-FP8`, GPU `5`, and server-side
+`HUNYUAN_MT_MAX_CONCURRENT=4`:
 
 ```bash
 scripts/start_hunyuan_mt_service.sh
