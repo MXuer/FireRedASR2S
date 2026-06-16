@@ -1,9 +1,32 @@
 from dataclasses import dataclass, field
+from typing import Any, Sequence
 
 from semantic_asr.firered_runtime.fireredasr2 import FireRedAsr2, FireRedAsr2Config
 from semantic_asr.firered_runtime.fireredpunc import FireRedPunc, FireRedPuncConfig
 from semantic_asr.firered_runtime.fireredvad import FireRedVad, FireRedVadConfig
-from semantic_asr.core import PipelineConfig, SemanticAsrPipeline
+from semantic_asr.core import PipelineConfig, SemanticAsrPipeline, SpeechSegment
+
+
+@dataclass
+class FireRedAsrAdapterConfig:
+    asr_type: str = "aed"
+    model_dir: str = "pretrained_models/FireRedASR2-AED"
+    return_timestamp: bool = True
+    config: FireRedAsr2Config = field(default_factory=FireRedAsr2Config)
+
+
+class FireRedAsrAdapter:
+    def __init__(self, config: FireRedAsrAdapterConfig | None = None):
+        self.config = config or FireRedAsrAdapterConfig()
+        self.config.config.return_timestamp = self.config.return_timestamp
+        self.model = FireRedAsr2.from_pretrained(
+            self.config.asr_type,
+            self.config.model_dir,
+            self.config.config,
+        )
+
+    def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
+        return self.model.transcribe(batch_uttid, batch_wav)
 
 
 @dataclass
@@ -19,11 +42,15 @@ class FireRedPipelineConfig:
 
 
 class AsrTimestampProvider:
-    def add_timestamps(self, batch_asr_result: list[dict], batch_segments: list) -> list[dict]:
+    def add_timestamps(
+        self,
+        batch_asr_result: Sequence[dict],
+        batch_segments: Sequence[SpeechSegment],
+    ) -> list[dict]:
         for asr_result in batch_asr_result:
             if not asr_result.get("timestamp"):
                 raise ValueError(f"FireRed ASR must return timestamp for {asr_result.get('uttid')}")
-        return batch_asr_result
+        return list(batch_asr_result)
 
 
 def build_firered_pipeline(config: FireRedPipelineConfig) -> SemanticAsrPipeline:

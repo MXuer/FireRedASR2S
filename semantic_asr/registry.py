@@ -47,11 +47,13 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("vad", "firered_vad", _build_firered_vad)
     registry.register("vad", "ten_vad", _build_ten_vad)
     registry.register("asr", "funasr_nano", _build_funasr_nano)
+    registry.register("asr", "firered_asr", _build_firered_asr)
     registry.register("asr", "whisper_large", _build_whisper_large)
     registry.register("asr", "qwen3_asr_1_7b", _build_qwen3_asr)
     registry.register("asr", "dolphin", _build_dolphin)
     registry.register("asr", "seamless_m4t_v2_large", _build_seamless_m4t)
     registry.register("timestamp", "funasr_native", _build_funasr_native_timestamp)
+    registry.register("timestamp", "firered_asr_native", _build_firered_asr_native_timestamp)
     registry.register("timestamp", "whisper_native", _build_whisper_native_timestamp)
     registry.register("timestamp", "qwen3_forced_aligner", _build_qwen3_forced_aligner)
     registry.register("timestamp", "mms_forced_aligner", _build_mms_forced_aligner)
@@ -92,6 +94,25 @@ def _build_funasr_nano(params: Mapping[str, Any]) -> AsrModel:
     return FunAsrNano(_dataclass_from_mapping(FunAsrNanoConfig, params))
 
 
+def _build_firered_asr(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.firered import FireRedAsrAdapter, FireRedAsrAdapterConfig
+    from semantic_asr.firered_runtime.fireredasr2 import FireRedAsr2Config
+
+    params = dict(params)
+    native_config_params = _nested_or_direct_config(params, FireRedAsr2Config, wrappers={
+        "asr_type",
+        "model_dir",
+        "return_timestamp",
+    })
+    adapter_config = FireRedAsrAdapterConfig(
+        asr_type=str(params.get("asr_type", "aed")),
+        model_dir=str(params.get("model_dir", "pretrained_models/FireRedASR2-AED")),
+        return_timestamp=bool(params.get("return_timestamp", True)),
+        config=_dataclass_from_mapping(FireRedAsr2Config, native_config_params),
+    )
+    return FireRedAsrAdapter(adapter_config)
+
+
 def _build_whisper_large(params: Mapping[str, Any]) -> AsrModel:
     from semantic_asr.adapters.whisper_large import WhisperLarge, WhisperLargeConfig
     from semantic_asr.parallel_components import ParallelAsrModel
@@ -124,6 +145,14 @@ def _build_funasr_native_timestamp(params: Mapping[str, Any]) -> TimestampProvid
     from semantic_asr.adapters.funasr_nano import FunAsrNanoTimestampProvider
 
     return FunAsrNanoTimestampProvider()
+
+
+def _build_firered_asr_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
+    from semantic_asr.adapters.firered import AsrTimestampProvider
+
+    if params:
+        raise ValueError("firered_asr_native timestamp provider does not accept params")
+    return AsrTimestampProvider()
 
 
 def _build_whisper_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
@@ -217,10 +246,15 @@ def _dataclass_from_mapping(cls, values: Mapping[str, Any]):
     return cls(**kwargs)
 
 
-def _nested_or_direct_config(params: Mapping[str, Any], config_cls) -> dict:
+def _nested_or_direct_config(
+    params: Mapping[str, Any],
+    config_cls,
+    wrappers: set[str] | None = None,
+) -> dict:
     values = dict(params.get("config", {}))
     config_fields = {field.name for field in fields(config_cls)}
-    direct_unknown = sorted(set(params) - {"model_dir", "config"} - config_fields)
+    allowed_wrappers = {"model_dir", "config"} | (wrappers or set())
+    direct_unknown = sorted(set(params) - allowed_wrappers - config_fields)
     if direct_unknown:
         raise ValueError(f"Unknown fields for {config_cls.__name__}: {', '.join(direct_unknown)}")
     for key, value in params.items():

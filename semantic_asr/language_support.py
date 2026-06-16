@@ -56,6 +56,15 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="asr",
+        name="firered_asr",
+        languages=("zh",),
+        aliases={"zh": ("chinese", "zh-cn", "cn")},
+        notes="FireRedASR2 AED Chinese ASR. Configure return_timestamp=true when using firered_asr_native.",
+        has_native_timestamps=True,
+        supports_batch=True,
+    ),
+    ModelLanguageSupport(
+        role="asr",
         name="whisper_large",
         languages=(
             "af", "am", "ar", "as", "az", "ba", "be", "bg", "bn", "bo", "br",
@@ -159,6 +168,13 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
             "zh": ("chinese", "zh-cn", "cn"),
         },
         notes="Validates Fun-ASR-Nano native token timestamps.",
+    ),
+    ModelLanguageSupport(
+        role="timestamp",
+        name="firered_asr_native",
+        languages=("zh",),
+        aliases={"zh": ("chinese", "zh-cn", "cn")},
+        notes="Validates FireRedASR2 native token timestamps when return_timestamp=true.",
     ),
     ModelLanguageSupport(
         role="timestamp",

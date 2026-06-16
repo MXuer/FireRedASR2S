@@ -61,6 +61,7 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("qwen3_asr_1_7b", names)
         self.assertIn("dolphin", names)
         self.assertIn("seamless_m4t_v2_large", names)
+        self.assertIn("firered_asr", names)
 
     def test_ten_vad_is_registered(self):
         registry = create_default_registry()
@@ -101,6 +102,22 @@ class LanguageSupportTest(unittest.TestCase):
 
         self.assertIn("mms_forced_aligner", names)
         self.assertIn("mms_forced_aligner", {item["name"] for item in zh_result["timestamp"]})
+
+    def test_firered_asr_and_native_timestamp_are_chinese_components(self):
+        registry = create_default_registry()
+        asr_names = set(registry.names("asr"))
+        timestamp_names = set(registry.names("timestamp"))
+        zh_asr = list_models_by_language("zh_cn", role="asr")
+        zh_timestamp = list_models_by_language("zh_cn", role="timestamp")
+        en_asr = list_models_by_language("en_us", role="asr")
+        en_timestamp = list_models_by_language("en_us", role="timestamp")
+
+        self.assertIn("firered_asr", asr_names)
+        self.assertIn("firered_asr_native", timestamp_names)
+        self.assertIn("firered_asr", {item["name"] for item in zh_asr["asr"]})
+        self.assertIn("firered_asr_native", {item["name"] for item in zh_timestamp["timestamp"]})
+        self.assertNotIn("firered_asr", {item["name"] for item in en_asr["asr"]})
+        self.assertNotIn("firered_asr_native", {item["name"] for item in en_timestamp["timestamp"]})
 
     def test_xlm_roberta_punctuation_supports_full_language_list(self):
         zh_result = list_models_by_language("zh_cn", role="punc")

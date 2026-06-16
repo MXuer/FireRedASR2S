@@ -2,12 +2,14 @@ import json
 import os
 import tempfile
 import unittest
+from unittest import mock
 
 import numpy as np
 import soundfile as sf
 
 from semantic_asr.config import build_pipeline_from_profile, parse_pipeline_profile
 from semantic_asr.registry import ComponentRegistry
+from semantic_asr.registry import create_default_registry
 from semantic_asr.run_pipeline import run_from_config
 
 
@@ -156,6 +158,48 @@ class ConfigRunnerTest(unittest.TestCase):
 
         self.assertEqual(captured["asr"]["language"], "zh_cn")
         self.assertEqual(captured["timestamp"]["language"], "zh_cn")
+
+    def test_firered_asr_registry_builds_with_native_timestamps_enabled(self):
+        registry = create_default_registry()
+        fake_model = mock.Mock()
+        fake_model.transcribe.return_value = [
+            {
+                "uttid": "utt",
+                "text": "你好",
+                "timestamp": [["你", 0.0, 0.1], ["好", 0.1, 0.2]],
+            }
+        ]
+
+        with mock.patch("semantic_asr.adapters.firered.FireRedAsr2.from_pretrained", return_value=fake_model) as build:
+            asr = registry.build(
+                "asr",
+                "firered_asr",
+                {
+                    "asr_type": "aed",
+                    "model_dir": "mock_firered",
+                    "beam_size": 5,
+                },
+            )
+
+        args = build.call_args.args
+        self.assertEqual(args[0], "aed")
+        self.assertEqual(args[1], "mock_firered")
+        self.assertEqual(args[2].beam_size, 5)
+        self.assertTrue(args[2].return_timestamp)
+        self.assertEqual(asr.transcribe(["utt"], [(16000, np.zeros(1600, dtype=np.int16))])[0]["text"], "你好")
+
+    def test_firered_asr_native_timestamp_provider_validates_timestamps(self):
+        registry = create_default_registry()
+        provider = registry.build("timestamp", "firered_asr_native")
+
+        result = provider.add_timestamps(
+            [{"uttid": "utt", "timestamp": [["你", 0.0, 0.1]]}],
+            [],
+        )
+
+        self.assertEqual(result[0]["timestamp"], [["你", 0.0, 0.1]])
+        with self.assertRaisesRegex(ValueError, "FireRed ASR must return timestamp"):
+            provider.add_timestamps([{"uttid": "utt", "text": "你好"}], [])
 
     def test_runner_writes_json_jsonl_and_resolved_config(self):
         with tempfile.TemporaryDirectory() as tmpdir:

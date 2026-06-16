@@ -2,6 +2,12 @@
 
 Current state:
 
+- FireRedASR2 is now available as composable components:
+  `firered_asr` for ASR and `firered_asr_native` for native timestamp
+  validation/pass-through. The ASR component defaults to the AED Chinese model
+  path `pretrained_models/FireRedASR2-AED` with `return_timestamp=true`.
+  Language support metadata marks both as Chinese (`zh`) components, and
+  `docs/models/firered_asr.md` documents the config fragment.
 - Translation now uses `tencent/HY-MT1.5-1.8B-FP8` by default. The Hunyuan
   startup script discovers the newest local HuggingFace snapshot unless
   `HUNYUAN_MT_MODEL_PATH` is set, supports `HUNYUAN_MT_PORTS` for multiple

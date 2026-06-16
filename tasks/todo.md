@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: register FireRedASR as an ASR component named `firered_asr`.
+- [x] Current work: register FireRedASR native timestamps as a timestamp component named `firered_asr_native`.
+- [x] Current work: add language-support metadata and unit tests for FireRedASR ASR/timestamp discovery.
+- [x] Current work: validate registry/config parsing without loading model checkpoints.
+
+Review:
+- Added `FireRedAsrAdapter` and `FireRedAsrAdapterConfig` in `semantic_asr/adapters/firered.py`.
+- Registered `firered_asr` under ASR and `firered_asr_native` under timestamp in the default component registry.
+- `firered_asr` defaults to `asr_type=aed`, `model_dir=pretrained_models/FireRedASR2-AED`, and `return_timestamp=true`.
+- Added language metadata marking FireRedASR2 and its native timestamps as Chinese (`zh`) components.
+- Added `docs/models/firered_asr.md` with config fragments and dependency notes.
+- Validation passed: targeted language/config tests, query-model CLI checks, `compileall`, `git diff --check`, and full unittest discovery with 181 tests.
+
 - [x] Current work: add a reusable translation backfill command for succeeded jobs missing cached translations.
 - [x] Current work: document the HY-MT1.5 backfill flow and keep the service docs aligned with the current startup scripts.
 - [x] Current work: validate the backfill code with unit tests and syntax checks.
