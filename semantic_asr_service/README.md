@@ -26,7 +26,8 @@ export SEMANTIC_ASR_SERVICE_PORT=10086
 export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
 export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
 export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
-export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=32
+export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=8
+export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=1
 export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
 export SEMANTIC_ASR_DEMO_USER_HEADER=1
 ```
@@ -167,10 +168,14 @@ does not change sentence timestamps or waveform intervals.
 The demo calls `POST /v1/jobs/{job_id}/translations/stream` and updates the
 segment list as each translated sentence arrives. The default startup script
 uses `SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single`, which sends one
-sentence per request while dispatching up to
-`SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` requests concurrently. `json_batch` is
-still available for a single structured JSON request containing multiple
-sentences, but it cannot stream sentence-by-sentence UI updates.
+sentence per request. `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` controls how many
+sentences are processed per window, while
+`SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY` controls how many requests may hit
+the translation service at the same time. Keep this low for a single
+transformers model server; too much concurrency can leave old `generate()`
+requests queued and make later translations appear stuck. `json_batch` is still
+available for a single structured JSON request containing multiple sentences,
+but it cannot stream sentence-by-sentence UI updates.
 
 `systemd` and `supervisor` are process managers. They are useful when this
 service should survive SSH logout, machine reboot, or crashes. The startup

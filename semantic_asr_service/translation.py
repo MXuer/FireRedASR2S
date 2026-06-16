@@ -103,6 +103,7 @@ def translate_job_result(
         source["target_name"],
         max(1, int(settings.translation_batch_size)),
         settings.translation_request_mode,
+        max(1, int(settings.translation_max_concurrency)),
     )
     return _write_translation_payload(job, settings, target_language, source, translated_sentences)
 
@@ -125,6 +126,7 @@ def stream_translate_job_result(
     translator = translator or HunyuanMTClient.from_settings(settings)
     translated_by_index = {}
     batch_size = max(1, int(settings.translation_batch_size))
+    max_concurrency = max(1, int(settings.translation_max_concurrency))
     for start in range(0, len(source["sentences"]), batch_size):
         batch = source["sentences"][start:start + batch_size]
         for sentence in _stream_translate_concurrent_single(
@@ -132,6 +134,7 @@ def stream_translate_job_result(
             translator,
             source["source_name"],
             source["target_name"],
+            max_concurrency,
         ):
             translated_by_index[int(sentence["index"])] = sentence
             yield {"type": "sentence", "sentence": sentence}
@@ -156,12 +159,19 @@ def translate_sentences_batched(
     target_language: str,
     batch_size: int = 16,
     request_mode: str = "json_batch",
+    max_concurrency: int = 1,
 ) -> list[dict]:
     translated = []
     for start in range(0, len(sentences), batch_size):
         batch = sentences[start:start + batch_size]
         if request_mode == "concurrent_single":
-            batch_translations = _translate_concurrent_single(batch, translator, source_language, target_language)
+            batch_translations = _translate_concurrent_single(
+                batch,
+                translator,
+                source_language,
+                target_language,
+                max_concurrency,
+            )
         else:
             try:
                 batch_translations = _translate_batch(batch, translator, source_language, target_language)
@@ -179,13 +189,15 @@ def _stream_translate_concurrent_single(
     translator: Translator,
     source_language: str,
     target_language: str,
+    max_concurrency: int = 1,
 ):
     if len(batch) <= 1:
         for sentence, translation in zip(batch, _translate_one_by_one(batch, translator, source_language, target_language)):
             yield dict(sentence, translation=translation)
         return
     try:
-        with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+        max_workers = max(1, min(int(max_concurrency), len(batch)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {
                 executor.submit(_translate_sentence, sentence, translator, source_language, target_language): sentence
                 for sentence in batch
@@ -203,11 +215,13 @@ def _translate_concurrent_single(
     translator: Translator,
     source_language: str,
     target_language: str,
+    max_concurrency: int = 1,
 ) -> list[str]:
     if len(batch) <= 1:
         return _translate_one_by_one(batch, translator, source_language, target_language)
     try:
-        with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+        max_workers = max(1, min(int(max_concurrency), len(batch)))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(_translate_sentence, sentence, translator, source_language, target_language)
                 for sentence in batch

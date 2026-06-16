@@ -2,6 +2,17 @@
 
 Current state:
 
+- Hunyuan-MT translation slowness was traced to over-concurrency against a
+  single local transformers model server: the demo default sent up to 32
+  one-sentence requests at once, and the Hunyuan server did not serialize
+  `model.generate()` calls. A tiny direct request to `10087` timed out at 30s
+  while the old service was wedged. The client now has
+  `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY` separate from batch size, the demo
+  defaults to batch size 8 and max concurrency 1, and the Hunyuan-MT server has
+  a `--max-concurrent` generation semaphore. Restarting only `10087` with
+  `--max-concurrent 1` restored a tiny request to about 3s. The running `10086`
+  demo API still needs a restart to load the client-side concurrency window;
+  the server-side semaphore is already active on `10087`.
 - The web demo job panel now matches the upload panel height, scrolls the table
   inside the panel, and provides `Language / Profile` plus `PM / Username`
   filters. `GET /v1/jobs` supports optional `config` and `user_id` filters

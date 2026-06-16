@@ -2,6 +2,8 @@ import io
 import json
 import os
 import re
+import threading
+import time
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -477,6 +479,23 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(translator.calls, 0)
         self.assertEqual(translator.fallback_calls, 2)
 
+    def test_concurrent_single_mode_respects_max_concurrency(self):
+        sentences = [{"index": index, "text": f"text {index}"} for index in range(4)]
+        translator = self.CountingTranslator()
+
+        translated = translate_sentences_batched(
+            sentences,
+            translator,
+            "English",
+            "Chinese",
+            batch_size=4,
+            request_mode="concurrent_single",
+            max_concurrency=2,
+        )
+
+        self.assertEqual([item["translation"] for item in translated], [f"Chinese::text {index}" for index in range(4)])
+        self.assertLessEqual(translator.max_active, 2)
+
     def test_stream_translate_job_result_yields_sentences_and_writes_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = self._settings(tmpdir)
@@ -599,6 +618,24 @@ class SemanticAsrServiceTest(unittest.TestCase):
         def complete(self, _prompt: str) -> str:
             self.batch_calls += 1
             return "not json"
+
+    class CountingTranslator:
+        def __init__(self):
+            self.active = 0
+            self.max_active = 0
+            self.lock = threading.Lock()
+
+        def translate(self, text: str, _source_language: str, target_language: str) -> str:
+            with self.lock:
+                self.active += 1
+                self.max_active = max(self.max_active, self.active)
+            time.sleep(0.01)
+            with self.lock:
+                self.active -= 1
+            return f"{target_language}::{text}"
+
+        def complete(self, _prompt: str) -> str:
+            raise AssertionError("concurrent_single should not call complete()")
 
     @staticmethod
     def _write_wav(tmpdir: str, samples: int = 160) -> str:

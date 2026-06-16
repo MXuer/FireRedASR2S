@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: diagnose why Hunyuan-MT translation streams only produce one sentence every few minutes.
+- [x] Current work: check whether old/in-flight translation requests or server-side serialization are blocking new requests.
+- [x] Current work: propose or implement the minimal fix after identifying the bottleneck.
+
+Review:
+- Root cause: the demo used `concurrent_single` with `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=32`, which meant up to 32 one-sentence requests were sent to one local transformers Hunyuan-MT model server at once.
+- The Hunyuan-MT server previously had no generation semaphore, so concurrent `model.generate()` calls could occupy/queue the single model for a long time. A direct tiny request to `10087` timed out after 30s while the old server was wedged.
+- Added `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY` and changed the client to use it as the true concurrent request window, separate from batch size.
+- Added a Hunyuan-MT server-side generation semaphore (`--max-concurrent`, default/env `HUNYUAN_MT_MAX_CONCURRENT=1`) so the model is not hammered by parallel generate calls.
+- Demo startup now defaults to `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=8` and `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=1`.
+- Restarted only the Hunyuan-MT service on `127.0.0.1:10087` with `--max-concurrent 1`; the same tiny request then returned in about 3s.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, `git diff --check`, and direct Hunyuan-MT latency smoke.
+
 - [x] Current work: add language/profile and PM username filters to the demo job list.
 - [x] Current work: keep hidden internal smoke jobs out of filtered job results.
 - [x] Current work: validate service tests, restart/check the demo, and commit.
