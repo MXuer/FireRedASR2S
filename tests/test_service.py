@@ -667,6 +667,37 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(second["sentences"][0]["translation"], "Chinese::감회가 새롭습니다.")
         self.assertEqual(translator.calls, 1)
 
+    def test_translate_job_result_skips_chinese_to_chinese_model_call(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            job = store.create_job(
+                "job1",
+                "alice",
+                "hakka",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+            store.mark_succeeded("job1")
+            job = store.get_job("job1")
+            os.makedirs(job["outdir"], exist_ok=True)
+            with open(os.path.join(job["outdir"], "job1.json"), "w", encoding="utf-8") as fout:
+                json.dump({
+                    "sentences": [
+                        {"start_ms": 100, "end_ms": 300, "text": "涯唔晓你讲的什么。"}
+                    ]
+                }, fout)
+
+            translator = self.FakeTranslator()
+            result = translate_job_result(job, settings, "zh_cn", translator=translator)
+
+        self.assertEqual(result["model"], "identity")
+        self.assertTrue(result["skipped"])
+        self.assertEqual(result["sentences"][0]["translation"], "涯唔晓你讲的什么。")
+        self.assertEqual(translator.calls, 0)
+
     def test_backfill_translations_finds_succeeded_jobs_missing_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = self._settings(tmpdir)
@@ -828,6 +859,32 @@ class SemanticAsrServiceTest(unittest.TestCase):
             self.assertEqual(len(sentence_events), 2)
             self.assertEqual(events[-1]["type"], "done")
             self.assertTrue(os.path.exists(translation_cache_path(job["outdir"], "zh_cn")))
+
+    def test_stream_translate_job_result_skips_chinese_to_chinese_model_call(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            job = store.create_job(
+                "job1",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+            store.mark_succeeded("job1")
+            job = store.get_job("job1")
+            os.makedirs(job["outdir"], exist_ok=True)
+            with open(os.path.join(job["outdir"], "job1.json"), "w", encoding="utf-8") as fout:
+                json.dump({"sentences": [{"start_ms": 0, "end_ms": 100, "text": "你好。"}]}, fout)
+
+            translator = self.FakeTranslator()
+            events = list(stream_translate_job_result(job, settings, "zh_cn", translator=translator))
+
+        self.assertEqual(events[0]["sentence"]["translation"], "你好。")
+        self.assertTrue(events[-1]["payload"]["skipped"])
+        self.assertEqual(translator.calls, 0)
 
     def test_translate_job_result_rejects_disallowed_target(self):
         settings = self._settings(tempfile.mkdtemp())

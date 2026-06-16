@@ -2,6 +2,10 @@
 
 Current state:
 
+- Translation skips Hunyuan-MT for Chinese-source to Chinese-target jobs
+  (`zh_cn`, `zh`, `hakka`, etc. -> `zh_cn`). The service writes an identity
+  translation cache with `model="identity"` and `skipped=true` so the web UI
+  can still load the expected bilingual sidecar without using GPU.
 - The web demo freezes the selected Language/Profile and output formats at the
   start of a multi-file upload. Changing the dropdown while files are still
   being submitted no longer affects later files in that same upload batch; the

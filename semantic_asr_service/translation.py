@@ -108,6 +108,16 @@ def translate_job_result(
     cached = _read_valid_cache(cache_path, source["source_hash"])
     if cached:
         return cached
+    if _should_skip_translation(source["source_language"], target_language):
+        return _write_translation_payload(
+            job,
+            settings,
+            target_language,
+            source,
+            _identity_translations(source["sentences"]),
+            model="identity",
+            skipped=True,
+        )
 
     translator = translator or HunyuanMTClient.from_settings(settings)
     translated_sentences = translate_sentences_batched(
@@ -135,6 +145,21 @@ def stream_translate_job_result(
         for sentence in cached.get("sentences") or []:
             yield {"type": "sentence", "sentence": sentence, "cached": True}
         yield {"type": "done", "payload": cached, "cached": True}
+        return
+    if _should_skip_translation(source["source_language"], target_language):
+        translated_sentences = _identity_translations(source["sentences"])
+        for sentence in translated_sentences:
+            yield {"type": "sentence", "sentence": sentence, "cached": False}
+        payload = _write_translation_payload(
+            job,
+            settings,
+            target_language,
+            source,
+            translated_sentences,
+            model="identity",
+            skipped=True,
+        )
+        yield {"type": "done", "payload": payload}
         return
 
     translator = translator or HunyuanMTClient.from_settings(settings)
@@ -398,6 +423,8 @@ def _write_translation_payload(
     target_language: str,
     source: dict,
     translated_sentences: list[dict],
+    model: str | None = None,
+    skipped: bool = False,
 ) -> dict:
     payload = {
         "job_id": job["job_id"],
@@ -405,7 +432,8 @@ def _write_translation_payload(
         "target_language": target_language,
         "target_language_name": source["target_name"],
         "status": "succeeded",
-        "model": settings.translation_model,
+        "model": model or settings.translation_model,
+        "skipped": skipped,
         "source_signature": source["source_hash"],
         "sentences": translated_sentences,
     }
@@ -424,3 +452,21 @@ def _read_valid_cache(path: str, source_signature: dict) -> dict | None:
     if cached.get("source_signature") == source_signature:
         return cached
     return None
+
+
+def _should_skip_translation(source_language: str, target_language: str) -> bool:
+    return _is_chinese_source(source_language) and _is_chinese_target(target_language)
+
+
+def _is_chinese_source(language: str) -> bool:
+    normalized = language.strip().lower().replace("-", "_")
+    return normalized in {"zh", "zh_cn", "zh_hans", "zh_hant", "cmn", "hakka"}
+
+
+def _is_chinese_target(language: str) -> bool:
+    normalized = language.strip().lower().replace("-", "_")
+    return normalized in {"zh", "zh_cn", "zh_hans", "zh_hant", "cmn"}
+
+
+def _identity_translations(sentences: list[dict]) -> list[dict]:
+    return [dict(sentence, translation=sentence.get("text", "")) for sentence in sentences]

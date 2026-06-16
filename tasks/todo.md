@@ -1,5 +1,15 @@
 # Todo
 
+- [x] Current work: skip Hunyuan translation calls for Chinese-source to Chinese-target jobs.
+- [x] Current work: write identity translation cache for skipped Chinese jobs so the UI can still load bilingual data.
+- [x] Current work: validate sync and streaming translation paths.
+
+Review:
+- `translate_job_result()` and `stream_translate_job_result()` now skip Hunyuan calls when the source profile is Chinese (`zh_cn`, `zh`, `hakka`, etc.) and the target is Chinese.
+- Skipped translations write an identity cache with `model="identity"` and `skipped=true`, preserving the UI cache/display path without spending GPU.
+- Added tests for both synchronous and streaming Chinese-to-Chinese translation skip behavior.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service/translation.py tests/test_service.py`, and `git diff --check`.
+
 - [x] Current work: freeze the selected Language/Profile at the start of a multi-file upload.
 - [x] Current work: disable profile/format controls while the upload batch is being submitted.
 - [x] Current work: add demo smoke assertions and validate service tests.
