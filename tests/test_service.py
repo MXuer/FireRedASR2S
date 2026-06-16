@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import re
 import tempfile
 import unittest
 from types import SimpleNamespace
@@ -23,7 +24,11 @@ from semantic_asr_service.app import (
 from semantic_asr_service.artifacts import artifact_path
 from semantic_asr_service.settings import ServiceSettings, _parse_api_keys, load_settings
 from semantic_asr_service.store import JobStore
-from semantic_asr_service.translation import translate_job_result, translation_cache_path
+from semantic_asr_service.translation import (
+    translate_job_result,
+    translate_sentences_batched,
+    translation_cache_path,
+)
 from semantic_asr_service.worker import run_worker_once
 
 
@@ -284,6 +289,32 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(second["sentences"][0]["translation"], "Chinese::감회가 새롭습니다.")
         self.assertEqual(translator.calls, 1)
 
+    def test_translate_sentences_batched_accepts_structured_batch_output(self):
+        sentences = [
+            {"index": 3, "text": "Hallo Welt."},
+            {"index": 4, "text": "Guten Morgen."},
+        ]
+        translator = self.FakeTranslator()
+
+        translated = translate_sentences_batched(sentences, translator, "German", "Chinese", batch_size=16)
+
+        self.assertEqual([item["translation"] for item in translated], ["Chinese::Hallo Welt.", "Chinese::Guten Morgen."])
+        self.assertEqual(translator.calls, 1)
+        self.assertEqual(translator.fallback_calls, 0)
+
+    def test_translate_sentences_batched_falls_back_on_malformed_batch_output(self):
+        sentences = [
+            {"index": 1, "text": "مرحبا"},
+            {"index": 2, "text": "كيف الحال؟"},
+        ]
+        translator = self.BadBatchTranslator()
+
+        translated = translate_sentences_batched(sentences, translator, "Arabic", "Chinese", batch_size=16)
+
+        self.assertEqual([item["translation"] for item in translated], ["Chinese::مرحبا", "Chinese::كيف الحال؟"])
+        self.assertEqual(translator.batch_calls, 1)
+        self.assertEqual(translator.fallback_calls, 2)
+
     def test_translate_job_result_rejects_disallowed_target(self):
         settings = self._settings(tempfile.mkdtemp())
         settings.translation_targets = {"zh_cn"}
@@ -344,10 +375,36 @@ class SemanticAsrServiceTest(unittest.TestCase):
     class FakeTranslator:
         def __init__(self):
             self.calls = 0
+            self.fallback_calls = 0
 
         def translate(self, text: str, _source_language: str, target_language: str) -> str:
-            self.calls += 1
+            self.fallback_calls += 1
             return f"{target_language}::{text}"
+
+        def complete(self, prompt: str) -> str:
+            self.calls += 1
+            match = re.search(r"\[[\s\S]*\]", prompt)
+            if not match:
+                return "[]"
+            items = json.loads(match.group(0))
+            translated = [
+                {"index": int(item["index"]), "translation": f"Chinese::{item['text']}"}
+                for item in items
+            ]
+            return json.dumps(translated, ensure_ascii=False)
+
+    class BadBatchTranslator:
+        def __init__(self):
+            self.batch_calls = 0
+            self.fallback_calls = 0
+
+        def translate(self, text: str, _source_language: str, target_language: str) -> str:
+            self.fallback_calls += 1
+            return f"{target_language}::{text}"
+
+        def complete(self, _prompt: str) -> str:
+            self.batch_calls += 1
+            return "not json"
 
     @staticmethod
     def _write_wav(tmpdir: str, samples: int = 160) -> str:

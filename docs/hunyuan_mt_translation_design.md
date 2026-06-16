@@ -113,31 +113,42 @@ Smoke result:
   - `감회가 새롭습니다.` -> `再次重温这些往事，心中依然充满了感慨。`
   - `오늘은 날씨가 좋습니다.` -> `今天天气很好。`
 
-The long Korean demo job was too slow with the current synchronous
-sentence-by-sentence translation endpoint. The next backend iteration should
-make translation asynchronous or add progress/batching before translating
-entire long recordings interactively.
+The first long Korean demo job was too slow with the synchronous
+sentence-by-sentence translation path. The current service translates completed
+ASR sentences in configurable batches and keeps per-batch fallback to
+sentence-by-sentence translation when the model output is malformed.
 
 ## Prompt Policy
 
-Use one sentence per request for v1. It is slower than batched JSON prompting,
-but it preserves the sentence-to-translation mapping and avoids malformed JSON
-from LLM output.
+Use batched JSON prompting for completed ASR results. Each request contains up
+to `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` sentence records:
 
-For Chinese as target or source:
-
-```text
-把下面的文本翻译成<target_language>，不要额外解释。
-
-<source_text>
+```json
+[
+  {"index": 0, "text": "감회가 새롭습니다."},
+  {"index": 1, "text": "오늘은 날씨가 좋습니다."}
+]
 ```
 
-For non-Chinese to non-Chinese:
+The model must return only a JSON array with the same `index` values and one
+`translation` field per item. The client validates the returned indexes before
+accepting the batch. If parsing or validation fails, only that batch falls back
+to one-sentence-at-a-time translation.
+
+For Chinese as target or source, the batch prompt shape is:
 
 ```text
-Translate the following segment into <target_language>, without additional explanation.
+把下面 JSON 数组中的 text 翻译成<target_language>，不要额外解释。只返回 JSON 数组，每一项包含 index 和 translation，index 必须保持不变。
 
-<source_text>
+<source_json_array>
+```
+
+For non-Chinese to non-Chinese, the batch prompt shape is:
+
+```text
+Translate each text field in the following JSON array into <target_language>. Return only a JSON array. Each item must contain index and translation, and index must remain unchanged.
+
+<source_json_array>
 ```
 
 Use deterministic-ish settings for review consistency, even if official

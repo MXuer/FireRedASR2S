@@ -30,6 +30,9 @@ class Translator(Protocol):
     def translate(self, text: str, source_language: str, target_language: str) -> str:
         ...
 
+    def complete(self, prompt: str) -> str:
+        ...
+
 
 @dataclass
 class HunyuanMTClient:
@@ -52,6 +55,9 @@ class HunyuanMTClient:
 
     def translate(self, text: str, source_language: str, target_language: str) -> str:
         prompt = build_translation_prompt(text, source_language, target_language)
+        return self.complete(prompt)
+
+    def complete(self, prompt: str) -> str:
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
@@ -102,19 +108,23 @@ def translate_job_result(
     source_name = language_prompt_name(source_language)
     target_name = language_prompt_name(target_language)
     translator = translator or HunyuanMTClient.from_settings(settings)
-    translated_sentences = []
+    source_sentences = []
     for index, sentence in enumerate(result.get("sentences") or []):
-        text = str(sentence.get("text") or "").strip()
-        translation = translator.translate(text, source_name, target_name) if text else ""
-        translated_sentences.append({
+        source_sentences.append({
             "index": index,
             "start_ms": sentence.get("start_ms"),
             "end_ms": sentence.get("end_ms"),
             "cut_start_ms": sentence.get("cut_start_ms", sentence.get("start_ms")),
             "cut_end_ms": sentence.get("cut_end_ms", sentence.get("end_ms")),
-            "text": text,
-            "translation": translation,
+            "text": str(sentence.get("text") or "").strip(),
         })
+    translated_sentences = translate_sentences_batched(
+        source_sentences,
+        translator,
+        source_name,
+        target_name,
+        max(1, int(settings.translation_batch_size)),
+    )
 
     payload = {
         "job_id": job["job_id"],
@@ -137,10 +147,105 @@ def translation_cache_path(outdir: str, target_language: str) -> str:
     return os.path.join(outdir, "translations", f"{safe_target}.json")
 
 
+def translate_sentences_batched(
+    sentences: list[dict],
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+    batch_size: int = 16,
+) -> list[dict]:
+    translated = []
+    for start in range(0, len(sentences), batch_size):
+        batch = sentences[start:start + batch_size]
+        try:
+            batch_translations = _translate_batch(batch, translator, source_language, target_language)
+        except Exception:
+            batch_translations = _translate_one_by_one(batch, translator, source_language, target_language)
+        for sentence, translation in zip(batch, batch_translations):
+            enriched = dict(sentence)
+            enriched["translation"] = translation
+            translated.append(enriched)
+    return translated
+
+
+def _translate_batch(
+    batch: list[dict],
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+) -> list[str]:
+    prompt = build_batch_translation_prompt(batch, source_language, target_language)
+    if hasattr(translator, "complete"):
+        raw = translator.complete(prompt)  # type: ignore[attr-defined]
+    else:
+        raw = translator.translate(prompt, source_language, target_language)
+    parsed = _parse_batch_translation_json(raw)
+    expected_indexes = [int(item["index"]) for item in batch]
+    translations_by_index = {}
+    for item in parsed:
+        index = int(item.get("index"))
+        translation = str(item.get("translation", "")).strip()
+        translations_by_index[index] = translation
+    if sorted(translations_by_index) != sorted(expected_indexes):
+        raise ValueError("Batch translation indexes do not match source indexes")
+    return [translations_by_index[index] for index in expected_indexes]
+
+
+def _translate_one_by_one(
+    batch: list[dict],
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+) -> list[str]:
+    translations = []
+    for sentence in batch:
+        text = str(sentence.get("text") or "").strip()
+        translations.append(translator.translate(text, source_language, target_language) if text else "")
+    return translations
+
+
 def build_translation_prompt(text: str, source_language: str, target_language: str) -> str:
     if source_language == "Chinese" or target_language == "Chinese":
         return f"把下面的文本翻译成{target_language}，不要额外解释。\n\n{text}"
     return f"Translate the following segment into {target_language}, without additional explanation.\n\n{text}"
+
+
+def build_batch_translation_prompt(sentences: list[dict], source_language: str, target_language: str) -> str:
+    payload = [
+        {"index": int(sentence["index"]), "text": str(sentence.get("text") or "")}
+        for sentence in sentences
+    ]
+    source_json = json.dumps(payload, ensure_ascii=False)
+    if source_language == "Chinese" or target_language == "Chinese":
+        return (
+            f"把下面 JSON 数组中的 text 翻译成{target_language}，不要额外解释。"
+            "只返回 JSON 数组，每一项包含 index 和 translation，index 必须保持不变。\n\n"
+            f"{source_json}"
+        )
+    return (
+        f"Translate each text field in the following JSON array into {target_language}. "
+        "Return only a JSON array. Each item must contain index and translation, and index must remain unchanged.\n\n"
+        f"{source_json}"
+    )
+
+
+def _parse_batch_translation_json(raw: str) -> list[dict]:
+    text = raw.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?\s*", "", text)
+        text = re.sub(r"\s*```$", "", text)
+    if not text.startswith("["):
+        match = re.search(r"\[[\s\S]*\]", text)
+        if not match:
+            raise ValueError("Batch translation output is not JSON")
+        text = match.group(0)
+    data = json.loads(text)
+    if not isinstance(data, list):
+        raise ValueError("Batch translation output must be a list")
+    for item in data:
+        if not isinstance(item, dict) or "index" not in item or "translation" not in item:
+            raise ValueError("Batch translation item must contain index and translation")
+    return data
 
 
 def language_prompt_name(language: str) -> str:

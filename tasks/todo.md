@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: add batched Hunyuan-MT translation for completed ASR sentence lists.
+- [x] Current work: make the batch prompt return structured JSON and validate sentence indexes before accepting it.
+- [x] Current work: keep per-sentence fallback when batch output is malformed.
+- [x] Current work: add unit tests for batch success and fallback behavior, validate and commit.
+
+Review:
+- Added `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE`, defaulting to `16`.
+- `translate_job_result()` now translates completed ASR sentences in batches, validates returned sentence indexes, and only falls back to per-sentence translation for the malformed batch.
+- Added tests for structured batch success and malformed batch fallback.
+- Updated Hunyuan-MT service docs to describe batch prompting and fallback.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `git diff --check`, and a real Hunyuan-MT smoke on `translation_smoke_hunyuan_mt`.
+- Restarted the `10086` demo/API service with `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16`; Hunyuan-MT remains on `127.0.0.1:10087`.
+
 - [x] Current work: start a real Hunyuan-MT-7B-fp8 OpenAI-compatible translation service on port `10087`.
 - [x] Current work: smoke test direct Hunyuan-MT chat completion with the downloaded model.
 - [x] Current work: smoke test the Semantic ASR translation API against an existing completed job.

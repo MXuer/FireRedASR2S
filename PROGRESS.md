@@ -148,6 +148,19 @@ Current state:
 
 Recent validation:
 
+- Hunyuan-MT translation now supports batch translation after ASR completion.
+  `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` defaults to `16`; each batch sends a
+  JSON array of sentence `index/text` records to the OpenAI-compatible Hunyuan
+  service, validates that the returned `index` values match the source
+  sentences, and falls back to per-sentence translation only for malformed
+  batches. Tests now cover structured batch success and malformed batch
+  fallback. Validation passed: `tests.test_service`, `compileall
+  semantic_asr_service tests/test_service.py`, `git diff --check`, and a real
+  Hunyuan-MT smoke on `translation_smoke_hunyuan_mt` translating two Korean
+  sentences to Chinese. The demo/API service was restarted on
+  `0.0.0.0:10086` with `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16`; Hunyuan-MT
+  remains on `127.0.0.1:10087`.
+
 - Hunyuan-MT-7B-fp8 real local serving is working. The downloaded model lives at
   `/home/duhu/.cache/huggingface/hub/models--tencent--Hunyuan-MT-7B-fp8/snapshots/81e5a3f7199524570ba75e61360e990ba88665e4`.
   Since `fireredasr2s` has no vLLM and its transformers import is broken, the

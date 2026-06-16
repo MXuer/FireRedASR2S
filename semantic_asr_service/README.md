@@ -26,6 +26,7 @@ export SEMANTIC_ASR_SERVICE_PORT=10086
 export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
 export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
 export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
+export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -134,6 +135,11 @@ When translation is configured, the Review panel can translate sentence text
 with Hunyuan-MT and switch display between original, translated and bilingual
 text. Translation is stored as a sidecar JSON under the job output directory and
 does not change sentence timestamps or waveform intervals.
+
+Completed ASR sentences are translated in batches by default. The service sends
+up to `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` sentence texts in one structured JSON
+prompt, validates that the model returns the same sentence indexes, and falls
+back to per-sentence translation for that batch if the JSON is malformed.
 
 Example Hunyuan-MT-7B-fp8 OpenAI-compatible service:
 
