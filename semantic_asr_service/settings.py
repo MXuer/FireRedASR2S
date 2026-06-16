@@ -17,6 +17,10 @@ class ServiceSettings:
     port: int = 10086
     allowed_extensions: set[str] = field(default_factory=lambda: {".wav", ".flac", ".mp3", ".m4a", ".ogg"})
     poll_interval_s: float = 2.0
+    translation_base_url: str = ""
+    translation_model: str = "hunyuan-mt"
+    translation_api_key: str = ""
+    translation_targets: set[str] = field(default_factory=lambda: {"zh_cn", "en_us"})
 
     @property
     def db_path(self) -> str:
@@ -60,6 +64,10 @@ def load_settings() -> ServiceSettings:
         port=int(os.environ.get("SEMANTIC_ASR_SERVICE_PORT", "10086")),
         allowed_extensions=_env_set("SEMANTIC_ASR_ALLOWED_EXTENSIONS") or {".wav", ".flac", ".mp3", ".m4a", ".ogg"},
         poll_interval_s=float(os.environ.get("SEMANTIC_ASR_POLL_INTERVAL_S", "2.0")),
+        translation_base_url=os.environ.get("SEMANTIC_ASR_TRANSLATION_BASE_URL", "").rstrip("/"),
+        translation_model=os.environ.get("SEMANTIC_ASR_TRANSLATION_MODEL", "hunyuan-mt"),
+        translation_api_key=os.environ.get("SEMANTIC_ASR_TRANSLATION_API_KEY", ""),
+        translation_targets=_env_set("SEMANTIC_ASR_TRANSLATION_TARGETS") or {"zh_cn", "en_us"},
     )
 
 

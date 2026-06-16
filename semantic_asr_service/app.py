@@ -9,9 +9,14 @@ import soundfile as sf
 from semantic_asr.api import list_models
 from semantic_asr_service.artifacts import artifact_path, artifact_urls
 from semantic_asr_service.demo import DEMO_HTML
-from semantic_asr_service.schemas import JobCreateResponse, JobStatusResponse
+from semantic_asr_service.schemas import JobCreateResponse, JobStatusResponse, TranslationCreateRequest
 from semantic_asr_service.settings import ServiceSettings, load_settings
 from semantic_asr_service.store import JobStore
+from semantic_asr_service.translation import (
+    HunyuanMTClient,
+    translate_job_result,
+    translation_cache_path,
+)
 
 
 def create_app(
@@ -26,6 +31,7 @@ def create_app(
     app = FastAPI(title="Semantic ASR Service")
     app.state.settings = settings
     app.state.store = store
+    app.state.translation_client = None
 
     @app.get("/health")
     def health():
@@ -38,6 +44,10 @@ def create_app(
     @app.get("/v1/configs")
     def get_configs(user=Depends(_require_user)):
         return {"configs": sorted(settings.allowed_configs)}
+
+    @app.get("/v1/translation-targets")
+    def get_translation_targets(user=Depends(_require_user)):
+        return {"targets": sorted(settings.translation_targets)}
 
     @app.post("/v1/jobs", response_model=JobCreateResponse)
     def create_job(
@@ -94,6 +104,29 @@ def create_app(
         if not os.path.exists(path):
             raise HTTPException(status_code=404, detail="Artifact is not available")
         return FileResponse(path, filename=os.path.basename(path))
+
+    @app.post("/v1/jobs/{job_id}/translations")
+    def create_translation(job_id: str, request: TranslationCreateRequest, user=Depends(_require_user)):
+        job = _get_authorized_job(store, job_id, user)
+        if job["status"] != "succeeded":
+            raise HTTPException(status_code=400, detail="ASR job has not succeeded")
+        try:
+            client = app.state.translation_client or HunyuanMTClient.from_settings(settings)
+            return translate_job_result(job, settings, request.target_language, translator=client)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+    @app.get("/v1/jobs/{job_id}/translations/{target_language}")
+    def get_translation(job_id: str, target_language: str, user=Depends(_require_user)):
+        job = _get_authorized_job(store, job_id, user)
+        path = translation_cache_path(job["outdir"], target_language)
+        if not os.path.exists(path):
+            raise HTTPException(status_code=404, detail="Translation is not available")
+        return FileResponse(path, media_type="application/json", filename=os.path.basename(path))
 
     @app.get("/v1/models")
     def get_models(language: str, role: str | None = None, user=Depends(_require_user)):

@@ -148,6 +148,22 @@ Current state:
 
 Recent validation:
 
+- Added Hunyuan-MT translation scaffolding for the HTTP service and web demo.
+  Translation is a post-ASR sidecar: completed jobs can be translated through
+  `POST /v1/jobs/{job_id}/translations`, cached under
+  `outputs/translations/{target}.json`, and shown in the Review panel as
+  original, translated or bilingual text without changing waveform intervals or
+  cut timestamps. The v1 client targets an OpenAI-compatible Hunyuan-MT service
+  through `SEMANTIC_ASR_TRANSLATION_BASE_URL`, with default model
+  `hunyuan-mt` and target allowlist from `SEMANTIC_ASR_TRANSLATION_TARGETS`.
+  Fake translator tests cover cache reuse, target allowlist rejection, missing
+  translation-service config and route behavior. Validation passed:
+  `tests.test_service`, `compileall semantic_asr_service
+  tests/test_service.py`, and `git diff --check`. The demo server was started
+  on `0.0.0.0:10086` with translation base URL `http://127.0.0.1:10087`; two
+  GPU 7 ASR workers were also started. `/health`, `/v1/translation-targets`
+  and `/demo` responded correctly.
+
 - Added Hunyuan-MT translation integration design in
   `docs/hunyuan_mt_translation_design.md`. The recommended v1 approach is to
   deploy `Hunyuan-MT-7B-fp8` or a local quantized `Hunyuan-MT-7B` as a separate

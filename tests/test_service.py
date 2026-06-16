@@ -23,6 +23,7 @@ from semantic_asr_service.app import (
 from semantic_asr_service.artifacts import artifact_path
 from semantic_asr_service.settings import ServiceSettings, _parse_api_keys, load_settings
 from semantic_asr_service.store import JobStore
+from semantic_asr_service.translation import translate_job_result, translation_cache_path
 from semantic_asr_service.worker import run_worker_once
 
 
@@ -99,6 +100,11 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('waveWrap.addEventListener("wheel"', demo)
         self.assertIn('waveWrap.addEventListener("pointerdown"', demo)
         self.assertIn("setWaveZoom(Number(waveZoom.value)", demo)
+        self.assertIn('id="translation-target"', demo)
+        self.assertIn('id="text-mode"', demo)
+        self.assertIn('id="translate"', demo)
+        self.assertIn('apiFetch(`/v1/jobs/${reviewState.jobId}/translations`', demo)
+        self.assertIn("segmentTextHtml(segment)", demo)
 
     def test_configs_route_returns_allowed_profiles(self):
         settings = self._settings(tempfile.mkdtemp())
@@ -107,6 +113,14 @@ class SemanticAsrServiceTest(unittest.TestCase):
         response = self._route_endpoint(app, "/v1/configs")(user={"user_id": "alice"})
 
         self.assertEqual(response, {"configs": ["vi_vn", "zh_cn"]})
+
+    def test_translation_targets_route_returns_allowlist(self):
+        settings = self._settings(tempfile.mkdtemp())
+        settings.translation_targets = {"zh_cn", "en_us"}
+        app = create_app(settings=settings, store=JobStore(settings.db_path))
+        response = self._route_endpoint(app, "/v1/translation-targets")(user={"user_id": "alice"})
+
+        self.assertEqual(response, {"targets": ["en_us", "zh_cn"]})
 
     def test_submit_job_core_creates_queued_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -238,12 +252,102 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(failed_result["status"], "failed")
         self.assertIn("boom", failed_result["error"])
 
+    def test_translate_job_result_writes_and_reuses_cache(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            job = store.create_job(
+                "job1",
+                "alice",
+                "ko_kr",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+            store.mark_succeeded("job1")
+            job = store.get_job("job1")
+            os.makedirs(job["outdir"], exist_ok=True)
+            with open(os.path.join(job["outdir"], "job1.json"), "w", encoding="utf-8") as fout:
+                json.dump({
+                    "sentences": [
+                        {"start_ms": 100, "end_ms": 300, "cut_start_ms": 120, "cut_end_ms": 280, "text": "감회가 새롭습니다."}
+                    ]
+                }, fout)
+
+            translator = self.FakeTranslator()
+            first = translate_job_result(job, settings, "zh_cn", translator=translator)
+            second = translate_job_result(job, settings, "zh_cn", translator=translator)
+
+        self.assertEqual(first["status"], "succeeded")
+        self.assertEqual(first["sentences"][0]["translation"], "Chinese::감회가 새롭습니다.")
+        self.assertEqual(second["sentences"][0]["translation"], "Chinese::감회가 새롭습니다.")
+        self.assertEqual(translator.calls, 1)
+
+    def test_translate_job_result_rejects_disallowed_target(self):
+        settings = self._settings(tempfile.mkdtemp())
+        settings.translation_targets = {"zh_cn"}
+
+        with self.assertRaises(ValueError):
+            translate_job_result({"outdir": "", "job_id": "job1", "config": "ko_kr"}, settings, "en_us", self.FakeTranslator())
+
+    def test_translation_routes_require_configured_service_or_fake_client(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            app = create_app(settings=settings, store=JobStore(settings.db_path))
+            store = app.state.store
+            job = store.create_job(
+                "job1",
+                "alice",
+                "ko_kr",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+            store.mark_succeeded(job["job_id"])
+            job = store.get_job(job["job_id"])
+            os.makedirs(job["outdir"], exist_ok=True)
+            with open(os.path.join(job["outdir"], "job1.json"), "w", encoding="utf-8") as fout:
+                json.dump({"sentences": [{"start_ms": 0, "end_ms": 100, "text": "hello"}]}, fout)
+            request = SimpleNamespace(target_language="zh_cn")
+
+            with self.assertRaises(HTTPException) as missing_service:
+                self._route_endpoint(app, "/v1/jobs/{job_id}/translations")(
+                    "job1",
+                    request,
+                    user={"user_id": "alice", "is_admin": False},
+                )
+
+            app.state.translation_client = self.FakeTranslator()
+            translated = self._route_endpoint(app, "/v1/jobs/{job_id}/translations")(
+                "job1",
+                request,
+                user={"user_id": "alice", "is_admin": False},
+            )
+
+        self.assertEqual(missing_service.exception.status_code, 503)
+        self.assertEqual(translated["sentences"][0]["translation"], "Chinese::hello")
+
+    def test_translation_cache_path_is_under_output_dir(self):
+        path = translation_cache_path("/tmp/out", "zh_cn")
+
+        self.assertEqual(path, "/tmp/out/translations/zh_cn.json")
+
     @staticmethod
     def _route_endpoint(app, path: str):
         for route in app.routes:
             if getattr(route, "path", None) == path:
                 return route.endpoint
         raise AssertionError(f"Route not found: {path}")
+
+    class FakeTranslator:
+        def __init__(self):
+            self.calls = 0
+
+        def translate(self, text: str, _source_language: str, target_language: str) -> str:
+            self.calls += 1
+            return f"{target_language}::{text}"
 
     @staticmethod
     def _write_wav(tmpdir: str, samples: int = 160) -> str:

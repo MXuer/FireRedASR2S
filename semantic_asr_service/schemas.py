@@ -14,3 +14,6 @@ class JobStatusResponse(BaseModel):
     error: str | None = None
     artifacts: dict[str, str] = {}
 
+
+class TranslationCreateRequest(BaseModel):
+    target_language: str = "zh_cn"

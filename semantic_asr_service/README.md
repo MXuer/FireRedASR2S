@@ -23,6 +23,9 @@ export SEMANTIC_ASR_API_KEYS='user-token:user,admin-token:admin:admin'
 export SEMANTIC_ASR_MAX_UPLOAD_MB=2048
 export SEMANTIC_ASR_MAX_AUDIO_SECONDS=0
 export SEMANTIC_ASR_SERVICE_PORT=10086
+export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
+export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
+export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -126,6 +129,24 @@ For long audio review, use the waveform zoom slider or mouse wheel over the
 waveform to zoom in and out. Drag the waveform horizontally to pan through the
 timeline. The sentence/time-text list is shown below the waveform so the audio
 area stays wide.
+
+When translation is configured, the Review panel can translate sentence text
+with Hunyuan-MT and switch display between original, translated and bilingual
+text. Translation is stored as a sidecar JSON under the job output directory and
+does not change sentence timestamps or waveform intervals.
+
+Example Hunyuan-MT-7B-fp8 OpenAI-compatible service:
+
+```bash
+export MODEL_PATH=/path/to/Hunyuan-MT-7B-fp8
+CUDA_VISIBLE_DEVICES=6 python -m vllm.entrypoints.openai.api_server \
+  --host 0.0.0.0 \
+  --port 10087 \
+  --trust-remote-code \
+  --model "${MODEL_PATH}" \
+  --served-model-name hunyuan-mt \
+  --dtype bfloat16
+```
 
 For a demo backed by GPU 7 with two workers:
 

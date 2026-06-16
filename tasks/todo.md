@@ -1,5 +1,21 @@
 # Todo
 
+- [x] Current work: implement Hunyuan-MT translation settings and OpenAI-compatible client scaffolding.
+- [x] Current work: add translation cache/API endpoints for completed ASR jobs.
+- [x] Current work: add web demo controls for target language and original/translation/bilingual display.
+- [x] Current work: add fake translation tests and validate without requiring downloaded model files.
+- [x] Current work: document Hunyuan-MT-7B-fp8 startup and commit the integration scaffolding.
+
+Review:
+- Added `semantic_asr_service.translation` with an OpenAI-compatible Hunyuan-MT client, prompt builder, language-name mapping and per-job translation cache under `outputs/translations/{target}.json`.
+- Added translation settings: `SEMANTIC_ASR_TRANSLATION_BASE_URL`, `SEMANTIC_ASR_TRANSLATION_MODEL`, `SEMANTIC_ASR_TRANSLATION_API_KEY` and `SEMANTIC_ASR_TRANSLATION_TARGETS`.
+- Added service endpoints: `GET /v1/translation-targets`, `POST /v1/jobs/{job_id}/translations` and `GET /v1/jobs/{job_id}/translations/{target_language}`.
+- Added web demo review controls for target language, `Translate`, and display mode `Original / Translation / Bilingual`.
+- Added fake translator tests for cache creation/reuse, target allowlist rejection, missing service config and route behavior.
+- Documented Hunyuan-MT-7B-fp8 vLLM startup in `semantic_asr_service/README.md`.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, and `git diff --check`.
+- Restarted demo server on `0.0.0.0:10086` with translation base URL `http://127.0.0.1:10087`, and restarted two GPU 7 ASR workers. `/health`, `/v1/translation-targets` and `/demo` all responded correctly.
+
 - [x] Current work: analyze Hunyuan-MT model choices, deployment options and constraints for translation.
 - [x] Current work: inspect the current service/web demo structure and identify the clean translation integration points.
 - [x] Current work: design how users can toggle ASR original text vs translated text in the web review UI.

@@ -329,6 +329,16 @@ DEMO_HTML = """<!doctype html>
             <span>Visible</span>
             <span id="wave-visible">00:00.000 - 00:00.000</span>
             <span></span>
+            <span>Text</span>
+            <select id="text-mode">
+              <option value="original">Original</option>
+              <option value="translation">Translation</option>
+              <option value="bilingual">Bilingual</option>
+            </select>
+            <span></span>
+            <span>Target</span>
+            <select id="translation-target"></select>
+            <button id="translate" type="button">Translate</button>
           </div>
           <div class="wave-wrap">
             <canvas id="waveform" width="1200" height="220"></canvas>
@@ -358,6 +368,9 @@ DEMO_HTML = """<!doctype html>
     const waveZoom = document.getElementById("wave-zoom");
     const waveZoomLabel = document.getElementById("wave-zoom-label");
     const waveVisible = document.getElementById("wave-visible");
+    const textMode = document.getElementById("text-mode");
+    const translationTarget = document.getElementById("translation-target");
+    const translateButton = document.getElementById("translate");
 
     function authHeaders() {
       return { Authorization: `Bearer ${tokenInput.value.trim()}` };
@@ -385,6 +398,21 @@ DEMO_HTML = """<!doctype html>
       });
       if (data.configs.includes("vi_vn")) {
         configSelect.value = "vi_vn";
+      }
+    }
+
+    async function loadTranslationTargets() {
+      const response = await apiFetch("/v1/translation-targets");
+      const data = await response.json();
+      translationTarget.innerHTML = "";
+      data.targets.forEach((name) => {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        translationTarget.appendChild(option);
+      });
+      if (data.targets.includes("zh_cn")) {
+        translationTarget.value = "zh_cn";
       }
     }
 
@@ -553,6 +581,8 @@ DEMO_HTML = """<!doctype html>
         audioBuffer: buffer,
         duration: result.dur_s || buffer.duration,
         segments,
+        translations: {},
+        displayMode: textMode.value,
         zoom: Number(waveZoom.value || 1),
         peaksByWidth: new Map(),
       };
@@ -589,9 +619,53 @@ DEMO_HTML = """<!doctype html>
       segmentList.innerHTML = segments.map((segment) => `
         <button type="button" class="segment-item" data-segment-index="${segment.index}">
           <span class="segment-time">${formatMs(segment.startMs)} - ${formatMs(segment.endMs)}</span>
-          ${escapeHtml(segment.text)}
+          ${segmentTextHtml(segment)}
         </button>
       `).join("");
+    }
+
+    function segmentTextHtml(segment) {
+      const reviewState = state.review || {};
+      const translated = (reviewState.translations || {})[segment.index] || "";
+      const mode = reviewState.displayMode || "original";
+      if (mode === "translation") {
+        return escapeHtml(translated || segment.text);
+      }
+      if (mode === "bilingual" && translated) {
+        return `${escapeHtml(segment.text)}<br><span class="message">${escapeHtml(translated)}</span>`;
+      }
+      return escapeHtml(segment.text);
+    }
+
+    async function translateReview() {
+      const reviewState = state.review;
+      if (!reviewState) {
+        return;
+      }
+      const target = translationTarget.value;
+      translateButton.disabled = true;
+      reviewMessage.textContent = "Translating...";
+      try {
+        const response = await apiFetch(`/v1/jobs/${reviewState.jobId}/translations`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ target_language: target }),
+        });
+        const result = await response.json();
+        reviewState.translations = {};
+        (result.sentences || []).forEach((sentence) => {
+          reviewState.translations[Number(sentence.index)] = sentence.translation || "";
+        });
+        textMode.value = "bilingual";
+        reviewState.displayMode = textMode.value;
+        renderSegmentList(reviewState.segments);
+        reviewMessage.textContent = `Translation loaded: ${target}`;
+      } catch (error) {
+        reviewMessage.textContent = error.message;
+        reviewMessage.className = "message error";
+      } finally {
+        translateButton.disabled = false;
+      }
     }
 
     function drawWaveform() {
@@ -828,6 +902,15 @@ DEMO_HTML = """<!doctype html>
     });
     reviewAudio.addEventListener("timeupdate", drawWaveform);
     waveZoom.addEventListener("input", () => setWaveZoom(Number(waveZoom.value)));
+    textMode.addEventListener("change", () => {
+      if (!state.review) {
+        return;
+      }
+      state.review.displayMode = textMode.value;
+      renderSegmentList(state.review.segments);
+      updateActiveSegment(reviewAudio.currentTime * 1000);
+    });
+    translateButton.addEventListener("click", translateReview);
     waveWrap.addEventListener("scroll", updateVisibleWindow);
     window.addEventListener("resize", drawWaveform);
     waveWrap.addEventListener("wheel", (event) => {
@@ -894,7 +977,7 @@ DEMO_HTML = """<!doctype html>
     }
     tokenInput.addEventListener("change", loadConfigs);
     checkHealth();
-    loadConfigs().catch((error) => {
+    Promise.all([loadConfigs(), loadTranslationTargets()]).catch((error) => {
       message.textContent = error.message;
       message.className = "message error";
     });
