@@ -148,6 +148,16 @@ Current state:
 
 Recent validation:
 
+- Added Hunyuan-MT translation integration design in
+  `docs/hunyuan_mt_translation_design.md`. The recommended v1 approach is to
+  deploy `Hunyuan-MT-7B-fp8` or a local quantized `Hunyuan-MT-7B` as a separate
+  OpenAI-compatible service, keep ASR workers independent, and produce
+  per-job translation sidecar JSON files keyed by sentence index/timestamps.
+  `Hunyuan-MT-Chimera` is reserved for later high-quality/offline refinement
+  because the interactive review UI needs predictable one-sentence-in,
+  one-translation-out behavior. The design includes API routes, cache layout,
+  web UI display modes and implementation TODOs.
+
 - Improved long-audio waveform review in the web demo. The waveform now has a
   `1x-48x` zoom slider, mouse-wheel zoom around the cursor, horizontal
   drag-to-pan, a visible-window readout and auto-scroll while playback moves

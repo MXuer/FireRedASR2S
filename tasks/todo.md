@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: analyze Hunyuan-MT model choices, deployment options and constraints for translation.
+- [x] Current work: inspect the current service/web demo structure and identify the clean translation integration points.
+- [x] Current work: design how users can toggle ASR original text vs translated text in the web review UI.
+- [x] Current work: document recommended deployment and implementation TODOs without requiring downloaded model files.
+
+Review:
+- Added `docs/hunyuan_mt_translation_design.md`.
+- Recommended `Hunyuan-MT-7B-fp8` or another local quantized `Hunyuan-MT-7B` variant for the first interactive deployment; keep `Hunyuan-MT-Chimera` for later high-quality/offline mode.
+- Recommended serving Hunyuan-MT as a separate OpenAI-compatible service, preferably on a GPU separate from ASR workers, instead of loading it inside ASR workers.
+- Designed translation as a post-ASR sidecar artifact keyed by sentence index and timestamps, not as part of the core VAD/ASR/timestamp/punctuation pipeline.
+- Proposed async translation APIs, translation cache files under each job output directory, and web review display modes: original, translation and bilingual.
+
 - [x] Current work: add waveform zoom controls for long-audio review in the web demo.
 - [x] Current work: make waveform canvas horizontally scrollable and redraw segments/playback cursor at the selected zoom scale.
 - [x] Current work: keep click-to-seek accurate after zoom/scroll changes.
