@@ -18,8 +18,8 @@ TRANSLATION_BATCH_SIZE="${SEMANTIC_ASR_TRANSLATION_BATCH_SIZE:-8}"
 TRANSLATION_MAX_CONCURRENCY="${SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY:-1}"
 TRANSLATION_REQUEST_MODE="${SEMANTIC_ASR_TRANSLATION_REQUEST_MODE:-concurrent_single}"
 DEMO_USER_HEADER="${SEMANTIC_ASR_DEMO_USER_HEADER:-1}"
-WORKER_DEVICE="${SEMANTIC_ASR_DEMO_WORKER_DEVICE:-7}"
-WORKER_COUNT="${SEMANTIC_ASR_DEMO_WORKER_COUNT:-2}"
+WORKER_DEVICES="${SEMANTIC_ASR_DEMO_WORKER_DEVICES:-6,7}"
+WORKERS_PER_DEVICE="${SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE:-4}"
 CONDA_ENV="${SEMANTIC_ASR_CONDA_ENV:-fireredasr2s}"
 
 PIDS=()
@@ -36,7 +36,7 @@ trap cleanup EXIT INT TERM
 echo "[demo] root=${ROOT_DIR}"
 echo "[demo] data_dir=${DATA_DIR}"
 echo "[demo] api=http://${HOST}:${PORT}/demo"
-echo "[demo] workers=${WORKER_COUNT} device=${WORKER_DEVICE}"
+echo "[demo] worker_devices=${WORKER_DEVICES} workers_per_device=${WORKERS_PER_DEVICE}"
 
 if command -v curl >/dev/null 2>&1; then
   if curl -fsS --max-time 2 "${TRANSLATION_BASE_URL}/health" >/dev/null 2>&1; then
@@ -65,10 +65,17 @@ conda run -n "${CONDA_ENV}" python -u -m semantic_asr_service.app &
 PIDS+=("$!")
 echo "[demo] started api pid=${PIDS[-1]}"
 
-for index in $(seq 1 "${WORKER_COUNT}"); do
-  CUDA_VISIBLE_DEVICES="${WORKER_DEVICE}" conda run -n "${CONDA_ENV}" python -u -m semantic_asr_service.worker --device "${WORKER_DEVICE}" &
-  PIDS+=("$!")
-  echo "[demo] started worker ${index}/${WORKER_COUNT} pid=${PIDS[-1]}"
+IFS=',' read -ra DEVICE_LIST <<< "${WORKER_DEVICES}"
+for device in "${DEVICE_LIST[@]}"; do
+  device="${device//[[:space:]]/}"
+  if [[ -z "${device}" ]]; then
+    continue
+  fi
+  for index in $(seq 1 "${WORKERS_PER_DEVICE}"); do
+    CUDA_VISIBLE_DEVICES="${device}" conda run -n "${CONDA_ENV}" python -u -m semantic_asr_service.worker --device "${device}" &
+    PIDS+=("$!")
+    echo "[demo] started worker device=${device} index=${index}/${WORKERS_PER_DEVICE} pid=${PIDS[-1]}"
+  done
 done
 
 echo "[demo] ready. Press Ctrl-C to stop API and workers."

@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import uuid
 from pathlib import Path
 
@@ -126,6 +127,25 @@ def create_app(
         job = _get_authorized_job(store, job_id, user)
         return _job_response(job)
 
+    @app.delete("/v1/jobs/{job_id}")
+    def delete_job(job_id: str, user=Depends(_require_user)):
+        job = _get_authorized_job(store, job_id, user)
+        if job["status"] == "running":
+            raise HTTPException(status_code=409, detail="Running jobs cannot be deleted")
+        _delete_job_files(job, settings)
+        store.delete_job(job_id)
+        return {"job_id": job_id, "deleted": True}
+
+    @app.post("/v1/jobs/{job_id}/retry")
+    def retry_job(job_id: str, user=Depends(_require_user)):
+        job = _get_authorized_job(store, job_id, user)
+        if job["status"] not in {"failed", "canceled"}:
+            raise HTTPException(status_code=409, detail="Only failed or canceled jobs can be retried")
+        if not store.retry_job(job_id):
+            raise HTTPException(status_code=409, detail="Job could not be retried")
+        retried = store.get_job(job_id)
+        return _job_response(retried)
+
     @app.get("/v1/jobs/{job_id}/result")
     def get_result(job_id: str, user=Depends(_require_user)):
         job = _get_authorized_job(store, job_id, user)
@@ -247,6 +267,37 @@ def _job_response(job: dict) -> dict:
         "error": job.get("error"),
         "artifacts": artifact_urls(job["job_id"], job["formats"]) if job["status"] == "succeeded" else {},
     }
+
+
+def _delete_job_files(job: dict, settings: ServiceSettings) -> None:
+    for path in _job_delete_paths(job, settings):
+        if os.path.exists(path):
+            shutil.rmtree(path, ignore_errors=True)
+
+
+def _job_delete_paths(job: dict, settings: ServiceSettings) -> list[str]:
+    paths = []
+    wav_path = job.get("wav_path") or ""
+    outdir = job.get("outdir") or ""
+    if wav_path:
+        upload_dir = os.path.dirname(os.path.abspath(wav_path))
+        if _is_relative_to(upload_dir, settings.upload_root):
+            paths.append(upload_dir)
+    if outdir:
+        outputs_dir = os.path.abspath(outdir)
+        job_dir = os.path.dirname(outputs_dir)
+        if _is_relative_to(job_dir, settings.jobs_root):
+            paths.append(job_dir)
+    return [path for path in dict.fromkeys(paths) if path]
+
+
+def _is_relative_to(path: str, root: str) -> bool:
+    try:
+        abs_path = os.path.abspath(path)
+        abs_root = os.path.abspath(root)
+        return abs_path != abs_root and os.path.commonpath([abs_path, abs_root]) == abs_root
+    except ValueError:
+        return False
 
 
 def _require_allowed_config(settings: ServiceSettings, config: str) -> None:

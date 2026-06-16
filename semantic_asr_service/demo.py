@@ -166,6 +166,16 @@ DEMO_HTML = """<!doctype html>
       font-size: 16px;
       letter-spacing: 0;
     }
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toolbar-actions button.delete {
+      background: #fff;
+      border: 1px solid #fecdca;
+      color: var(--danger);
+    }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -187,6 +197,15 @@ DEMO_HTML = """<!doctype html>
       font-size: 12px;
       font-weight: 700;
       background: #fbfcfe;
+    }
+    .select-cell {
+      width: 36px;
+      text-align: center;
+    }
+    .select-cell input {
+      width: 16px;
+      height: 16px;
+      padding: 0;
     }
     .status {
       display: inline-flex;
@@ -222,6 +241,13 @@ DEMO_HTML = """<!doctype html>
       font-size: 12px;
     }
     .downloads button:hover { background: #f8fafc; }
+    .downloads button.retry {
+      color: var(--warn);
+    }
+    .downloads button.error {
+      color: var(--danger);
+      border-color: #fecdca;
+    }
     .review {
       grid-column: 1 / -1;
       padding: 16px;
@@ -317,7 +343,7 @@ DEMO_HTML = """<!doctype html>
       .review-grid { grid-template-columns: 1fr; }
       .controls, .jobs { height: auto; }
       .job-filters { grid-template-columns: 1fr; }
-      th:nth-child(2), td:nth-child(2) { display: none; }
+      th:nth-child(3), td:nth-child(3) { display: none; }
     }
   </style>
 </head>
@@ -359,7 +385,10 @@ DEMO_HTML = """<!doctype html>
     <section class="jobs">
       <div class="toolbar">
         <h2>Jobs</h2>
-        <button id="refresh" type="button">Refresh</button>
+        <div class="toolbar-actions">
+          <button id="delete-selected" class="delete" type="button" disabled>Delete</button>
+          <button id="refresh" type="button">Refresh</button>
+        </div>
       </div>
       <div class="job-filters">
         <div class="field">
@@ -378,10 +407,11 @@ DEMO_HTML = """<!doctype html>
         <table>
           <thead>
             <tr>
-              <th style="width: 20%">File</th>
+              <th class="select-cell"><input id="select-all-jobs" type="checkbox" aria-label="Select all jobs"></th>
+              <th style="width: 24%">File</th>
+              <th style="width: 13%">Language</th>
               <th style="width: 25%">Job ID</th>
-              <th style="width: 14%">Status</th>
-              <th style="width: 17%">Stage</th>
+              <th style="width: 13%">Status</th>
               <th>Artifacts</th>
             </tr>
           </thead>
@@ -423,6 +453,7 @@ DEMO_HTML = """<!doctype html>
       waveDrag: null,
       translationsByJob: {},
       translatingByJob: {},
+      selectedJobIds: new Set(),
       page: { offset: 0, limit: 8, total: 0 },
       filters: { config: "", userId: "" },
     };
@@ -448,6 +479,8 @@ DEMO_HTML = """<!doctype html>
     const filterConfig = document.getElementById("filter-config");
     const filterUser = document.getElementById("filter-user");
     const clearFilters = document.getElementById("clear-filters");
+    const selectAllJobs = document.getElementById("select-all-jobs");
+    const deleteSelected = document.getElementById("delete-selected");
 
     function authHeaders() {
       const token = tokenInput.value.trim() || userNameInput.value.trim();
@@ -632,6 +665,7 @@ DEMO_HTML = """<!doctype html>
         file: job.local_path || job.filename || job.job_id,
         fileObject: currentFiles.get(job.job_id) || null,
       }));
+      keepVisibleSelections();
     }
 
     function mergeJobs(jobs) {
@@ -665,16 +699,38 @@ DEMO_HTML = """<!doctype html>
       jobsBody.innerHTML = "";
       state.jobs.forEach((job) => {
         const row = document.createElement("tr");
+        const jobId = job.job_id || "";
+        const fullName = displayJobName(job);
         row.innerHTML = `
-          <td>${escapeHtml(displayJobName(job))}<br><span class="message">${escapeHtml(job.config || "")}</span></td>
-          <td>${escapeHtml(job.job_id || "")}</td>
+          <td class="select-cell"><input type="checkbox" data-select-job="${escapeHtml(jobId)}" ${state.selectedJobIds.has(jobId) ? "checked" : ""}></td>
+          <td title="${escapeHtml(fullName)}">${escapeHtml(truncateText(fullName, 42))}</td>
+          <td>${escapeHtml(job.config || "")}</td>
+          <td>${escapeHtml(jobId)}</td>
           <td><span class="status ${escapeHtml(job.status || "")}">${escapeHtml(job.status || "")}</span></td>
-          <td>${escapeHtml((job.progress && job.progress.stage) || "")}</td>
           <td>${artifactControls(job)}</td>
         `;
         jobsBody.appendChild(row);
       });
+      renderSelectionState();
       renderPager();
+    }
+
+    function renderSelectionState() {
+      const visibleIds = state.jobs.map((job) => job.job_id).filter(Boolean);
+      const selectedVisible = visibleIds.filter((jobId) => state.selectedJobIds.has(jobId));
+      selectAllJobs.checked = Boolean(visibleIds.length && selectedVisible.length === visibleIds.length);
+      selectAllJobs.indeterminate = Boolean(selectedVisible.length && selectedVisible.length < visibleIds.length);
+      deleteSelected.disabled = selectedVisible.length === 0;
+      deleteSelected.textContent = selectedVisible.length ? `Delete (${selectedVisible.length})` : "Delete";
+    }
+
+    function keepVisibleSelections() {
+      const visible = new Set(state.jobs.map((job) => job.job_id));
+      state.selectedJobIds.forEach((jobId) => {
+        if (!visible.has(jobId)) {
+          state.selectedJobIds.delete(jobId);
+        }
+      });
     }
 
     function renderPager() {
@@ -688,12 +744,46 @@ DEMO_HTML = """<!doctype html>
 
     function artifactControls(job) {
       if (!job.artifacts || !Object.keys(job.artifacts).length) {
-        return job.error ? `<span class="message error">${escapeHtml(job.error)}</span>` : "";
+        if (job.error) {
+          return `<div class="downloads"><button class="error" type="button" data-error-job="${escapeHtml(job.job_id)}">Error</button>${retryControl(job)}</div>`;
+        }
+        return retryControl(job);
       }
       const downloads = Object.keys(job.artifacts).map((name) => {
         return `<button type="button" data-download-job="${escapeHtml(job.job_id)}" data-download-format="${escapeHtml(name)}">${escapeHtml(name)}</button>`;
       }).join("");
       return `<div class="downloads"><button type="button" data-review-job="${escapeHtml(job.job_id)}">View</button>${downloads}</div>`;
+    }
+
+    function retryControl(job) {
+      if (job.status === "failed" || job.status === "canceled") {
+        return `<button class="retry" type="button" data-retry-job="${escapeHtml(job.job_id)}">Retry</button>`;
+      }
+      return "";
+    }
+
+    async function retryJob(jobId) {
+      message.textContent = "Retrying job...";
+      message.className = "message";
+      try {
+        const response = await apiFetch(`/v1/jobs/${jobId}/retry`, { method: "POST" });
+        const updated = await response.json();
+        const current = state.jobs.find((item) => item.job_id === jobId);
+        if (current) {
+          Object.assign(current, updated);
+        }
+        renderJobs();
+        startPolling();
+        message.textContent = "Job queued for retry.";
+      } catch (error) {
+        message.textContent = error.message;
+        message.className = "message error";
+      }
+    }
+
+    function showJobError(jobId) {
+      const job = state.jobs.find((item) => item.job_id === jobId);
+      window.alert((job && job.error) || "No error details are available.");
     }
 
     async function downloadArtifact(jobId, format) {
@@ -713,6 +803,36 @@ DEMO_HTML = """<!doctype html>
       } catch (error) {
         message.textContent = error.message;
         message.className = "message error";
+      }
+    }
+
+    async function deleteSelectedJobs() {
+      const jobIds = Array.from(state.selectedJobIds);
+      if (!jobIds.length) {
+        return;
+      }
+      if (!window.confirm(`Delete ${jobIds.length} selected job record(s) and files?`)) {
+        return;
+      }
+      deleteSelected.disabled = true;
+      message.textContent = "Deleting selected jobs...";
+      message.className = "message";
+      try {
+        for (const jobId of jobIds) {
+          await apiFetch(`/v1/jobs/${jobId}`, { method: "DELETE" });
+        }
+        if (state.review && state.selectedJobIds.has(state.review.jobId)) {
+          state.review = null;
+          review.hidden = true;
+        }
+        state.selectedJobIds.clear();
+        await loadJobs();
+        message.textContent = `Deleted ${jobIds.length} job(s).`;
+      } catch (error) {
+        message.textContent = error.message;
+        message.className = "message error";
+      } finally {
+        renderSelectionState();
       }
     }
 
@@ -786,6 +906,14 @@ DEMO_HTML = """<!doctype html>
 
     function displayJobName(job) {
       return job.local_path || job.file || job.filename || job.job_id || "";
+    }
+
+    function truncateText(value, maxLength) {
+      const text = String(value || "");
+      if (text.length <= maxLength) {
+        return text;
+      }
+      return `${text.slice(0, Math.max(1, maxLength - 1))}…`;
     }
 
     async function decodeAudioFile(file) {
@@ -1085,6 +1213,20 @@ DEMO_HTML = """<!doctype html>
 
     document.getElementById("submit").addEventListener("click", submitJobs);
     document.getElementById("refresh").addEventListener("click", loadJobs);
+    deleteSelected.addEventListener("click", deleteSelectedJobs);
+    selectAllJobs.addEventListener("change", () => {
+      state.jobs.forEach((job) => {
+        if (!job.job_id) {
+          return;
+        }
+        if (selectAllJobs.checked) {
+          state.selectedJobIds.add(job.job_id);
+        } else {
+          state.selectedJobIds.delete(job.job_id);
+        }
+      });
+      renderJobs();
+    });
     filterConfig.addEventListener("change", applyJobFilters);
     filterUser.addEventListener("change", applyJobFilters);
     filterUser.addEventListener("keydown", (event) => {
@@ -1109,6 +1251,20 @@ DEMO_HTML = """<!doctype html>
       downloadArtifact(button.dataset.downloadJob, button.dataset.downloadFormat);
     });
     jobsBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-retry-job]");
+      if (!button) {
+        return;
+      }
+      retryJob(button.dataset.retryJob);
+    });
+    jobsBody.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-error-job]");
+      if (!button) {
+        return;
+      }
+      showJobError(button.dataset.errorJob);
+    });
+    jobsBody.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-review-job]");
       if (!button) {
         return;
@@ -1117,6 +1273,18 @@ DEMO_HTML = """<!doctype html>
         message.textContent = error.message;
         message.className = "message error";
       });
+    });
+    jobsBody.addEventListener("change", (event) => {
+      const checkbox = event.target.closest("input[data-select-job]");
+      if (!checkbox) {
+        return;
+      }
+      if (checkbox.checked) {
+        state.selectedJobIds.add(checkbox.dataset.selectJob);
+      } else {
+        state.selectedJobIds.delete(checkbox.dataset.selectJob);
+      }
+      renderSelectionState();
     });
     segmentList.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-segment-index]");

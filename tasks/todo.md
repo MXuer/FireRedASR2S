@@ -1,5 +1,34 @@
 # Todo
 
+- [x] Current work: split job language/profile into its own Jobs table column.
+- [x] Current work: truncate long file labels in the Jobs table while preserving the full value as hover text.
+- [x] Current work: remove the Stage column from the Jobs table.
+- [x] Current work: add multi-select deletion for job records and outputs/uploads.
+- [ ] Current work: restart the demo service after host-command approval is available.
+- [x] Current work: add retry for failed/canceled jobs.
+- [x] Current work: make failed error display compact in the Jobs table.
+- [x] Current work: make auto translation asynchronous so ASR workers do not wait for translation.
+- [x] Current work: change demo ASR worker defaults to GPUs 6 and 7 with four workers per GPU, and document translation on GPU 5.
+
+Review:
+- Failed/canceled jobs can now be retried through `POST /v1/jobs/{job_id}/retry`, which requeues the job and clears previous error/start/finish metadata. Running jobs cannot be retried.
+- The Jobs table no longer dumps traceback text into the cell. Failed jobs show compact `Error` and `Retry` buttons; `Error` opens the full text on demand.
+- Automatic translation is now fire-and-forget after `mark_succeeded()`: ASR workers do not wait for Hunyuan-MT translation before claiming more ASR jobs.
+- Demo ASR worker defaults are now `SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7` and `SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=4`.
+- Added `scripts/start_hunyuan_mt_service.sh`, defaulting Hunyuan-MT to GPU 5 and port 10087.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, `bash -n scripts/start_hunyuan_mt_service.sh`, and `git diff --check`.
+- Demo service restart still needs to be done when host-command approval is available; the previous attempt to inspect/restart host processes was blocked by the approval usage limit.
+
+Review:
+- Jobs table now has separate selection, File, Language, Job ID, Status and Artifacts columns.
+- File labels are truncated to 42 characters in the table and keep the full value in the cell title/hover text.
+- Removed the Stage column.
+- Added page-level multi-select plus a Delete button. Deleting calls `DELETE /v1/jobs/{job_id}` for each selected job.
+- Backend delete is authorized: normal users can delete only their own jobs, admins can delete visible jobs. Running jobs return 409 and are not deleted.
+- Delete removes the DB record plus upload/output directories only when those paths are under the configured service upload/jobs roots.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, and `git diff --check`.
+- Demo restart was not performed because host process/port commands were blocked by the current approval usage limit; restart 10086 later to load the new page/API.
+
 - [x] Current work: remove visible Text/Target translation controls from the demo review panel.
 - [x] Current work: remove the visible Zoom slider from the demo review panel while keeping mouse-wheel zoom.
 - [x] Current work: default review display to bilingual Chinese translation and auto-load cached translation.

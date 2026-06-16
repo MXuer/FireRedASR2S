@@ -89,6 +89,11 @@ class JobStore:
             row = conn.execute("SELECT * FROM jobs WHERE job_id = ?", (job_id,)).fetchone()
         return _row_to_job(row) if row else None
 
+    def delete_job(self, job_id: str) -> bool:
+        with self.connect() as conn:
+            cur = conn.execute("DELETE FROM jobs WHERE job_id = ?", (job_id,))
+        return cur.rowcount > 0
+
     def list_jobs(
         self,
         user_id: str,
@@ -179,6 +184,18 @@ class JobStore:
                 WHERE job_id = ? AND status = 'queued'
                 """,
                 (now, json.dumps({"stage": "canceled"}), job_id),
+            )
+        return cur.rowcount > 0
+
+    def retry_job(self, job_id: str) -> bool:
+        with self.connect() as conn:
+            cur = conn.execute(
+                """
+                UPDATE jobs
+                SET status = 'queued', progress = ?, error = NULL, started_at = NULL, finished_at = NULL
+                WHERE job_id = ? AND status IN ('failed', 'canceled')
+                """,
+                (json.dumps({"stage": "queued"}), job_id),
             )
         return cur.rowcount > 0
 

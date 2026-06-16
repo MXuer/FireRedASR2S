@@ -2,6 +2,21 @@
 
 Current state:
 
+- Failed/canceled demo jobs can be retried through
+  `POST /v1/jobs/{job_id}/retry`; failed rows show compact Error/Retry buttons
+  instead of dumping long traceback text into the Jobs table. Auto translation
+  now runs in a daemon background thread after the ASR job is marked succeeded,
+  so ASR workers do not wait for Hunyuan-MT before claiming the next ASR job.
+  Demo ASR worker defaults are GPUs `6,7` with four workers per GPU, and
+  `scripts/start_hunyuan_mt_service.sh` starts Hunyuan-MT on GPU `5`.
+- The web demo Jobs table has been simplified for cleanup work: language/profile
+  is now a separate column, file labels are truncated in-table with full text in
+  the cell title, the Stage column was removed, and jobs can be multi-selected
+  and deleted. Backend `DELETE /v1/jobs/{job_id}` enforces ownership/admin
+  access, rejects running jobs with 409, removes the DB row, and only deletes
+  upload/output directories under the configured service roots. Tests pass, but
+  the running `10086` demo service still needs a restart to load this change;
+  host process/port commands were blocked by the current approval usage limit.
 - The web demo Review panel no longer shows Text/Target/Translate controls or
   the Zoom slider. It defaults to bilingual display with `zh_cn` translation,
   loads cached `translations/zh_cn.json` when a job is opened, and keeps

@@ -31,6 +31,8 @@ export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=8
 export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=1
 export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
 export SEMANTIC_ASR_DEMO_USER_HEADER=1
+export SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7
+export SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=4
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -57,15 +59,20 @@ The API listens on `0.0.0.0:10086` by default. Override it with
 Start one or more workers on the GPU machine:
 
 ```bash
-semantic-asr-worker --device 4
-semantic-asr-worker --device 5
 semantic-asr-worker --device 6
 semantic-asr-worker --device 7
 ```
 
-Each worker sets `CUDA_VISIBLE_DEVICES` before loading models. For the first
-production pass, use one worker per GPU, then increase concurrency only after
-checking model memory usage.
+Each worker sets `CUDA_VISIBLE_DEVICES` before loading models. The demo startup
+script defaults to GPUs `6,7` with four ASR workers per GPU:
+
+```bash
+SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7 SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=4 \
+  scripts/start_demo_service.sh
+```
+
+Keep Hunyuan-MT translation on GPU `5` so slow translation does not compete
+with ASR workers.
 
 ## Submit A Job
 
@@ -188,7 +195,7 @@ Example Hunyuan-MT-7B-fp8 OpenAI-compatible service:
 
 ```bash
 export MODEL_PATH=/path/to/Hunyuan-MT-7B-fp8
-CUDA_VISIBLE_DEVICES=6 python -m vllm.entrypoints.openai.api_server \
+CUDA_VISIBLE_DEVICES=5 python -m vllm.entrypoints.openai.api_server \
   --host 0.0.0.0 \
   --port 10087 \
   --trust-remote-code \
@@ -201,13 +208,7 @@ On this machine, vLLM is not installed in the ASR environment. A minimal
 transformers-based OpenAI-compatible wrapper is available instead:
 
 ```bash
-export MODEL_PATH=/home/duhu/.cache/huggingface/hub/models--tencent--Hunyuan-MT-7B-fp8/snapshots/81e5a3f7199524570ba75e61360e990ba88665e4
-CUDA_VISIBLE_DEVICES=6 conda run -n llm python -m semantic_asr_service.hunyuan_mt_server \
-  --model-path "${MODEL_PATH}" \
-  --runtime-model-path service_data/hunyuan_mt_fp8_patched \
-  --served-model-name hunyuan-mt \
-  --host 127.0.0.1 \
-  --port 10087
+scripts/start_hunyuan_mt_service.sh
 ```
 
 The wrapper prepares a local runtime copy of the FP8 config because the

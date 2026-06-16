@@ -15,7 +15,9 @@ from fastapi import HTTPException
 
 from semantic_asr_service.app import (
     create_app,
+    _delete_job_files,
     _get_authorized_job,
+    _job_delete_paths,
     _job_response,
     _parse_formats,
     _require_allowed_config,
@@ -33,6 +35,7 @@ from semantic_asr_service.translation import (
     translation_cache_path,
 )
 from semantic_asr_service.worker import run_worker_once
+import semantic_asr_service.worker as worker_module
 
 
 class SemanticAsrServiceTest(unittest.TestCase):
@@ -91,6 +94,16 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(default_settings.port, 10086)
         self.assertEqual(overridden_settings.port, 12345)
 
+    def test_demo_startup_scripts_default_to_requested_gpu_layout(self):
+        with open("scripts/start_demo_service.sh", encoding="utf-8") as fin:
+            demo_script = fin.read()
+        with open("scripts/start_hunyuan_mt_service.sh", encoding="utf-8") as fin:
+            translation_script = fin.read()
+
+        self.assertIn('WORKER_DEVICES="${SEMANTIC_ASR_DEMO_WORKER_DEVICES:-6,7}"', demo_script)
+        self.assertIn('WORKERS_PER_DEVICE="${SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE:-4}"', demo_script)
+        self.assertIn('DEVICE="${HUNYUAN_MT_DEVICE:-5}"', translation_script)
+
     def test_web_demo_route_uses_existing_job_api_and_multi_file_upload(self):
         settings = self._settings(tempfile.mkdtemp())
         app = create_app(settings=settings, store=JobStore(settings.db_path))
@@ -127,6 +140,14 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('"X-Semantic-ASR-User"', demo)
         self.assertIn('id="prev-page"', demo)
         self.assertIn('id="next-page"', demo)
+        self.assertIn('id="delete-selected"', demo)
+        self.assertIn('id="select-all-jobs"', demo)
+        self.assertIn("deleteSelectedJobs", demo)
+        self.assertIn("retryJob(button.dataset.retryJob)", demo)
+        self.assertIn("showJobError(button.dataset.errorJob)", demo)
+        self.assertIn("truncateText(fullName, 42)", demo)
+        self.assertIn("<th style=\"width: 13%\">Language</th>", demo)
+        self.assertNotIn("<th style=\"width: 17%\">Stage</th>", demo)
         self.assertIn('id="filter-config"', demo)
         self.assertIn('id="filter-user"', demo)
         self.assertIn("jobsUrl()", demo)
@@ -247,6 +268,90 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(alice_response["limit"], 1)
         self.assertEqual(alice_response["offset"], 0)
 
+    def test_delete_job_removes_owned_terminal_job_and_files(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            app = create_app(settings=settings, store=JobStore(settings.db_path))
+            store = app.state.store
+            upload_dir = os.path.join(settings.upload_root, "job1")
+            outdir = os.path.join(settings.jobs_root, "job1", "outputs")
+            os.makedirs(upload_dir, exist_ok=True)
+            os.makedirs(outdir, exist_ok=True)
+            wav_path = os.path.join(upload_dir, "input.wav")
+            sf.write(wav_path, np.zeros(160, dtype=np.int16), 16000)
+            job = store.create_job("job1", "alice", "zh_cn", wav_path, outdir, ["json"])
+            store.mark_succeeded(job["job_id"])
+
+            response = self._route_endpoint(app, "/v1/jobs/{job_id}", method="DELETE")(
+                "job1",
+                user={"user_id": "alice", "is_admin": False},
+            )
+
+            self.assertEqual(response, {"job_id": "job1", "deleted": True})
+            self.assertIsNone(store.get_job("job1"))
+            self.assertFalse(os.path.exists(upload_dir))
+            self.assertFalse(os.path.exists(os.path.dirname(outdir)))
+
+    def test_delete_job_rejects_running_or_other_user_jobs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            app = create_app(settings=settings, store=JobStore(settings.db_path))
+            store = app.state.store
+            running = store.create_job(
+                "running",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "running", "outputs"),
+                ["json"],
+            )
+            other = store.create_job(
+                "other",
+                "bob",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "other", "outputs"),
+                ["json"],
+            )
+            store.claim_next_job()
+
+            with self.assertRaises(HTTPException) as running_error:
+                self._route_endpoint(app, "/v1/jobs/{job_id}", method="DELETE")(
+                    running["job_id"],
+                    user={"user_id": "alice", "is_admin": False},
+                )
+            with self.assertRaises(HTTPException) as other_error:
+                self._route_endpoint(app, "/v1/jobs/{job_id}", method="DELETE")(
+                    other["job_id"],
+                    user={"user_id": "alice", "is_admin": False},
+                )
+
+        self.assertEqual(running_error.exception.status_code, 409)
+        self.assertEqual(other_error.exception.status_code, 404)
+
+    def test_job_delete_paths_are_limited_to_service_roots(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            upload_dir = os.path.join(settings.upload_root, "job1")
+            job_dir = os.path.join(settings.jobs_root, "job1")
+            outdir = os.path.join(job_dir, "outputs")
+            external_dir = os.path.join(tmpdir, "external")
+            for path in (upload_dir, outdir, external_dir):
+                os.makedirs(path, exist_ok=True)
+            job = {
+                "wav_path": os.path.join(upload_dir, "input.wav"),
+                "outdir": outdir,
+            }
+            external_job = {
+                "wav_path": os.path.join(external_dir, "input.wav"),
+                "outdir": os.path.join(external_dir, "outputs"),
+            }
+
+            self.assertEqual(set(_job_delete_paths(job, settings)), {upload_dir, job_dir})
+            self.assertEqual(_job_delete_paths(external_job, settings), [])
+            _delete_job_files(external_job, settings)
+            self.assertTrue(os.path.exists(external_dir))
+
     def test_submit_job_core_creates_queued_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = self._settings(tmpdir)
@@ -315,6 +420,70 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(queued_response["artifacts"], {})
         self.assertIn("json", succeeded_response["artifacts"])
         self.assertIn("srt", succeeded_response["artifacts"])
+
+    def test_retry_failed_job_route_requeues_job(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            app = create_app(settings=settings, store=JobStore(settings.db_path))
+            store = app.state.store
+            job = store.create_job(
+                "job1",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+            store.mark_failed(job["job_id"], "boom")
+
+            response = self._route_endpoint(app, "/v1/jobs/{job_id}/retry", method="POST")(
+                job["job_id"],
+                user={"user_id": "alice", "is_admin": False},
+            )
+            retried = store.get_job(job["job_id"])
+
+        self.assertEqual(response["status"], "queued")
+        self.assertEqual(retried["status"], "queued")
+        self.assertIsNone(retried["error"])
+        self.assertIsNone(retried["started_at"])
+        self.assertIsNone(retried["finished_at"])
+
+    def test_retry_route_rejects_running_or_other_user_jobs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            app = create_app(settings=settings, store=JobStore(settings.db_path))
+            store = app.state.store
+            running = store.create_job(
+                "running",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "running", "outputs"),
+                ["json"],
+            )
+            other = store.create_job(
+                "other",
+                "bob",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "other", "outputs"),
+                ["json"],
+            )
+            store.claim_next_job()
+
+            with self.assertRaises(HTTPException) as running_error:
+                self._route_endpoint(app, "/v1/jobs/{job_id}/retry", method="POST")(
+                    running["job_id"],
+                    user={"user_id": "alice", "is_admin": False},
+                )
+            with self.assertRaises(HTTPException) as other_error:
+                self._route_endpoint(app, "/v1/jobs/{job_id}/retry", method="POST")(
+                    other["job_id"],
+                    user={"user_id": "alice", "is_admin": False},
+                )
+
+        self.assertEqual(running_error.exception.status_code, 409)
+        self.assertEqual(other_error.exception.status_code, 404)
 
     def test_audio_route_returns_uploaded_audio_for_authorized_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -401,7 +570,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(failed_result["status"], "failed")
         self.assertIn("boom", failed_result["error"])
 
-    def test_worker_auto_translates_allowed_targets_after_success(self):
+    def test_worker_schedules_auto_translation_after_success(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = self._settings(tmpdir)
             settings.translation_base_url = "http://translation.local"
@@ -422,15 +591,27 @@ class SemanticAsrServiceTest(unittest.TestCase):
                 with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
                     json.dump({"job_id": job["job_id"], "sentences": []}, fout)
 
-            with mock.patch("semantic_asr_service.translation.translate_job_result") as translate_mock:
+            with mock.patch("semantic_asr_service.worker._auto_translate_async") as translate_mock:
                 result = run_worker_once(settings, store, runner=ok_runner)
 
         self.assertEqual(result["status"], "succeeded")
         translate_mock.assert_called_once()
-        called_job, called_settings, called_target = translate_mock.call_args.args
+        called_job, called_settings = translate_mock.call_args.args
         self.assertEqual(called_job["job_id"], job["job_id"])
         self.assertIs(called_settings, settings)
-        self.assertEqual(called_target, "zh_cn")
+
+    def test_auto_translation_async_starts_daemon_thread(self):
+        settings = self._settings(tempfile.mkdtemp())
+        settings.auto_translate_targets = {"zh_cn"}
+        job = {"job_id": "job1"}
+
+        with mock.patch("semantic_asr_service.worker.threading.Thread") as thread_cls:
+            thread = thread_cls.return_value
+            worker_module._auto_translate_async(job, settings)
+
+        thread_cls.assert_called_once()
+        self.assertTrue(thread_cls.call_args.kwargs["daemon"])
+        thread.start.assert_called_once()
 
     def test_translate_job_result_writes_and_reuses_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -610,8 +791,12 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(path, "/tmp/out/translations/zh_cn.json")
 
     @staticmethod
-    def _route_endpoint(app, path: str):
+    def _route_endpoint(app, path: str, method: str | None = None):
         for route in app.routes:
+            if getattr(route, "path", None) != path:
+                continue
+            if method and method.upper() not in getattr(route, "methods", set()):
+                continue
             if getattr(route, "path", None) == path:
                 return route.endpoint
         raise AssertionError(f"Route not found: {path}")

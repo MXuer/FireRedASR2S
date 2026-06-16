@@ -1,5 +1,6 @@
 import argparse
 import os
+import threading
 import time
 import traceback
 from typing import Callable
@@ -23,9 +24,9 @@ def run_worker_once(
     runner = runner or run_job
     try:
         runner(job, settings)
-        _auto_translate(job, settings)
         store.mark_succeeded(job["job_id"])
         _log(f"succeeded job_id={job['job_id']}")
+        _auto_translate_async(job, settings)
     except Exception:
         error = traceback.format_exc()
         store.mark_failed(job["job_id"], error)
@@ -68,6 +69,18 @@ def _auto_translate(job: dict, settings: ServiceSettings) -> None:
             _log(f"auto translated job_id={job['job_id']} target={target}")
         except Exception:
             _log(f"auto translation failed job_id={job['job_id']} target={target}\n{traceback.format_exc()}")
+
+
+def _auto_translate_async(job: dict, settings: ServiceSettings) -> None:
+    if not settings.auto_translate_targets:
+        return
+    thread = threading.Thread(
+        target=_auto_translate,
+        args=(dict(job), settings),
+        name=f"semantic-asr-translate-{job['job_id']}",
+        daemon=True,
+    )
+    thread.start()
 
 
 def worker_loop(settings: ServiceSettings, device: str | None = None) -> None:
