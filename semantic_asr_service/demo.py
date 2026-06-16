@@ -548,14 +548,20 @@ DEMO_HTML = """<!doctype html>
         message.className = "message error";
         return;
       }
-      document.getElementById("submit").disabled = true;
+      const submitButton = document.getElementById("submit");
+      const uploadConfig = configSelect.value;
+      const uploadFormats = selectedFormats();
+      const formatInputs = Array.from(document.querySelectorAll("input[name='format']"));
+      submitButton.disabled = true;
+      configSelect.disabled = true;
+      formatInputs.forEach((input) => { input.disabled = true; });
       try {
         for (const file of files) {
           const form = new FormData();
           const localPath = localPathForFile(file);
           form.append("audio", file);
-          form.append("config", configSelect.value);
-          form.append("formats", selectedFormats());
+          form.append("config", uploadConfig);
+          form.append("formats", uploadFormats);
           form.append("local_path", localPath);
           const response = await apiFetch("/v1/jobs", { method: "POST", body: form });
           const job = await response.json();
@@ -566,7 +572,7 @@ DEMO_HTML = """<!doctype html>
             fileObject: file,
             job_id: job.job_id,
             status: job.status,
-            config: configSelect.value,
+            config: uploadConfig,
             progress: {},
             artifacts: {},
           });
@@ -579,7 +585,9 @@ DEMO_HTML = """<!doctype html>
         message.textContent = error.message;
         message.className = "message error";
       } finally {
-        document.getElementById("submit").disabled = false;
+        submitButton.disabled = false;
+        configSelect.disabled = false;
+        formatInputs.forEach((input) => { input.disabled = false; });
       }
     }
 

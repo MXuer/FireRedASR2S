@@ -2,6 +2,10 @@
 
 Current state:
 
+- The web demo freezes the selected Language/Profile and output formats at the
+  start of a multi-file upload. Changing the dropdown while files are still
+  being submitted no longer affects later files in that same upload batch; the
+  profile and format controls are disabled until submission finishes.
 - FireRedASR2 is now available as composable components:
   `firered_asr` for ASR and `firered_asr_native` for native timestamp
   validation/pass-through. The ASR component defaults to the AED Chinese model

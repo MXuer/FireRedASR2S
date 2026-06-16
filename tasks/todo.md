@@ -1,5 +1,15 @@
 # Todo
 
+- [x] Current work: freeze the selected Language/Profile at the start of a multi-file upload.
+- [x] Current work: disable profile/format controls while the upload batch is being submitted.
+- [x] Current work: add demo smoke assertions and validate service tests.
+
+Review:
+- The web demo now captures `uploadConfig = configSelect.value` and `uploadFormats = selectedFormats()` once at the start of `submitJobs()`.
+- Every file in the same multi-file upload batch uses that frozen profile and format list, even if the user changes the dropdown before all requests finish.
+- The Language/Profile select and output-format checkboxes are disabled while the batch is being submitted.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service/demo.py tests/test_service.py`, and `git diff --check`.
+
 - [x] Current work: register FireRedASR as an ASR component named `firered_asr`.
 - [x] Current work: register FireRedASR native timestamps as a timestamp component named `firered_asr_native`.
 - [x] Current work: add language-support metadata and unit tests for FireRedASR ASR/timestamp discovery.
