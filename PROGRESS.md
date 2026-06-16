@@ -2,6 +2,12 @@
 
 Current state:
 
+- The web demo Review panel no longer shows Text/Target/Translate controls or
+  the Zoom slider. It defaults to bilingual display with `zh_cn` translation,
+  loads cached `translations/zh_cn.json` when a job is opened, and keeps
+  mouse-wheel zoom plus drag-to-pan. Workers can now auto-translate completed
+  ASR jobs via `SEMANTIC_ASR_AUTO_TRANSLATE_TARGETS`; the demo startup defaults
+  this to `zh_cn`. Translation failures are logged but do not fail the ASR job.
 - Hunyuan-MT translation slowness was traced to over-concurrency against a
   single local transformers model server: the demo default sent up to 32
   one-sentence requests at once, and the Hunyuan server did not serialize

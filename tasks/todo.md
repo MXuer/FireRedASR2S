@@ -1,5 +1,20 @@
 # Todo
 
+- [x] Current work: remove visible Text/Target translation controls from the demo review panel.
+- [x] Current work: remove the visible Zoom slider from the demo review panel while keeping mouse-wheel zoom.
+- [x] Current work: default review display to bilingual Chinese translation and auto-load cached translation.
+- [x] Current work: run translation automatically after ASR job success and store the sidecar cache.
+- [x] Current work: validate, restart affected services when safe, and commit.
+
+Review:
+- Removed visible `Text`, `Target`, `Translate` and `Zoom` slider controls from the Review panel.
+- Review now defaults internally to bilingual display with `zh_cn` translation and tries to load cached `translations/zh_cn.json` when a completed job is opened.
+- Mouse-wheel zoom and drag-to-pan remain available even without the slider.
+- Added `SEMANTIC_ASR_AUTO_TRANSLATE_TARGETS`; the demo startup defaults it to `zh_cn`.
+- Workers now try automatic translation after ASR output is written and before marking the job succeeded. Translation failures are logged but do not fail the ASR job.
+- Restarted the 10086 demo API/workers after confirming there were no queued/running demo jobs; 10087 Hunyuan-MT stayed running.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, `git diff --check`, `/health`, and `/demo` control-removal smoke.
+
 - [x] Current work: diagnose why Hunyuan-MT translation streams only produce one sentence every few minutes.
 - [x] Current work: check whether old/in-flight translation requests or server-side serialization are blocking new requests.
 - [x] Current work: propose or implement the minimal fix after identifying the bottleneck.

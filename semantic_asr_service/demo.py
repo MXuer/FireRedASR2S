@@ -242,7 +242,7 @@ DEMO_HTML = """<!doctype html>
     }
     .review-tools {
       display: grid;
-      grid-template-columns: 80px minmax(0, 1fr) 96px;
+      grid-template-columns: 80px minmax(0, 1fr);
       gap: 10px;
       align-items: center;
       margin-bottom: 10px;
@@ -400,22 +400,8 @@ DEMO_HTML = """<!doctype html>
         <div>
           <audio id="review-audio" controls></audio>
           <div class="review-tools">
-            <span>Zoom</span>
-            <input id="wave-zoom" type="range" min="1" max="48" step="1" value="1">
-            <span id="wave-zoom-label">1x</span>
             <span>Visible</span>
             <span id="wave-visible">00:00.000 - 00:00.000</span>
-            <span></span>
-            <span>Text</span>
-            <select id="text-mode">
-              <option value="original">Original</option>
-              <option value="translation">Translation</option>
-              <option value="bilingual">Bilingual</option>
-            </select>
-            <span></span>
-            <span>Target</span>
-            <select id="translation-target"></select>
-            <button id="translate" type="button">Translate</button>
           </div>
           <div class="wave-wrap">
             <canvas id="waveform" width="1200" height="220"></canvas>
@@ -427,6 +413,9 @@ DEMO_HTML = """<!doctype html>
     </section>
   </main>
   <script>
+    const DEFAULT_TRANSLATION_TARGET = "zh_cn";
+    const DEFAULT_DISPLAY_MODE = "bilingual";
+    const DEFAULT_WAVE_ZOOM = 1;
     const state = {
       jobs: [],
       timer: null,
@@ -452,12 +441,7 @@ DEMO_HTML = """<!doctype html>
     const waveform = document.getElementById("waveform");
     const waveContext = waveform.getContext("2d");
     const waveWrap = document.querySelector(".wave-wrap");
-    const waveZoom = document.getElementById("wave-zoom");
-    const waveZoomLabel = document.getElementById("wave-zoom-label");
     const waveVisible = document.getElementById("wave-visible");
-    const textMode = document.getElementById("text-mode");
-    const translationTarget = document.getElementById("translation-target");
-    const translateButton = document.getElementById("translate");
     const pageInfo = document.getElementById("page-info");
     const prevPage = document.getElementById("prev-page");
     const nextPage = document.getElementById("next-page");
@@ -501,21 +485,6 @@ DEMO_HTML = """<!doctype html>
       const savedConfig = localStorage.getItem("semanticAsrDemo.config");
       if (savedConfig && data.configs.includes(savedConfig)) {
         configSelect.value = savedConfig;
-      }
-    }
-
-    async function loadTranslationTargets() {
-      const response = await apiFetch("/v1/translation-targets");
-      const data = await response.json();
-      translationTarget.innerHTML = "";
-      data.targets.forEach((name) => {
-        const option = document.createElement("option");
-        option.value = name;
-        option.textContent = name;
-        translationTarget.appendChild(option);
-      });
-      if (data.targets.includes("zh_cn")) {
-        translationTarget.value = "zh_cn";
       }
     }
 
@@ -776,18 +745,29 @@ DEMO_HTML = """<!doctype html>
         audioBuffer: buffer,
         duration: result.dur_s || buffer.duration,
         segments,
-        translations: translationsForJob(jobId, translationTarget.value),
-        displayMode: textMode.value,
-        zoom: Number(waveZoom.value || 1),
+        translations: translationsForJob(jobId, DEFAULT_TRANSLATION_TARGET),
+        displayMode: DEFAULT_DISPLAY_MODE,
+        zoom: DEFAULT_WAVE_ZOOM,
         playUntilMs: null,
         peaksByWidth: new Map(),
       };
       renderSegmentList(segments);
+      await loadCachedTranslation(jobId, DEFAULT_TRANSLATION_TARGET);
       resizeWaveformForZoom();
       drawWaveform();
       reviewMessage.textContent = `${segments.length} segments loaded.`;
-      updateTranslationUi();
       review.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    async function loadCachedTranslation(jobId, target) {
+      try {
+        const response = await apiFetch(`/v1/jobs/${jobId}/translations/${target}`);
+        const payload = await response.json();
+        applyTranslationPayload(jobId, target, payload);
+      } catch (_error) {
+        reviewMessage.textContent = "Translation is not ready yet.";
+        reviewMessage.className = "message";
+      }
     }
 
     async function audioFileForJob(job) {
@@ -852,86 +832,6 @@ DEMO_HTML = """<!doctype html>
       return escapeHtml(segment.text);
     }
 
-    async function translateReview() {
-      const reviewState = state.review;
-      if (!reviewState) {
-        return;
-      }
-      const target = translationTarget.value;
-      const jobId = reviewState.jobId;
-      const key = translationKey(jobId, target);
-      state.translatingByJob[key] = true;
-      state.translationsByJob[key] = state.translationsByJob[key] || {};
-      reviewState.translations = state.translationsByJob[key];
-      textMode.value = "bilingual";
-      reviewState.displayMode = textMode.value;
-      renderSegmentList(reviewState.segments);
-      updateTranslationUi();
-      reviewMessage.textContent = "Translating...";
-      reviewMessage.className = "message";
-      try {
-        const response = await apiFetch(`/v1/jobs/${jobId}/translations/stream`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ target_language: target }),
-        });
-        await readTranslationStream(response, jobId, target);
-      } catch (error) {
-        if (state.review && state.review.jobId === jobId) {
-          reviewMessage.textContent = error.message;
-          reviewMessage.className = "message error";
-        }
-      } finally {
-        delete state.translatingByJob[key];
-        updateTranslationUi();
-      }
-    }
-
-    async function readTranslationStream(response, jobId, target) {
-      if (!response.body) {
-        const result = await response.json();
-        applyTranslationPayload(jobId, target, result);
-        return;
-      }
-      const key = translationKey(jobId, target);
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\\n");
-        buffer = lines.pop() || "";
-        lines.forEach((line) => handleTranslationEvent(line, jobId, target, key));
-      }
-      if (buffer.trim()) {
-        handleTranslationEvent(buffer, jobId, target, key);
-      }
-    }
-
-    function handleTranslationEvent(line, jobId, target, key) {
-      const event = JSON.parse(line);
-      if (event.type === "error") {
-        throw new Error(event.error || "Translation failed");
-      }
-      if (event.type === "sentence" && event.sentence) {
-        const sentence = event.sentence;
-        state.translationsByJob[key] = state.translationsByJob[key] || {};
-        state.translationsByJob[key][Number(sentence.index)] = sentence.translation || "";
-        if (state.review && state.review.jobId === jobId && translationTarget.value === target) {
-          state.review.translations = state.translationsByJob[key];
-          renderSegmentList(state.review.segments);
-          updateActiveSegment(reviewAudio.currentTime * 1000);
-          reviewMessage.textContent = `Translated ${Object.keys(state.review.translations).length} segments...`;
-          reviewMessage.className = "message";
-        }
-      }
-      if (event.type === "done") {
-        applyTranslationPayload(jobId, target, event.payload || {});
-      }
-    }
-
     function applyTranslationPayload(jobId, target, payload) {
       const key = translationKey(jobId, target);
       const translations = {};
@@ -939,10 +839,9 @@ DEMO_HTML = """<!doctype html>
         translations[Number(sentence.index)] = sentence.translation || "";
       });
       state.translationsByJob[key] = Object.keys(translations).length ? translations : (state.translationsByJob[key] || {});
-      if (state.review && state.review.jobId === jobId && translationTarget.value === target) {
+      if (state.review && state.review.jobId === jobId && target === DEFAULT_TRANSLATION_TARGET) {
         state.review.translations = state.translationsByJob[key];
-        textMode.value = "bilingual";
-        state.review.displayMode = textMode.value;
+        state.review.displayMode = DEFAULT_DISPLAY_MODE;
         renderSegmentList(state.review.segments);
         reviewMessage.textContent = `Translation loaded: ${target}`;
         reviewMessage.className = "message";
@@ -955,22 +854,6 @@ DEMO_HTML = """<!doctype html>
 
     function translationsForJob(jobId, target) {
       return state.translationsByJob[translationKey(jobId, target)] || {};
-    }
-
-    function updateTranslationUi() {
-      const reviewState = state.review;
-      if (!reviewState) {
-        translateButton.disabled = true;
-        return;
-      }
-      const key = translationKey(reviewState.jobId, translationTarget.value);
-      const translating = Boolean(state.translatingByJob[key]);
-      translateButton.disabled = translating;
-      translateButton.textContent = translating ? "Translating..." : "Translate";
-      if (translating) {
-        reviewMessage.textContent = "Translating...";
-        reviewMessage.className = "message";
-      }
     }
 
     function savePreferences() {
@@ -1026,10 +909,8 @@ DEMO_HTML = """<!doctype html>
       if (!reviewState) {
         return;
       }
-      const zoom = clampZoom(Number(waveZoom.value || reviewState.zoom || 1));
+      const zoom = clampZoom(Number(reviewState.zoom || DEFAULT_WAVE_ZOOM));
       reviewState.zoom = zoom;
-      waveZoom.value = String(zoom);
-      waveZoomLabel.textContent = `${zoom}x`;
       const visibleWidth = Math.max(600, Math.floor(waveWrap.clientWidth || 1200));
       const targetWidth = Math.min(60000, Math.max(visibleWidth, Math.floor(visibleWidth * zoom)));
       if (waveform.width !== targetWidth) {
@@ -1053,7 +934,6 @@ DEMO_HTML = """<!doctype html>
         anchorRatio = (waveWrap.scrollLeft + anchorClientX - rect.left) / oldWidth;
       }
       reviewState.zoom = clampZoom(nextZoom);
-      waveZoom.value = String(reviewState.zoom);
       resizeWaveformForZoom();
       drawWaveform();
       const anchorX = anchorRatio * waveform.width;
@@ -1246,24 +1126,6 @@ DEMO_HTML = """<!doctype html>
       seekSegment(button.dataset.segmentIndex);
     });
     reviewAudio.addEventListener("timeupdate", handleAudioTimeUpdate);
-    waveZoom.addEventListener("input", () => setWaveZoom(Number(waveZoom.value)));
-    textMode.addEventListener("change", () => {
-      if (!state.review) {
-        return;
-      }
-      state.review.displayMode = textMode.value;
-      renderSegmentList(state.review.segments);
-      updateActiveSegment(reviewAudio.currentTime * 1000);
-    });
-    translationTarget.addEventListener("change", () => {
-      if (!state.review) {
-        return;
-      }
-      state.review.translations = translationsForJob(state.review.jobId, translationTarget.value);
-      renderSegmentList(state.review.segments);
-      updateTranslationUi();
-    });
-    translateButton.addEventListener("click", translateReview);
     waveWrap.addEventListener("scroll", updateVisibleWindow);
     window.addEventListener("resize", drawWaveform);
     waveWrap.addEventListener("wheel", (event) => {
@@ -1273,7 +1135,7 @@ DEMO_HTML = """<!doctype html>
       event.preventDefault();
       const direction = event.deltaY < 0 ? 1 : -1;
       const factor = event.shiftKey ? 4 : 2;
-      setWaveZoom(Number(waveZoom.value) + direction * factor, event.clientX);
+      setWaveZoom((state.review.zoom || DEFAULT_WAVE_ZOOM) + direction * factor, event.clientX);
     }, { passive: false });
     waveWrap.addEventListener("pointerdown", (event) => {
       if (!state.review) {
@@ -1348,7 +1210,7 @@ DEMO_HTML = """<!doctype html>
       resetToFirstPage();
       state.review = null;
       review.hidden = true;
-      Promise.all([loadMe(), loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
+      Promise.all([loadMe(), loadConfigs(), loadJobs()]).catch((error) => {
         message.textContent = error.message;
         message.className = "message error";
       });
@@ -1356,7 +1218,7 @@ DEMO_HTML = """<!doctype html>
     configSelect.addEventListener("change", savePreferences);
     loadPreferences();
     checkHealth();
-    Promise.all([loadMe(), loadConfigs(), loadTranslationTargets(), loadJobs()]).catch((error) => {
+    Promise.all([loadMe(), loadConfigs(), loadJobs()]).catch((error) => {
       message.textContent = error.message;
       message.className = "message error";
     });

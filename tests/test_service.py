@@ -111,17 +111,17 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("normalizeSegments(result.sentences || [])", demo)
         self.assertIn("drawWaveform()", demo)
         self.assertIn("seekSegment(button.dataset.segmentIndex)", demo)
-        self.assertIn('id="wave-zoom"', demo)
+        self.assertNotIn('id="wave-zoom"', demo)
         self.assertIn('grid-template-columns: minmax(0, 1fr);', demo)
         self.assertIn('waveWrap.addEventListener("wheel"', demo)
         self.assertIn('waveWrap.addEventListener("pointerdown"', demo)
-        self.assertIn("setWaveZoom(Number(waveZoom.value)", demo)
-        self.assertIn('id="translation-target"', demo)
-        self.assertIn('id="text-mode"', demo)
-        self.assertIn('id="translate"', demo)
-        self.assertIn("state.translatingByJob[key] = true", demo)
-        self.assertIn('apiFetch(`/v1/jobs/${jobId}/translations/stream`', demo)
-        self.assertIn("readTranslationStream(response, jobId, target)", demo)
+        self.assertIn("DEFAULT_TRANSLATION_TARGET = \"zh_cn\"", demo)
+        self.assertIn("DEFAULT_DISPLAY_MODE = \"bilingual\"", demo)
+        self.assertIn("loadCachedTranslation(jobId, DEFAULT_TRANSLATION_TARGET)", demo)
+        self.assertNotIn('id="translation-target"', demo)
+        self.assertNotIn('id="text-mode"', demo)
+        self.assertNotIn('id="translate"', demo)
+        self.assertNotIn('apiFetch(`/v1/jobs/${jobId}/translations/stream`', demo)
         self.assertIn('form.append("local_path", localPath)', demo)
         self.assertIn("displayJobName(job)", demo)
         self.assertIn('"X-Semantic-ASR-User"', demo)
@@ -137,7 +137,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn("playUntilMs", demo)
         self.assertIn("handleAudioTimeUpdate", demo)
         self.assertIn("review.hidden = true", demo)
-        self.assertIn("updateTranslationUi()", demo)
+        self.assertNotIn("updateTranslationUi()", demo)
         self.assertIn("segmentTextHtml(segment)", demo)
 
     def test_configs_route_returns_allowed_profiles(self):
@@ -400,6 +400,37 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(failed_result["job_id"], failed["job_id"])
         self.assertEqual(failed_result["status"], "failed")
         self.assertIn("boom", failed_result["error"])
+
+    def test_worker_auto_translates_allowed_targets_after_success(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_base_url = "http://translation.local"
+            settings.translation_targets = {"zh_cn", "en_us"}
+            settings.auto_translate_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            job = store.create_job(
+                "job1",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+
+            def ok_runner(job, _settings):
+                os.makedirs(job["outdir"], exist_ok=True)
+                with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
+                    json.dump({"job_id": job["job_id"], "sentences": []}, fout)
+
+            with mock.patch("semantic_asr_service.translation.translate_job_result") as translate_mock:
+                result = run_worker_once(settings, store, runner=ok_runner)
+
+        self.assertEqual(result["status"], "succeeded")
+        translate_mock.assert_called_once()
+        called_job, called_settings, called_target = translate_mock.call_args.args
+        self.assertEqual(called_job["job_id"], job["job_id"])
+        self.assertIs(called_settings, settings)
+        self.assertEqual(called_target, "zh_cn")
 
     def test_translate_job_result_writes_and_reuses_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:

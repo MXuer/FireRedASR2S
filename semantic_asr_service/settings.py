@@ -21,6 +21,7 @@ class ServiceSettings:
     translation_model: str = "hunyuan-mt"
     translation_api_key: str = ""
     translation_targets: set[str] = field(default_factory=lambda: {"zh_cn", "en_us"})
+    auto_translate_targets: set[str] = field(default_factory=set)
     translation_batch_size: int = 16
     translation_max_concurrency: int = 1
     translation_request_mode: str = "json_batch"
@@ -72,6 +73,7 @@ def load_settings() -> ServiceSettings:
         translation_model=os.environ.get("SEMANTIC_ASR_TRANSLATION_MODEL", "hunyuan-mt"),
         translation_api_key=os.environ.get("SEMANTIC_ASR_TRANSLATION_API_KEY", ""),
         translation_targets=_env_set("SEMANTIC_ASR_TRANSLATION_TARGETS") or {"zh_cn", "en_us"},
+        auto_translate_targets=_env_set("SEMANTIC_ASR_AUTO_TRANSLATE_TARGETS"),
         translation_batch_size=int(os.environ.get("SEMANTIC_ASR_TRANSLATION_BATCH_SIZE", "16")),
         translation_max_concurrency=int(os.environ.get("SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY", "1")),
         translation_request_mode=os.environ.get("SEMANTIC_ASR_TRANSLATION_REQUEST_MODE", "json_batch"),
