@@ -32,7 +32,7 @@ export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=1
 export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
 export SEMANTIC_ASR_DEMO_USER_HEADER=1
 export SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7
-export SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=4
+export SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=2
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -64,10 +64,10 @@ semantic-asr-worker --device 7
 ```
 
 Each worker sets `CUDA_VISIBLE_DEVICES` before loading models. The demo startup
-script defaults to GPUs `6,7` with four ASR workers per GPU:
+script defaults to GPUs `6,7` with two ASR workers per GPU:
 
 ```bash
-SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7 SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=4 \
+SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7 SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=2 \
   scripts/start_demo_service.sh
 ```
 

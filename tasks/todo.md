@@ -1,5 +1,9 @@
 # Todo
 
+- [ ] Current work: reduce demo ASR worker default to GPUs 6/7 with two workers per GPU.
+- [ ] Current work: restart 10086 demo/API workers without touching Hunyuan-MT on GPU 5.
+- [ ] Current work: verify service health and queue state after restart.
+
 - [x] Current work: split job language/profile into its own Jobs table column.
 - [x] Current work: truncate long file labels in the Jobs table while preserving the full value as hover text.
 - [x] Current work: remove the Stage column from the Jobs table.
@@ -8,13 +12,13 @@
 - [x] Current work: add retry for failed/canceled jobs.
 - [x] Current work: make failed error display compact in the Jobs table.
 - [x] Current work: make auto translation asynchronous so ASR workers do not wait for translation.
-- [x] Current work: change demo ASR worker defaults to GPUs 6 and 7 with four workers per GPU, and document translation on GPU 5.
+- [x] Current work: change demo ASR worker defaults to GPUs 6 and 7 with two workers per GPU, and document translation on GPU 5.
 
 Review:
 - Failed/canceled jobs can now be retried through `POST /v1/jobs/{job_id}/retry`, which requeues the job and clears previous error/start/finish metadata. Running jobs cannot be retried.
 - The Jobs table no longer dumps traceback text into the cell. Failed jobs show compact `Error` and `Retry` buttons; `Error` opens the full text on demand.
 - Automatic translation is now fire-and-forget after `mark_succeeded()`: ASR workers do not wait for Hunyuan-MT translation before claiming more ASR jobs.
-- Demo ASR worker defaults are now `SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7` and `SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=4`.
+- Demo ASR worker defaults are now `SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7` and `SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=2`.
 - Added `scripts/start_hunyuan_mt_service.sh`, defaulting Hunyuan-MT to GPU 5 and port 10087.
 - Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, `bash -n scripts/start_hunyuan_mt_service.sh`, and `git diff --check`.
 - Demo service restart still needs to be done when host-command approval is available; the previous attempt to inspect/restart host processes was blocked by the approval usage limit.
