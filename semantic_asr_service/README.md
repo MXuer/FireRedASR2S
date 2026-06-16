@@ -27,7 +27,7 @@ export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
 export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
 export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
 export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16
-export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=json_batch
+export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
 ```
 
 `SEMANTIC_ASR_ALLOWED_CONFIGS` uses config profile names. A request with
@@ -99,9 +99,12 @@ curl -H "Authorization: Bearer user-token" \
 Available endpoints:
 
 - `POST /v1/jobs`
+- `GET /v1/jobs`
 - `GET /v1/jobs/{job_id}`
 - `GET /v1/jobs/{job_id}/result`
+- `GET /v1/jobs/{job_id}/audio`
 - `GET /v1/jobs/{job_id}/artifacts/{json|srt|csv|textgrid}`
+- `POST /v1/jobs/{job_id}/translations/stream`
 - `GET /v1/configs`
 - `GET /v1/models?language=zh_cn`
 - `GET /demo`
@@ -132,16 +135,18 @@ there is no separate backend.
 
 The demo persists the entered user name, API token and selected profile in the
 browser. It also reloads the authenticated user's previous jobs from
-`GET /v1/jobs` after refresh or service restart. Completed historical jobs can
-be reviewed without re-uploading because the browser fetches the original
-uploaded audio from `GET /v1/jobs/{job_id}/audio`.
+`GET /v1/jobs` after refresh or service restart. Uploads include a best-effort
+local-path hint (`webkitRelativePath` when available, otherwise the file name)
+so the job table can show a recognizable source name instead of only a job id.
+Browsers do not expose real absolute local paths and cannot reopen arbitrary
+local files by path after refresh. During the current page session the demo uses
+the browser `File` object first; after refresh it fetches the saved uploaded
+audio from `GET /v1/jobs/{job_id}/audio`.
 
 After a job succeeds, click `View` to review the result in the browser. The
-demo decodes the local uploaded audio file, draws a waveform, overlays sentence
-cut intervals from the JSON result and lets the user click a segment to seek and
-play the corresponding audio. If the browser page was refreshed, reselect and
-resubmit the local audio file because browsers do not preserve access to local
-files across page loads.
+demo decodes the selected or saved uploaded audio file, draws a waveform,
+overlays sentence cut intervals from the JSON result and lets the user click a
+segment to seek and play the corresponding audio.
 
 For long audio review, use the waveform zoom slider or mouse wheel over the
 waveform to zoom in and out. Drag the waveform horizontally to pan through the
@@ -153,13 +158,13 @@ with Hunyuan-MT and switch display between original, translated and bilingual
 text. Translation is stored as a sidecar JSON under the job output directory and
 does not change sentence timestamps or waveform intervals.
 
-Completed ASR sentences are translated in batches by default. The service sends
-up to `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` sentence texts in one structured JSON
-prompt, validates that the model returns the same sentence indexes, and falls
-back to per-sentence translation for that batch if the JSON is malformed.
-Set `SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single` to instead send
-one sentence per request while dispatching up to
-`SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` requests concurrently.
+The demo calls `POST /v1/jobs/{job_id}/translations/stream` and updates the
+segment list as each translated sentence arrives. The default startup script
+uses `SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single`, which sends one
+sentence per request while dispatching up to
+`SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` requests concurrently. `json_batch` is
+still available for a single structured JSON request containing multiple
+sentences, but it cannot stream sentence-by-sentence UI updates.
 
 `systemd` and `supervisor` are process managers. They are useful when this
 service should survive SSH logout, machine reboot, or crashes. The startup

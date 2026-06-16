@@ -11,6 +11,7 @@ class JobStatusResponse(BaseModel):
     status: str
     config: str
     filename: str | None = None
+    local_path: str | None = None
     created_at: str | None = None
     started_at: str | None = None
     finished_at: str | None = None

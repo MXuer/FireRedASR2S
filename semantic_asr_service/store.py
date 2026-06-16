@@ -28,6 +28,7 @@ class JobStore:
                     user_id TEXT NOT NULL,
                     config TEXT NOT NULL,
                     filename TEXT,
+                    local_path TEXT,
                     wav_path TEXT NOT NULL,
                     outdir TEXT NOT NULL,
                     formats TEXT NOT NULL,
@@ -43,6 +44,8 @@ class JobStore:
             columns = {row["name"] for row in conn.execute("PRAGMA table_info(jobs)").fetchall()}
             if "filename" not in columns:
                 conn.execute("ALTER TABLE jobs ADD COLUMN filename TEXT")
+            if "local_path" not in columns:
+                conn.execute("ALTER TABLE jobs ADD COLUMN local_path TEXT")
 
     def create_job(
         self,
@@ -53,22 +56,24 @@ class JobStore:
         outdir: str,
         formats: list[str],
         filename: str = "",
+        local_path: str = "",
     ) -> dict[str, Any]:
         now = _utc_now()
         with self.connect() as conn:
             conn.execute(
                 """
                 INSERT INTO jobs (
-                    job_id, user_id, config, filename, wav_path, outdir, formats, status,
+                    job_id, user_id, config, filename, local_path, wav_path, outdir, formats, status,
                     progress, error, created_at, started_at, finished_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, NULL, NULL)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, NULL, ?, NULL, NULL)
                 """,
                 (
                     job_id,
                     user_id,
                     config,
                     filename,
+                    local_path,
                     wav_path,
                     outdir,
                     json.dumps(formats),

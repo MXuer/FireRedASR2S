@@ -25,6 +25,7 @@ from semantic_asr_service.artifacts import artifact_path
 from semantic_asr_service.settings import ServiceSettings, _parse_api_keys, load_settings
 from semantic_asr_service.store import JobStore
 from semantic_asr_service.translation import (
+    stream_translate_job_result,
     translate_job_result,
     translate_sentences_batched,
     translation_cache_path,
@@ -111,8 +112,11 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('id="translation-target"', demo)
         self.assertIn('id="text-mode"', demo)
         self.assertIn('id="translate"', demo)
-        self.assertIn('apiFetch(`/v1/jobs/${jobId}/translations`', demo)
         self.assertIn("state.translatingByJob[key] = true", demo)
+        self.assertIn('apiFetch(`/v1/jobs/${jobId}/translations/stream`', demo)
+        self.assertIn("readTranslationStream(response, jobId, target)", demo)
+        self.assertIn('form.append("local_path", localPath)', demo)
+        self.assertIn("displayJobName(job)", demo)
         self.assertIn("updateTranslationUi()", demo)
         self.assertIn("segmentTextHtml(segment)", demo)
 
@@ -145,6 +149,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
                 os.path.join(tmpdir, "jobs", "alice-job", "outputs"),
                 ["json"],
                 filename="alice.wav",
+                local_path="/audio/alice.wav",
             )
             store.create_job(
                 "bob-job",
@@ -166,6 +171,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual([job["job_id"] for job in alice_response["jobs"]], ["alice-job"])
         self.assertEqual({job["job_id"] for job in admin_response["jobs"]}, {"alice-job", "bob-job"})
         self.assertEqual(alice_response["jobs"][0]["filename"], "alice.wav")
+        self.assertEqual(alice_response["jobs"][0]["local_path"], "/audio/alice.wav")
 
     def test_submit_job_core_creates_queued_job(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -398,6 +404,38 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual([item["translation"] for item in translated], ["Chinese::hello", "Chinese::world"])
         self.assertEqual(translator.calls, 0)
         self.assertEqual(translator.fallback_calls, 2)
+
+    def test_stream_translate_job_result_yields_sentences_and_writes_cache(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            settings.translation_batch_size = 2
+            store = JobStore(settings.db_path)
+            job = store.create_job(
+                "job1",
+                "alice",
+                "ko_kr",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+            store.mark_succeeded("job1")
+            job = store.get_job("job1")
+            os.makedirs(job["outdir"], exist_ok=True)
+            with open(os.path.join(job["outdir"], "job1.json"), "w", encoding="utf-8") as fout:
+                json.dump({
+                    "sentences": [
+                        {"start_ms": 0, "end_ms": 100, "text": "hello"},
+                        {"start_ms": 100, "end_ms": 200, "text": "world"},
+                    ]
+                }, fout)
+
+            events = list(stream_translate_job_result(job, settings, "zh_cn", translator=self.FakeTranslator()))
+
+            sentence_events = [event for event in events if event["type"] == "sentence"]
+            self.assertEqual(len(sentence_events), 2)
+            self.assertEqual(events[-1]["type"], "done")
+            self.assertTrue(os.path.exists(translation_cache_path(job["outdir"], "zh_cn")))
 
     def test_translate_job_result_rejects_disallowed_target(self):
         settings = self._settings(tempfile.mkdtemp())

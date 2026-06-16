@@ -457,14 +457,17 @@ DEMO_HTML = """<!doctype html>
       try {
         for (const file of files) {
           const form = new FormData();
+          const localPath = localPathForFile(file);
           form.append("audio", file);
           form.append("config", configSelect.value);
           form.append("formats", selectedFormats());
+          form.append("local_path", localPath);
           const response = await apiFetch("/v1/jobs", { method: "POST", body: form });
           const job = await response.json();
           state.jobs.unshift({
-            file: file.name,
+            file: localPath,
             filename: file.name,
+            local_path: localPath,
             fileObject: file,
             job_id: job.job_id,
             status: job.status,
@@ -528,6 +531,7 @@ DEMO_HTML = """<!doctype html>
         existing.set(job.job_id, Object.assign({}, current, job, {
           file: current.file || job.filename || job.job_id,
           filename: job.filename || current.filename || "",
+          local_path: job.local_path || current.local_path || "",
           fileObject: current.fileObject || null,
         }));
       });
@@ -552,7 +556,7 @@ DEMO_HTML = """<!doctype html>
       state.jobs.forEach((job) => {
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${escapeHtml(job.file || job.filename || "")}<br><span class="message">${escapeHtml(job.config || "")}</span></td>
+          <td>${escapeHtml(displayJobName(job))}<br><span class="message">${escapeHtml(job.config || "")}</span></td>
           <td>${escapeHtml(job.job_id || "")}</td>
           <td><span class="status ${escapeHtml(job.status || "")}">${escapeHtml(job.status || "")}</span></td>
           <td>${escapeHtml((job.progress && job.progress.stage) || "")}</td>
@@ -600,7 +604,7 @@ DEMO_HTML = """<!doctype html>
       message.textContent = "";
       message.className = "message";
       review.hidden = false;
-      reviewTitle.textContent = `Review - ${job.file || job.filename || job.job_id}`;
+      reviewTitle.textContent = `Review - ${displayJobName(job)}`;
       reviewMessage.textContent = "Loading waveform...";
       reviewMessage.className = "message";
       segmentList.innerHTML = "";
@@ -642,6 +646,14 @@ DEMO_HTML = """<!doctype html>
       const blob = await response.blob();
       const name = job.filename || `${job.job_id}.wav`;
       return new File([blob], name, { type: blob.type || "audio/wav" });
+    }
+
+    function localPathForFile(file) {
+      return file.webkitRelativePath || file.name || "";
+    }
+
+    function displayJobName(job) {
+      return job.local_path || job.file || job.filename || job.job_id || "";
     }
 
     async function decodeAudioFile(file) {
@@ -697,29 +709,21 @@ DEMO_HTML = """<!doctype html>
       const jobId = reviewState.jobId;
       const key = translationKey(jobId, target);
       state.translatingByJob[key] = true;
+      state.translationsByJob[key] = state.translationsByJob[key] || {};
+      reviewState.translations = state.translationsByJob[key];
+      textMode.value = "bilingual";
+      reviewState.displayMode = textMode.value;
+      renderSegmentList(reviewState.segments);
       updateTranslationUi();
       reviewMessage.textContent = "Translating...";
       reviewMessage.className = "message";
       try {
-        const response = await apiFetch(`/v1/jobs/${jobId}/translations`, {
+        const response = await apiFetch(`/v1/jobs/${jobId}/translations/stream`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ target_language: target }),
         });
-        const result = await response.json();
-        const translations = {};
-        (result.sentences || []).forEach((sentence) => {
-          translations[Number(sentence.index)] = sentence.translation || "";
-        });
-        state.translationsByJob[key] = translations;
-        if (state.review && state.review.jobId === jobId) {
-          state.review.translations = translations;
-          textMode.value = "bilingual";
-          state.review.displayMode = textMode.value;
-          renderSegmentList(state.review.segments);
-          reviewMessage.textContent = `Translation loaded: ${target}`;
-          reviewMessage.className = "message";
-        }
+        await readTranslationStream(response, jobId, target);
       } catch (error) {
         if (state.review && state.review.jobId === jobId) {
           reviewMessage.textContent = error.message;
@@ -728,6 +732,68 @@ DEMO_HTML = """<!doctype html>
       } finally {
         delete state.translatingByJob[key];
         updateTranslationUi();
+      }
+    }
+
+    async function readTranslationStream(response, jobId, target) {
+      if (!response.body) {
+        const result = await response.json();
+        applyTranslationPayload(jobId, target, result);
+        return;
+      }
+      const key = translationKey(jobId, target);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\\n");
+        buffer = lines.pop() || "";
+        lines.forEach((line) => handleTranslationEvent(line, jobId, target, key));
+      }
+      if (buffer.trim()) {
+        handleTranslationEvent(buffer, jobId, target, key);
+      }
+    }
+
+    function handleTranslationEvent(line, jobId, target, key) {
+      const event = JSON.parse(line);
+      if (event.type === "error") {
+        throw new Error(event.error || "Translation failed");
+      }
+      if (event.type === "sentence" && event.sentence) {
+        const sentence = event.sentence;
+        state.translationsByJob[key] = state.translationsByJob[key] || {};
+        state.translationsByJob[key][Number(sentence.index)] = sentence.translation || "";
+        if (state.review && state.review.jobId === jobId && translationTarget.value === target) {
+          state.review.translations = state.translationsByJob[key];
+          renderSegmentList(state.review.segments);
+          updateActiveSegment(reviewAudio.currentTime * 1000);
+          reviewMessage.textContent = `Translated ${Object.keys(state.review.translations).length} segments...`;
+          reviewMessage.className = "message";
+        }
+      }
+      if (event.type === "done") {
+        applyTranslationPayload(jobId, target, event.payload || {});
+      }
+    }
+
+    function applyTranslationPayload(jobId, target, payload) {
+      const key = translationKey(jobId, target);
+      const translations = {};
+      (payload.sentences || []).forEach((sentence) => {
+        translations[Number(sentence.index)] = sentence.translation || "";
+      });
+      state.translationsByJob[key] = Object.keys(translations).length ? translations : (state.translationsByJob[key] || {});
+      if (state.review && state.review.jobId === jobId && translationTarget.value === target) {
+        state.review.translations = state.translationsByJob[key];
+        textMode.value = "bilingual";
+        state.review.displayMode = textMode.value;
+        renderSegmentList(state.review.segments);
+        reviewMessage.textContent = `Translation loaded: ${target}`;
+        reviewMessage.className = "message";
       }
     }
 

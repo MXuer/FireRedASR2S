@@ -1,9 +1,10 @@
+import json
 import os
 import uuid
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 import soundfile as sf
 
 from semantic_asr.api import list_models
@@ -14,6 +15,7 @@ from semantic_asr_service.settings import ServiceSettings, load_settings
 from semantic_asr_service.store import JobStore
 from semantic_asr_service.translation import (
     HunyuanMTClient,
+    stream_translate_job_result,
     translate_job_result,
     translation_cache_path,
 )
@@ -59,6 +61,7 @@ def create_app(
         audio: UploadFile = File(...),
         config: str = Form(...),
         formats: str = Form("json,srt,csv,textgrid"),
+        local_path: str = Form(""),
         user=Depends(_require_user),
     ):
         _require_allowed_config(settings, config)
@@ -84,6 +87,7 @@ def create_app(
             outdir=outdir,
             formats=selected_formats,
             filename=audio.filename or "",
+            local_path=local_path,
         )
         return {"job_id": job["job_id"], "status": job["status"]}
 
@@ -134,6 +138,29 @@ def create_app(
         except RuntimeError as exc:
             raise HTTPException(status_code=503, detail=str(exc)) from exc
 
+    @app.post("/v1/jobs/{job_id}/translations/stream")
+    def stream_translation(job_id: str, request: TranslationCreateRequest, user=Depends(_require_user)):
+        job = _get_authorized_job(store, job_id, user)
+        if job["status"] != "succeeded":
+            raise HTTPException(status_code=400, detail="ASR job has not succeeded")
+        try:
+            client = app.state.translation_client or HunyuanMTClient.from_settings(settings)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+
+        def events():
+            try:
+                for event in stream_translate_job_result(job, settings, request.target_language, translator=client):
+                    yield f"{json_dumps(event)}\n"
+            except ValueError as exc:
+                yield f"{json_dumps({'type': 'error', 'error': str(exc)})}\n"
+            except FileNotFoundError as exc:
+                yield f"{json_dumps({'type': 'error', 'error': str(exc)})}\n"
+            except Exception as exc:
+                yield f"{json_dumps({'type': 'error', 'error': str(exc)})}\n"
+
+        return StreamingResponse(events(), media_type="application/x-ndjson")
+
     @app.get("/v1/jobs/{job_id}/translations/{target_language}")
     def get_translation(job_id: str, target_language: str, user=Depends(_require_user)):
         job = _get_authorized_job(store, job_id, user)
@@ -175,6 +202,7 @@ def _job_response(job: dict) -> dict:
         "status": job["status"],
         "config": job["config"],
         "filename": job.get("filename") or "",
+        "local_path": job.get("local_path") or "",
         "created_at": job.get("created_at"),
         "started_at": job.get("started_at"),
         "finished_at": job.get("finished_at"),
@@ -232,6 +260,10 @@ def _validate_audio_duration(wav_path: str, max_audio_seconds: float) -> None:
 
 def _new_job_id() -> str:
     return uuid.uuid4().hex
+
+
+def json_dumps(value: dict) -> str:
+    return json.dumps(value, ensure_ascii=False)
 
 
 app = create_app()

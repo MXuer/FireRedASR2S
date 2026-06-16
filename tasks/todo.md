@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: change demo startup default translation mode to `concurrent_single`.
+- [x] Current work: add streaming translation so each completed sentence can appear in the page immediately.
+- [x] Current work: store an upload-time local path hint and show it in the jobs/review UI.
+- [x] Current work: keep browser `File` loading as the first choice, then fall back to server-uploaded audio after refresh.
+- [x] Current work: update tests/docs, validate, restart demo and commit.
+
+Review:
+- `scripts/start_demo_service.sh` now defaults to `SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single`.
+- Added `POST /v1/jobs/{job_id}/translations/stream`, returning NDJSON sentence events as translations complete, followed by a final `done` event and cache write.
+- The demo reads the translation stream and updates the segment list sentence-by-sentence instead of waiting for the whole job.
+- Uploads now send a best-effort `local_path` hint. Browsers cannot expose absolute local paths, so this is `webkitRelativePath` when available, otherwise the file name.
+- Job list/review titles prioritize `local_path`, then file name, then job id. Current-session review still uses the browser `File` object first; after refresh it fetches the saved upload from `/audio`.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n scripts/start_demo_service.sh`, `git diff --check`, and an HTTP smoke on `/translations/stream`.
+
 - [x] Current work: add a single demo startup script that starts API plus worker processes together.
 - [x] Current work: make service workers claim jobs before model loading and print startup/claim/completion logs.
 - [x] Current work: fix web demo translation state so switching jobs does not leave the translate button disabled or silent.

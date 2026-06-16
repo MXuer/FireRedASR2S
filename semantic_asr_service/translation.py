@@ -2,7 +2,7 @@ import json
 import os
 import re
 import urllib.request
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -89,59 +89,59 @@ def translate_job_result(
     target_language: str,
     translator: Translator | None = None,
 ) -> dict:
-    if target_language not in settings.translation_targets:
-        raise ValueError(f"Translation target is not allowed: {target_language}")
-
-    result_path = artifact_path(job["outdir"], job["job_id"], "json")
-    if not os.path.exists(result_path):
-        raise FileNotFoundError(f"ASR JSON is not available: {result_path}")
-
-    with open(result_path, encoding="utf-8") as fin:
-        result = json.load(fin)
-
+    source = _load_translation_source(job, settings, target_language)
     cache_path = translation_cache_path(job["outdir"], target_language)
-    source_hash = _source_signature(result_path, result)
-    cached = _read_valid_cache(cache_path, source_hash)
+    cached = _read_valid_cache(cache_path, source["source_hash"])
     if cached:
         return cached
 
-    source_language = str(result.get("language") or job.get("config") or "").lower()
-    source_name = language_prompt_name(source_language)
-    target_name = language_prompt_name(target_language)
     translator = translator or HunyuanMTClient.from_settings(settings)
-    source_sentences = []
-    for index, sentence in enumerate(result.get("sentences") or []):
-        source_sentences.append({
-            "index": index,
-            "start_ms": sentence.get("start_ms"),
-            "end_ms": sentence.get("end_ms"),
-            "cut_start_ms": sentence.get("cut_start_ms", sentence.get("start_ms")),
-            "cut_end_ms": sentence.get("cut_end_ms", sentence.get("end_ms")),
-            "text": str(sentence.get("text") or "").strip(),
-        })
     translated_sentences = translate_sentences_batched(
-        source_sentences,
+        source["sentences"],
         translator,
-        source_name,
-        target_name,
+        source["source_name"],
+        source["target_name"],
         max(1, int(settings.translation_batch_size)),
         settings.translation_request_mode,
     )
+    return _write_translation_payload(job, settings, target_language, source, translated_sentences)
 
-    payload = {
-        "job_id": job["job_id"],
-        "source_language": source_language,
-        "target_language": target_language,
-        "target_language_name": target_name,
-        "status": "succeeded",
-        "model": settings.translation_model,
-        "source_signature": source_hash,
-        "sentences": translated_sentences,
-    }
-    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
-    with open(cache_path, "w", encoding="utf-8") as fout:
-        json.dump(payload, fout, ensure_ascii=False, indent=2)
-    return payload
+
+def stream_translate_job_result(
+    job: dict,
+    settings: ServiceSettings,
+    target_language: str,
+    translator: Translator | None = None,
+):
+    source = _load_translation_source(job, settings, target_language)
+    cache_path = translation_cache_path(job["outdir"], target_language)
+    cached = _read_valid_cache(cache_path, source["source_hash"])
+    if cached:
+        for sentence in cached.get("sentences") or []:
+            yield {"type": "sentence", "sentence": sentence, "cached": True}
+        yield {"type": "done", "payload": cached, "cached": True}
+        return
+
+    translator = translator or HunyuanMTClient.from_settings(settings)
+    translated_by_index = {}
+    batch_size = max(1, int(settings.translation_batch_size))
+    for start in range(0, len(source["sentences"]), batch_size):
+        batch = source["sentences"][start:start + batch_size]
+        for sentence in _stream_translate_concurrent_single(
+            batch,
+            translator,
+            source["source_name"],
+            source["target_name"],
+        ):
+            translated_by_index[int(sentence["index"])] = sentence
+            yield {"type": "sentence", "sentence": sentence}
+
+    translated_sentences = [
+        translated_by_index.get(int(sentence["index"]), dict(sentence, translation=""))
+        for sentence in source["sentences"]
+    ]
+    payload = _write_translation_payload(job, settings, target_language, source, translated_sentences)
+    yield {"type": "done", "payload": payload}
 
 
 def translation_cache_path(outdir: str, target_language: str) -> str:
@@ -172,6 +172,30 @@ def translate_sentences_batched(
             enriched["translation"] = translation
             translated.append(enriched)
     return translated
+
+
+def _stream_translate_concurrent_single(
+    batch: list[dict],
+    translator: Translator,
+    source_language: str,
+    target_language: str,
+):
+    if len(batch) <= 1:
+        for sentence, translation in zip(batch, _translate_one_by_one(batch, translator, source_language, target_language)):
+            yield dict(sentence, translation=translation)
+        return
+    try:
+        with ThreadPoolExecutor(max_workers=len(batch)) as executor:
+            futures = {
+                executor.submit(_translate_sentence, sentence, translator, source_language, target_language): sentence
+                for sentence in batch
+            }
+            for future in as_completed(futures):
+                sentence = futures[future]
+                yield dict(sentence, translation=future.result())
+    except Exception:
+        for sentence, translation in zip(batch, _translate_one_by_one(batch, translator, source_language, target_language)):
+            yield dict(sentence, translation=translation)
 
 
 def _translate_concurrent_single(
@@ -306,6 +330,62 @@ def _source_signature(result_path: str, result: dict) -> dict:
         "size": stat.st_size,
         "sentence_count": len(sentences),
     }
+
+
+def _load_translation_source(job: dict, settings: ServiceSettings, target_language: str) -> dict:
+    if target_language not in settings.translation_targets:
+        raise ValueError(f"Translation target is not allowed: {target_language}")
+
+    result_path = artifact_path(job["outdir"], job["job_id"], "json")
+    if not os.path.exists(result_path):
+        raise FileNotFoundError(f"ASR JSON is not available: {result_path}")
+
+    with open(result_path, encoding="utf-8") as fin:
+        result = json.load(fin)
+
+    source_language = str(result.get("language") or job.get("config") or "").lower()
+    source_sentences = []
+    for index, sentence in enumerate(result.get("sentences") or []):
+        source_sentences.append({
+            "index": index,
+            "start_ms": sentence.get("start_ms"),
+            "end_ms": sentence.get("end_ms"),
+            "cut_start_ms": sentence.get("cut_start_ms", sentence.get("start_ms")),
+            "cut_end_ms": sentence.get("cut_end_ms", sentence.get("end_ms")),
+            "text": str(sentence.get("text") or "").strip(),
+        })
+    return {
+        "result_path": result_path,
+        "source_hash": _source_signature(result_path, result),
+        "source_language": source_language,
+        "source_name": language_prompt_name(source_language),
+        "target_name": language_prompt_name(target_language),
+        "sentences": source_sentences,
+    }
+
+
+def _write_translation_payload(
+    job: dict,
+    settings: ServiceSettings,
+    target_language: str,
+    source: dict,
+    translated_sentences: list[dict],
+) -> dict:
+    payload = {
+        "job_id": job["job_id"],
+        "source_language": source["source_language"],
+        "target_language": target_language,
+        "target_language_name": source["target_name"],
+        "status": "succeeded",
+        "model": settings.translation_model,
+        "source_signature": source["source_hash"],
+        "sentences": translated_sentences,
+    }
+    cache_path = translation_cache_path(job["outdir"], target_language)
+    os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+    with open(cache_path, "w", encoding="utf-8") as fout:
+        json.dump(payload, fout, ensure_ascii=False, indent=2)
+    return payload
 
 
 def _read_valid_cache(path: str, source_signature: dict) -> dict | None:

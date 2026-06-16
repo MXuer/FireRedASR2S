@@ -148,6 +148,22 @@ Current state:
 
 Recent validation:
 
+- Demo translation now defaults to the one-sentence-per-request concurrent mode
+  in `scripts/start_demo_service.sh`
+  (`SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single`). Added
+  `POST /v1/jobs/{job_id}/translations/stream`, which returns NDJSON events so
+  the browser can display each sentence translation as soon as it completes and
+  then writes the normal sidecar cache on the final `done` event. Uploads now
+  include a best-effort `local_path` hint for display: browsers cannot expose a
+  true absolute local path, so the demo records `webkitRelativePath` when
+  available, otherwise the file name. The job list and review title prioritize
+  that source hint over the job id. Current-session waveform review still uses
+  the browser `File` object first; after refresh the page falls back to the
+  server-saved upload from `GET /v1/jobs/{job_id}/audio`. Validation passed:
+  `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`,
+  `bash -n scripts/start_demo_service.sh`, `git diff --check`, and an HTTP
+  smoke of `/v1/jobs/translation_smoke_hunyuan_mt/translations/stream`.
+
 - The HTTP demo now has a unified startup script:
   `scripts/start_demo_service.sh`. It starts the API and the configured number
   of workers together against the same `service_data/demo` SQLite queue, so the
