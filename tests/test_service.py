@@ -26,9 +26,11 @@ from semantic_asr_service.app import (
     _validate_audio_duration,
 )
 from semantic_asr_service.artifacts import artifact_path
+from semantic_asr_service.backfill_translations import find_missing_translation_jobs, backfill_translations
 from semantic_asr_service.settings import ServiceSettings, _parse_api_keys, load_settings
 from semantic_asr_service.store import JobStore
 from semantic_asr_service.translation import (
+    HunyuanMTClient,
     stream_translate_job_result,
     translate_job_result,
     translate_sentences_batched,
@@ -102,8 +104,8 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIn('WORKER_DEVICES="${SEMANTIC_ASR_DEMO_WORKER_DEVICES:-6,7}"', demo_script)
         self.assertIn('WORKERS_PER_DEVICE="${SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE:-2}"', demo_script)
         self.assertIn('DEVICE="${HUNYUAN_MT_DEVICE:-5}"', translation_script)
-        self.assertIn('MODEL_ID="${HUNYUAN_MT_MODEL_ID:-Tencent-Hunyuan/HY-MT1.5-1.8B-FP8}"', translation_script)
-        self.assertIn('MAX_CONCURRENT="${HUNYUAN_MT_MAX_CONCURRENT:-4}"', translation_script)
+        self.assertIn('MODEL_ID="${HUNYUAN_MT_MODEL_ID:-tencent/HY-MT1.5-1.8B-FP8}"', translation_script)
+        self.assertIn('MAX_CONCURRENT="${HUNYUAN_MT_MAX_CONCURRENT:-24}"', translation_script)
 
     def test_web_demo_route_uses_existing_job_api_and_multi_file_upload(self):
         settings = self._settings(tempfile.mkdtemp())
@@ -661,6 +663,73 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(second["sentences"][0]["translation"], "Chinese::감회가 새롭습니다.")
         self.assertEqual(translator.calls, 1)
 
+    def test_backfill_translations_finds_succeeded_jobs_missing_cache(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            missing = store.create_job(
+                "missing",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "missing", "outputs"),
+                ["json"],
+            )
+            failed = store.create_job(
+                "failed",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "failed", "outputs"),
+                ["json"],
+            )
+            cached = store.create_job(
+                "cached",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "cached", "outputs"),
+                ["json"],
+            )
+            for job in (missing, cached):
+                os.makedirs(job["outdir"], exist_ok=True)
+                with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
+                    json.dump({"sentences": [{"start_ms": 0, "end_ms": 1, "text": "hello"}]}, fout)
+                store.mark_succeeded(job["job_id"])
+            store.mark_failed(failed["job_id"], "boom")
+            os.makedirs(os.path.dirname(translation_cache_path(cached["outdir"], "zh_cn")), exist_ok=True)
+            with open(translation_cache_path(cached["outdir"], "zh_cn"), "w", encoding="utf-8") as fout:
+                json.dump({"source_signature": {}}, fout)
+
+            found = find_missing_translation_jobs(settings, store, "zh_cn")
+
+        self.assertEqual([job["job_id"] for job in found], ["missing"])
+
+    def test_backfill_translations_writes_missing_cache(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            job = store.create_job(
+                "job1",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "job1", "outputs"),
+                ["json"],
+            )
+            os.makedirs(job["outdir"], exist_ok=True)
+            with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
+                json.dump({"sentences": [{"start_ms": 0, "end_ms": 1, "text": "hello"}]}, fout)
+            store.mark_succeeded(job["job_id"])
+
+            with mock.patch("semantic_asr_service.backfill_translations.translate_job_result") as translate_mock:
+                succeeded, failed = backfill_translations(settings, "zh_cn")
+
+        self.assertEqual((succeeded, failed), (1, 0))
+        translate_mock.assert_called_once()
+
     def test_translate_sentences_batched_accepts_structured_batch_output(self):
         sentences = [
             {"index": 3, "text": "Hallo Welt."},
@@ -762,6 +831,13 @@ class SemanticAsrServiceTest(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             translate_job_result({"outdir": "", "job_id": "job1", "config": "ko_kr"}, settings, "en_us", self.FakeTranslator())
+
+    def test_hunyuan_client_round_robins_multiple_base_urls(self):
+        client = HunyuanMTClient("http://a, http://b/", "hunyuan-mt")
+
+        self.assertEqual(client._next_base_url(), "http://a")
+        self.assertEqual(client._next_base_url(), "http://b")
+        self.assertEqual(client._next_base_url(), "http://a")
 
     def test_translation_routes_require_configured_service_or_fake_client(self):
         with tempfile.TemporaryDirectory() as tmpdir:

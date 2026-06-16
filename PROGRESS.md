@@ -2,13 +2,25 @@
 
 Current state:
 
-- Translation defaults are being switched to `Tencent-Hunyuan/HY-MT1.5-1.8B-FP8`.
-  The Hunyuan startup script discovers the newest local HuggingFace snapshot for
-  that model unless `HUNYUAN_MT_MODEL_PATH` is set. Default translation
-  concurrency is raised to 4 and demo translation batch size to 16. Job success
-  now waits for configured auto translation to finish; translation failure
-  marks the job failed, so `succeeded` means ASR plus cached translation are
-  ready for the UI.
+- Translation now uses `tencent/HY-MT1.5-1.8B-FP8` by default. The Hunyuan
+  startup script discovers the newest local HuggingFace snapshot unless
+  `HUNYUAN_MT_MODEL_PATH` is set, supports `HUNYUAN_MT_PORTS` for multiple
+  same-GPU replicas, and runs with `conda run --no-capture-output` so service
+  logs are visible. Current live translation replicas are on GPU `5`, ports
+  `10087,10088,10089`, each with `--max-concurrent 8`.
+- Translation clients now accept comma-separated
+  `SEMANTIC_ASR_TRANSLATION_BASE_URL` values and round-robin requests across
+  replicas. Defaults are `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=64`,
+  `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=24`, and
+  `SEMANTIC_ASR_TRANSLATION_TIMEOUT_S=300`.
+- Translation backfill exists at
+  `python -m semantic_asr_service.backfill_translations --target zh_cn`. The
+  demo service data backfill completed successfully: 21 succeeded jobs with
+  JSON outputs now have `zh_cn` translation caches, with 0 missing.
+- Current live services are background `setsid` processes: demo/API on
+  `0.0.0.0:10086`, ASR workers on GPUs `6,7` with two workers per GPU, and
+  Hunyuan-MT replicas on ports `10087,10088,10089`. Health checks passed for
+  all four ports.
 - Failed/canceled demo jobs can be retried through
   `POST /v1/jobs/{job_id}/retry`; failed rows show compact Error/Retry buttons
   instead of dumping long traceback text into the Jobs table. Auto translation
@@ -21,26 +33,18 @@ Current state:
   the cell title, the Stage column was removed, and jobs can be multi-selected
   and deleted. Backend `DELETE /v1/jobs/{job_id}` enforces ownership/admin
   access, rejects running jobs with 409, removes the DB row, and only deletes
-  upload/output directories under the configured service roots. Tests pass, but
-  the running `10086` demo service still needs a restart to load this change;
-  host process/port commands were blocked by the current approval usage limit.
+  upload/output directories under the configured service roots. The running
+  `10086` demo service has been restarted with the current code.
 - The web demo Review panel no longer shows Text/Target/Translate controls or
   the Zoom slider. It defaults to bilingual display with `zh_cn` translation,
   loads cached `translations/zh_cn.json` when a job is opened, and keeps
   mouse-wheel zoom plus drag-to-pan. Workers can now auto-translate completed
   ASR jobs via `SEMANTIC_ASR_AUTO_TRANSLATE_TARGETS`; the demo startup defaults
   this to `zh_cn`. Translation failures are logged but do not fail the ASR job.
-- Hunyuan-MT translation slowness was traced to over-concurrency against a
-  single local transformers model server: the demo default sent up to 32
-  one-sentence requests at once, and the Hunyuan server did not serialize
-  `model.generate()` calls. A tiny direct request to `10087` timed out at 30s
-  while the old service was wedged. The client now has
-  `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY` separate from batch size, the demo
-  defaults to batch size 8 and max concurrency 1, and the Hunyuan-MT server has
-  a `--max-concurrent` generation semaphore. Restarting only `10087` with
-  `--max-concurrent 1` restored a tiny request to about 3s. The running `10086`
-  demo API still needs a restart to load the client-side concurrency window;
-  the server-side semaphore is already active on `10087`.
+- Earlier Hunyuan-MT slowness was traced to a single local transformers model
+  server underusing GPU 5. A single HY-MT1.5 instance stayed around 30% GPU
+  utilization; three same-GPU replicas raised utilization to 100% during
+  backfill and completed the pending translation cache generation.
 - The web demo job panel now matches the upload panel height, scrolls the table
   inside the panel, and provides `Language / Profile` plus `PM / Username`
   filters. `GET /v1/jobs` supports optional `config` and `user_id` filters

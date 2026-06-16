@@ -4,6 +4,8 @@ import re
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
+from itertools import cycle
+from threading import Lock
 from typing import Protocol
 
 from semantic_asr_service.artifacts import artifact_path
@@ -43,6 +45,13 @@ class HunyuanMTClient:
     temperature: float = 0.2
     top_p: float = 0.6
     max_tokens: int = 512
+    timeout_s: float = 300.0
+
+    def __post_init__(self) -> None:
+        urls = [url.strip().rstrip("/") for url in self.base_url.split(",") if url.strip()]
+        self._base_urls = urls or [self.base_url.rstrip("/")]
+        self._url_cycle = cycle(self._base_urls)
+        self._url_lock = Lock()
 
     @classmethod
     def from_settings(cls, settings: ServiceSettings) -> "HunyuanMTClient":
@@ -52,6 +61,7 @@ class HunyuanMTClient:
             base_url=settings.translation_base_url,
             model=settings.translation_model,
             api_key=settings.translation_api_key,
+            timeout_s=settings.translation_timeout_s,
         )
 
     def translate(self, text: str, source_language: str, target_language: str) -> str:
@@ -67,12 +77,12 @@ class HunyuanMTClient:
             "max_tokens": self.max_tokens,
         }
         request = urllib.request.Request(
-            f"{self.base_url}/v1/chat/completions",
+            f"{self._next_base_url()}/v1/chat/completions",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
             headers=self._headers(),
             method="POST",
         )
-        with urllib.request.urlopen(request, timeout=120) as response:
+        with urllib.request.urlopen(request, timeout=self.timeout_s) as response:
             data = json.loads(response.read().decode("utf-8"))
         return _extract_chat_content(data)
 
@@ -81,6 +91,10 @@ class HunyuanMTClient:
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
+
+    def _next_base_url(self) -> str:
+        with self._url_lock:
+            return next(self._url_cycle)
 
 
 def translate_job_result(

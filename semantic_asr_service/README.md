@@ -27,8 +27,9 @@ export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087
 export SEMANTIC_ASR_TRANSLATION_MODEL=hunyuan-mt
 export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
 export SEMANTIC_ASR_AUTO_TRANSLATE_TARGETS=zh_cn
-export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=16
-export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=4
+export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=64
+export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=24
+export SEMANTIC_ASR_TRANSLATION_TIMEOUT_S=300
 export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
 export SEMANTIC_ASR_DEMO_USER_HEADER=1
 export SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7
@@ -179,11 +180,15 @@ The Review panel defaults to bilingual display and tries to load the cached
 Text/Target/Translate controls. `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE` controls
 how many sentences are processed per window, while
 `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY` controls how many requests may hit
-the translation service at the same time. The default is `4` for the smaller
-`HY-MT1.5-1.8B-FP8` model. If latency gets worse or GPU memory becomes tight,
-lower it with the environment variable. `json_batch` remains available for
-programmatic translation requests, but the demo now relies on the precomputed
-cache.
+the translation service at the same time. `SEMANTIC_ASR_TRANSLATION_BASE_URL`
+also accepts comma-separated service replicas such as
+`http://127.0.0.1:10087,http://127.0.0.1:10088,http://127.0.0.1:10089`; requests
+are round-robin distributed across them. The default client concurrency is `24`
+for the smaller `HY-MT1.5-1.8B-FP8` model, with a `300` second per-request
+timeout for long or busy batches. If latency gets worse or GPU memory becomes
+tight, lower the concurrency with the environment variable. `json_batch`
+remains available for programmatic translation requests, but the demo now
+relies on the precomputed cache.
 
 `systemd` and `supervisor` are process managers. They are useful when this
 service should survive SSH logout, machine reboot, or crashes. The startup
@@ -206,11 +211,19 @@ CUDA_VISIBLE_DEVICES=5 python -m vllm.entrypoints.openai.api_server \
 
 On this machine, vLLM is not installed in the ASR environment. A minimal
 transformers-based OpenAI-compatible wrapper is available instead. It defaults
-to `Tencent-Hunyuan/HY-MT1.5-1.8B-FP8`, GPU `5`, and server-side
-`HUNYUAN_MT_MAX_CONCURRENT=4`:
+to `tencent/HY-MT1.5-1.8B-FP8`, GPU `5`, and server-side
+`HUNYUAN_MT_MAX_CONCURRENT=24`. Set `HUNYUAN_MT_PORTS=10087,10088,10089` to run
+multiple model replicas on the same GPU:
 
 ```bash
 scripts/start_hunyuan_mt_service.sh
+```
+
+For the current long-running demo deployment on this machine, run three
+HY-MT1.5 replicas on GPU `5` as a detached background process:
+
+```bash
+setsid -f bash -c 'cd /data/duhu/FireRedASR2S && HUNYUAN_MT_PORTS=10087,10088,10089 HUNYUAN_MT_DEVICE=5 HUNYUAN_MT_MAX_CONCURRENT=8 scripts/start_hunyuan_mt_service.sh > service_data/hunyuan_mt15_multi.log 2>&1'
 ```
 
 The wrapper prepares a local runtime copy of the FP8 config because the
@@ -218,20 +231,36 @@ Hunyuan-MT model card requires renaming `ignored_layers` to `ignore` when using
 the FP8 model with transformers/compressed-tensors. It keeps large safetensors
 files as symlinks to the Hugging Face cache.
 
-For a demo backed by GPU 7 with two workers:
+Backfill cached translations for historical jobs that already succeeded before
+auto-translation was enabled or before the translation model was ready:
 
 ```bash
 export SEMANTIC_ASR_SERVICE_DATA_DIR=service_data/demo
-export SEMANTIC_ASR_ALLOWED_CONFIGS=zh_cn,en_us,vi_vn,ar_sa,de_de
-export SEMANTIC_ASR_API_KEYS='demo-token:demo,admin-token:admin:admin'
-export SEMANTIC_ASR_SERVICE_PORT=10086
+export SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087,http://127.0.0.1:10088,http://127.0.0.1:10089
+export SEMANTIC_ASR_TRANSLATION_TARGETS=zh_cn,en_us
+export SEMANTIC_ASR_TRANSLATION_REQUEST_MODE=concurrent_single
+export SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=64
+export SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=24
+export SEMANTIC_ASR_TRANSLATION_TIMEOUT_S=300
 
-semantic-asr-server
+python -m semantic_asr_service.backfill_translations --target zh_cn --dry-run
+python -m semantic_asr_service.backfill_translations --target zh_cn
 ```
 
-In two additional shells:
+The backfill command only translates jobs whose DB status is `succeeded`, whose
+main result JSON exists, and whose target translation cache is missing. It does
+not rerun ASR or overwrite an existing translation cache.
+
+For the current demo stack, prefer the wrapper script instead of starting API
+and workers by hand. It starts the API on port `10086`, ASR workers on GPUs
+`6,7`, and points translation requests at the separate Hunyuan-MT service:
 
 ```bash
-semantic-asr-worker --device 7
-semantic-asr-worker --device 7
+scripts/start_demo_service.sh
+```
+
+Detached background demo startup with the three translation replicas:
+
+```bash
+setsid -f bash -c 'cd /data/duhu/FireRedASR2S && SEMANTIC_ASR_TRANSLATION_BASE_URL=http://127.0.0.1:10087,http://127.0.0.1:10088,http://127.0.0.1:10089 SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=64 SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=24 SEMANTIC_ASR_TRANSLATION_TIMEOUT_S=300 scripts/start_demo_service.sh > service_data/demo_service_10086.log 2>&1'
 ```

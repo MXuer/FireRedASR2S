@@ -102,11 +102,12 @@ class JobStore:
         offset: int = 0,
         config: str | None = None,
         filter_user_id: str | None = None,
+        include_internal: bool = False,
     ) -> list[dict[str, Any]]:
         limit = max(1, min(500, int(limit)))
         offset = max(0, int(offset))
         with self.connect() as conn:
-            where_clause, params = self._list_filter(user_id, include_all, config, filter_user_id)
+            where_clause, params = self._list_filter(user_id, include_all, config, filter_user_id, include_internal)
             rows = conn.execute(
                 f"SELECT * FROM jobs WHERE {where_clause} ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (*params, limit, offset),
@@ -119,9 +120,10 @@ class JobStore:
         include_all: bool = False,
         config: str | None = None,
         filter_user_id: str | None = None,
+        include_internal: bool = False,
     ) -> int:
         with self.connect() as conn:
-            where_clause, params = self._list_filter(user_id, include_all, config, filter_user_id)
+            where_clause, params = self._list_filter(user_id, include_all, config, filter_user_id, include_internal)
             row = conn.execute(f"SELECT COUNT(*) AS count FROM jobs WHERE {where_clause}", params).fetchone()
         return int(row["count"])
 
@@ -131,6 +133,7 @@ class JobStore:
         include_all: bool,
         config: str | None,
         filter_user_id: str | None,
+        include_internal: bool,
     ) -> tuple[str, tuple[str, ...]]:
         clauses = []
         params: list[str] = []
@@ -146,9 +149,12 @@ class JobStore:
         if config:
             clauses.append("config = ?")
             params.append(config)
-        hidden_clause, hidden_params = _hidden_jobs_filter()
-        clauses.append(hidden_clause)
-        params.extend(hidden_params)
+        if not include_internal:
+            hidden_clause, hidden_params = _hidden_jobs_filter()
+            clauses.append(hidden_clause)
+            params.extend(hidden_params)
+        if not clauses:
+            clauses.append("1 = 1")
         return " AND ".join(clauses), tuple(params)
 
     def claim_next_job(self) -> dict[str, Any] | None:

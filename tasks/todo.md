@@ -1,5 +1,22 @@
 # Todo
 
+- [x] Current work: add a reusable translation backfill command for succeeded jobs missing cached translations.
+- [x] Current work: document the HY-MT1.5 backfill flow and keep the service docs aligned with the current startup scripts.
+- [x] Current work: validate the backfill code with unit tests and syntax checks.
+- [x] Current work: restart/check the HY-MT1.5 translation service on port 10087.
+- [x] Current work: raise HY-MT1.5 translation concurrency after observing low GPU memory use.
+- [x] Current work: dry-run and execute zh_cn translation backfill for the demo service data.
+
+Review:
+- Added `semantic_asr_service.backfill_translations`, which scans succeeded jobs with existing ASR JSON and missing target translation cache, then writes the cache without rerunning ASR.
+- HY-MT1.5 now uses the local HF repo id `tencent/HY-MT1.5-1.8B-FP8`; the startup script handles lowercase HF cache paths and uses `conda run --no-capture-output` so logs are visible.
+- Translation clients accept comma-separated base URLs and round-robin requests across replicas.
+- Defaults are now `SEMANTIC_ASR_TRANSLATION_BATCH_SIZE=64`, `SEMANTIC_ASR_TRANSLATION_MAX_CONCURRENCY=24`, and `SEMANTIC_ASR_TRANSLATION_TIMEOUT_S=300`.
+- `scripts/start_hunyuan_mt_service.sh` supports `HUNYUAN_MT_PORTS=10087,10088,10089` for multiple same-GPU HY-MT1.5 replicas.
+- Real backfill completed for `service_data/demo`: 21 succeeded jobs have `zh_cn` translation cache, 0 missing.
+- Live services are background `setsid` processes: demo/API on `10086`, ASR workers on GPUs `6,7`, and Hunyuan-MT replicas on `10087,10088,10089`.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service tests/test_service.py`, `bash -n` for both startup scripts, and `git diff --check`.
+
 - [x] Current work: switch translation defaults from Hunyuan-MT-7B-fp8 to HY-MT1.5-1.8B-FP8.
 - [x] Current work: increase translation client/server concurrency defaults for the smaller model.
 - [x] Current work: make the Hunyuan startup script discover the downloaded HY-MT1.5 snapshot path.
