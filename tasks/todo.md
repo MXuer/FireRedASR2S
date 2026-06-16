@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: add upload progress UI for multi-file demo uploads.
+- [x] Current work: report current file index, upload percent, and approximate upload speed.
+- [x] Current work: switch job creation upload request to XMLHttpRequest so browser upload progress is available.
+- [x] Current work: validate demo HTML smoke tests.
+- [ ] Current work: restart 10086 after current running jobs finish.
+
+Review:
+- The web demo upload form now shows a progress bar while multi-file uploads are being submitted.
+- Upload status reports the current file index, per-file percentage, and approximate aggregate upload speed.
+- Job creation uploads now use XMLHttpRequest so browser upload progress events are available.
+- Validation passed: `tests.test_service`, `compileall semantic_asr_service/demo.py tests/test_service.py`, and `git diff --check`.
+
 - [x] Current work: skip Hunyuan translation calls for Chinese-source to Chinese-target jobs.
 - [x] Current work: write identity translation cache for skipped Chinese jobs so the UI can still load bilingual data.
 - [x] Current work: validate sync and streaming translation paths.

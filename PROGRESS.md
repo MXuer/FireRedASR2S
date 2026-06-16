@@ -2,6 +2,11 @@
 
 Current state:
 
+- The web demo upload form now shows browser upload progress for multi-file
+  submissions. Job creation requests use `XMLHttpRequest` so the UI can display
+  current file index, per-file percentage, overall progress, and approximate
+  aggregate upload speed while still freezing the selected profile/formats for
+  the whole batch.
 - Translation skips Hunyuan-MT for Chinese-source to Chinese-target jobs
   (`zh_cn`, `zh`, `hakka`, etc. -> `zh_cn`). The service writes an identity
   translation cache with `model="identity"` and `skipped=true` so the web UI

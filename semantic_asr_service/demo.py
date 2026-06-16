@@ -105,6 +105,32 @@ DEMO_HTML = """<!doctype html>
       font-size: 13px;
     }
     .formats input { width: 16px; height: 16px; }
+    .upload-progress {
+      display: none;
+      margin: 12px 0;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #f8fafc;
+    }
+    .upload-progress.active { display: block; }
+    .upload-progress-track {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #e2e8f0;
+    }
+    .upload-progress-bar {
+      width: 0%;
+      height: 100%;
+      background: var(--brand);
+      transition: width .15s ease;
+    }
+    .upload-progress-text {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+    }
     button {
       height: 40px;
       border: 0;
@@ -380,6 +406,12 @@ DEMO_HTML = """<!doctype html>
         </div>
       </div>
       <button id="submit">Submit</button>
+      <div id="upload-progress" class="upload-progress" aria-live="polite">
+        <div class="upload-progress-track">
+          <div id="upload-progress-bar" class="upload-progress-bar"></div>
+        </div>
+        <div id="upload-progress-text" class="upload-progress-text">Waiting...</div>
+      </div>
       <p id="message" class="message"></p>
     </section>
     <section class="jobs">
@@ -481,6 +513,9 @@ DEMO_HTML = """<!doctype html>
     const clearFilters = document.getElementById("clear-filters");
     const selectAllJobs = document.getElementById("select-all-jobs");
     const deleteSelected = document.getElementById("delete-selected");
+    const uploadProgress = document.getElementById("upload-progress");
+    const uploadProgressBar = document.getElementById("upload-progress-bar");
+    const uploadProgressText = document.getElementById("upload-progress-text");
 
     function authHeaders() {
       const token = tokenInput.value.trim() || userNameInput.value.trim();
@@ -498,6 +533,35 @@ DEMO_HTML = """<!doctype html>
         throw new Error(text || `${response.status} ${response.statusText}`);
       }
       return response;
+    }
+
+    function apiUpload(url, form, onProgress) {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", url);
+        Object.entries(authHeaders()).forEach(([key, value]) => {
+          xhr.setRequestHeader(key, value);
+        });
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable && onProgress) {
+            onProgress(event.loaded, event.total);
+          }
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              resolve(JSON.parse(xhr.responseText || "{}"));
+            } catch (error) {
+              reject(new Error("Invalid JSON response from upload"));
+            }
+          } else {
+            reject(new Error(xhr.responseText || `${xhr.status} ${xhr.statusText}`));
+          }
+        };
+        xhr.onerror = () => reject(new Error("Upload failed"));
+        xhr.onabort = () => reject(new Error("Upload canceled"));
+        xhr.send(form);
+      });
     }
 
     async function loadConfigs() {
@@ -539,6 +603,30 @@ DEMO_HTML = """<!doctype html>
         .join(",");
     }
 
+    function formatBytes(bytes) {
+      if (!Number.isFinite(bytes) || bytes <= 0) {
+        return "0 B";
+      }
+      const units = ["B", "KB", "MB", "GB"];
+      let value = bytes;
+      let unitIndex = 0;
+      while (value >= 1024 && unitIndex < units.length - 1) {
+        value /= 1024;
+        unitIndex += 1;
+      }
+      return `${value >= 10 || unitIndex === 0 ? value.toFixed(0) : value.toFixed(1)} ${units[unitIndex]}`;
+    }
+
+    function updateUploadProgress({ file, fileIndex, fileCount, fileLoaded, fileTotal, batchLoaded, batchTotal, startedAt }) {
+      const elapsedS = Math.max((Date.now() - startedAt) / 1000, 0.001);
+      const speed = batchLoaded / elapsedS;
+      const batchPercent = batchTotal > 0 ? Math.min(100, (batchLoaded / batchTotal) * 100) : 0;
+      const filePercent = fileTotal > 0 ? Math.min(100, (fileLoaded / fileTotal) * 100) : 0;
+      uploadProgress.classList.add("active");
+      uploadProgressBar.style.width = `${batchPercent.toFixed(1)}%`;
+      uploadProgressText.textContent = `上传 ${fileIndex}/${fileCount}: ${file.name} · ${filePercent.toFixed(1)}% · ${formatBytes(speed)}/s`;
+    }
+
     async function submitJobs() {
       message.textContent = "";
       message.className = "message";
@@ -552,19 +640,48 @@ DEMO_HTML = """<!doctype html>
       const uploadConfig = configSelect.value;
       const uploadFormats = selectedFormats();
       const formatInputs = Array.from(document.querySelectorAll("input[name='format']"));
+      const batchTotal = files.reduce((total, file) => total + file.size, 0);
+      let completedBytes = 0;
+      const startedAt = Date.now();
       submitButton.disabled = true;
       configSelect.disabled = true;
       formatInputs.forEach((input) => { input.disabled = true; });
+      uploadProgress.classList.add("active");
+      uploadProgressBar.style.width = "0%";
+      uploadProgressText.textContent = `准备上传 0/${files.length}`;
       try {
-        for (const file of files) {
+        for (const [index, file] of files.entries()) {
           const form = new FormData();
           const localPath = localPathForFile(file);
           form.append("audio", file);
           form.append("config", uploadConfig);
           form.append("formats", uploadFormats);
           form.append("local_path", localPath);
-          const response = await apiFetch("/v1/jobs", { method: "POST", body: form });
-          const job = await response.json();
+          updateUploadProgress({
+            file,
+            fileIndex: index + 1,
+            fileCount: files.length,
+            fileLoaded: 0,
+            fileTotal: file.size,
+            batchLoaded: completedBytes,
+            batchTotal,
+            startedAt,
+          });
+          const job = await apiUpload("/v1/jobs", form, (loaded, total) => {
+            updateUploadProgress({
+              file,
+              fileIndex: index + 1,
+              fileCount: files.length,
+              fileLoaded: loaded,
+              fileTotal: total || file.size,
+              batchLoaded: completedBytes + loaded,
+              batchTotal,
+              startedAt,
+            });
+          });
+          completedBytes += file.size;
+          uploadProgressBar.style.width = `${batchTotal > 0 ? Math.min(100, (completedBytes / batchTotal) * 100).toFixed(1) : 100}%`;
+          uploadProgressText.textContent = `创建任务 ${index + 1}/${files.length}: ${file.name}`;
           state.jobs.unshift({
             file: localPath,
             filename: file.name,
@@ -581,9 +698,11 @@ DEMO_HTML = """<!doctype html>
         renderJobs();
         startPolling();
         message.textContent = `已提交 ${files.length} 个任务。`;
+        uploadProgressText.textContent = `上传完成 ${files.length}/${files.length} · 平均 ${formatBytes(batchTotal / Math.max((Date.now() - startedAt) / 1000, 0.001))}/s`;
       } catch (error) {
         message.textContent = error.message;
         message.className = "message error";
+        uploadProgressText.textContent = `上传失败: ${error.message}`;
       } finally {
         submitButton.disabled = false;
         configSelect.disabled = false;
