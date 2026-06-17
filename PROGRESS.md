@@ -2,6 +2,14 @@
 
 Current state:
 
+- The previous demo/API/worker process group running from the main repository
+  path `/data/duhu/FireRedASR2S` has been stopped. The unrelated
+  `/data/duhu/semantic-asr-trans-api` service on port 8000 was left untouched.
+- The active demo/API/worker service now runs from this derived worktree:
+  `/home/duhu/.codex/worktrees/0d7a/FireRedASR2S`. It listens on port `10086`,
+  uses `service_data/demo`, and has ASR workers on GPUs `6,7` with two workers
+  per GPU. Translation still reuses `10087,10088,10089`. Health check returned
+  `{"ok":true}`, and `/demo` served the web UI.
 - Added `configs/zh_cn_mms_starprobe.json` as a real Chinese long-audio smoke
   profile for the new MMS star-probe path: Silero VAD, FunASR-Nano ASR, MMS
   forced alignment with `star_probe_enabled=true`, and FireRedPunc.

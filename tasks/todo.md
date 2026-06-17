@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: locate running main-branch demo/API/worker processes under `/data/duhu/FireRedASR2S`.
+- [x] Current work: stop only the main-branch server workers and web UI, leaving translation services alone.
+- [x] Current work: start the demo API/UI and workers from this worktree for user testing.
+- [x] Current work: verify `/health` and `/demo` are served by the current worktree instance.
+- [x] Current work: record the runtime handoff result.
+
+Review:
+- Stopped only the main-branch demo/API/worker process group whose cwd was `/data/duhu/FireRedASR2S`.
+- Left the unrelated `/data/duhu/semantic-asr-trans-api` service on port 8000 untouched.
+- Started the current worktree demo service from `/home/duhu/.codex/worktrees/0d7a/FireRedASR2S` on port 10086.
+- Started ASR workers from the current worktree on GPUs 6 and 7, two workers per GPU.
+- Translation endpoints on `10087,10088,10089` are reused.
+- Runtime validation passed: `GET /health` returned `{"ok":true}`, `/demo` served HTML, and `ss` shows port 10086 listening from the current worktree API process.
+
 - [x] Current work: choose a Chinese config for `/data/duhu/FireRedASR2S/data/zh-cn-long.wav`.
 - [x] Current work: run the long Chinese audio smoke test on GPU 2.
 - [x] Current work: inspect generated JSON/output health and record the result.
