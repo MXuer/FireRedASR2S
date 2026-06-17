@@ -21,10 +21,9 @@
       }
     },
     "punc": {
-      "name": "firered_punc",
+      "name": "ct_punc",
       "params": {
-        "model_dir": "/data/duhu/FireRedASR2S/pretrained_models/FireRedPunc",
-        "use_gpu": true
+        "batch_size": 8
       }
     }
   },

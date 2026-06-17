@@ -1,5 +1,19 @@
 # Todo
 
+- [x] Current work: add FunASR `ct-punc` punctuation adapter for Chinese.
+- [x] Current work: register `ct_punc` in the punctuation registry and language support metadata.
+- [x] Current work: switch Chinese profile punctuation to `ct_punc`.
+- [x] Current work: add tests/docs and run a local ct-punc smoke if available.
+
+Review:
+- Added `semantic_asr.adapters.ct_punc.CtPunc`, backed by FunASR `AutoModel(model="ct-punc")`.
+- The adapter joins Chinese tokens without spaces and keeps spaces around English/digit tokens before calling FunASR, then maps returned `text` back to timestamp sentences.
+- Registered `ct_punc` as a Chinese punctuation component and added it to language support metadata.
+- Switched `configs/zh_cn.json` and `configs/zh_cn_mms_starprobe.json` from `firered_punc` to `ct_punc`.
+- Added `docs/models/ct_punc.md` with install/runtime notes and smoke command.
+- Validation passed: `tests.test_punctuation_strategies tests.test_language_support tests.test_config_runner`, targeted `compileall`, `git diff --check`, and a real local ct-punc adapter smoke.
+
+
 - [x] Current work: inspect job `62addd9043b446a798784baaf0fc685f` around Vietnamese `Hiện tại CNP` split.
 - [x] Current work: identify which boundary-fusion rule kept the boundary before `sử dụng i-Sign`.
 - [x] Current work: decide whether incomplete fragments should merge across this boundary and add a focused regression if needed.

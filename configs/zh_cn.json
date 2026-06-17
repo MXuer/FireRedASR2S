@@ -15,9 +15,9 @@
       "name": "funasr_native"
     },
     "punc": {
-      "name": "firered_punc",
+      "name": "ct_punc",
       "params": {
-        "use_gpu": true
+        "batch_size": 8
       }
     }
   },

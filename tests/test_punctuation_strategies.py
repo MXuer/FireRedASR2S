@@ -8,6 +8,7 @@ from semantic_asr.core import (
     validate_sentence_intervals,
 )
 from semantic_asr.adapters.naqta_punctuation import punctuate_tokens_from_labels
+from semantic_asr.adapters.ct_punc import CtPunc
 from semantic_asr.adapters.yue_punctuation import (
     punctuate_timestamp_from_labels as punctuate_yue_timestamp_from_labels,
     punctuate_tokens_from_labels as punctuate_yue_tokens_from_labels,
@@ -117,6 +118,43 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(sentences[0]["end_s"], 0.4)
         self.assertEqual(sentences[1]["start_s"], 0.5)
         self.assertEqual(sentences[1]["end_s"], 0.9)
+
+    def test_ct_punc_maps_funasr_text_output_to_timestamps(self):
+        class FakeModel:
+            def generate(self, input, batch_size=1):
+                self.input = input
+                self.batch_size = batch_size
+                return [{"text": "那今天的会就到这里吧，happy new year,明年见。"}]
+
+        adapter = object.__new__(CtPunc)
+        adapter.config = type("Config", (), {"batch_size": 4})()
+        adapter.model = FakeModel()
+        timestamp = [
+            ["那", 0.0, 0.1],
+            ["今", 0.1, 0.2],
+            ["天", 0.2, 0.3],
+            ["的", 0.3, 0.4],
+            ["会", 0.4, 0.5],
+            ["就", 0.5, 0.6],
+            ["到", 0.6, 0.7],
+            ["这", 0.7, 0.8],
+            ["里", 0.8, 0.9],
+            ["吧", 0.9, 1.0],
+            ["happy", 1.1, 1.3],
+            ["new", 1.3, 1.5],
+            ["year", 1.5, 1.7],
+            ["明", 1.8, 1.9],
+            ["年", 1.9, 2.0],
+            ["见", 2.0, 2.1],
+        ]
+
+        result = adapter.process_with_timestamp([timestamp], ["sample"])[0]
+
+        self.assertEqual(adapter.model.input, ["那今天的会就到这里吧 happy new year 明年见"])
+        self.assertEqual(adapter.model.batch_size, 4)
+        self.assertEqual(len(result["punc_sentences"]), 1)
+        self.assertEqual(result["punc_sentences"][0]["punc_text"], "那今天的会就到这里吧，happy new year,明年见。")
+        self.assertEqual(result["punc_sentences"][0]["end_s"], 2.1)
 
     def test_text_punctuation_does_not_create_standalone_punctuation_sentence(self):
         sentences = split_text_by_punctuation(

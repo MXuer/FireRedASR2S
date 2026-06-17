@@ -58,6 +58,7 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("timestamp", "qwen3_forced_aligner", _build_qwen3_forced_aligner)
     registry.register("timestamp", "mms_forced_aligner", _build_mms_forced_aligner)
     registry.register("punc", "firered_punc", _build_firered_punc)
+    registry.register("punc", "ct_punc", _build_ct_punc)
     registry.register("punc", "asr_native", _build_asr_native_punc)
     registry.register("punc", "asr_text", _build_asr_text_punc)
     registry.register("punc", "naqta", _build_naqta_punctuation)
@@ -191,6 +192,12 @@ def _build_firered_punc(params: Mapping[str, Any]) -> PuncModel:
     config_params = _nested_or_direct_config(params, FireRedPuncConfig)
     config = _dataclass_from_mapping(FireRedPuncConfig, config_params)
     return build_firered_punc(model_dir, config)
+
+
+def _build_ct_punc(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.adapters.ct_punc import CtPunc, CtPuncConfig
+
+    return CtPunc(_dataclass_from_mapping(CtPuncConfig, params))
 
 
 def _build_asr_native_punc(params: Mapping[str, Any]) -> PuncModel:

@@ -2,6 +2,13 @@
 
 Current state:
 
+- Chinese punctuation now uses FunASR `ct-punc` via the registered `ct_punc`
+  component. `configs/zh_cn.json` and `configs/zh_cn_mms_starprobe.json` have
+  been switched from `firered_punc` to `ct_punc`. The adapter reconstructs text
+  from timestamp tokens, preserves spaces around English/digit runs for FunASR,
+  and maps the returned punctuated `text` back onto timestamps with
+  `split_text_by_punctuation()`. A real local smoke produced
+  `那今天的会就到这里吧，happy new year,明年见。`.
 - Vietnamese job `62addd9043b446a798784baaf0fc685f` exposed a short incomplete
   prefix fragment: `Hiện tại CNP` was kept separately because the next sentence
   made the combined duration exceed `target_sentence_s` and the boundary had

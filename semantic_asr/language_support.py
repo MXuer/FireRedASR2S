@@ -223,6 +223,13 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="punc",
+        name="ct_punc",
+        languages=("zh",),
+        aliases={"zh": ("chinese", "zh-cn", "cn")},
+        notes="FunASR ct-punc Chinese punctuation model.",
+    ),
+    ModelLanguageSupport(
+        role="punc",
         name="asr_native",
         languages=(ANY_LANGUAGE,),
         notes="Uses punctuation emitted by the ASR model.",

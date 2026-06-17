@@ -78,6 +78,14 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("xlm_roberta_punctuation", names)
         self.assertIn("naqta", names)
         self.assertIn("yue_punctuation", names)
+        self.assertIn("ct_punc", names)
+
+    def test_ct_punc_is_chinese_only(self):
+        zh_result = list_models_by_language("zh_cn", role="punc")
+        en_result = list_models_by_language("en_us", role="punc")
+
+        self.assertIn("ct_punc", {item["name"] for item in zh_result["punc"]})
+        self.assertNotIn("ct_punc", {item["name"] for item in en_result["punc"]})
 
     def test_naqta_punctuation_is_arabic_only(self):
         ar_result = list_models_by_language("ar_sa", role="punc")
