@@ -2,6 +2,11 @@
 
 Current state:
 
+- FireRed runtime package data directories are now explicitly unignored and
+  tracked despite the repository-wide `data/` ignore rule. This restores
+  `semantic_asr.firered_runtime.fireredasr2.data` and
+  `semantic_asr.firered_runtime.fireredpunc.data` in derived worktrees and
+  clean clones. Full test discovery currently passes with 187 tests.
 - ASR VAD postprocessing now builds longer ASR context segments: tiny raw VAD
   islands are still merged/skipped first, then adjacent speech islands are
   merged up to `asr_vad_max_segment_s` when the silence gap is within

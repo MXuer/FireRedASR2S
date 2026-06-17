@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: unignore `semantic_asr/firered_runtime/fireredasr2/data` in `.gitignore`.
+- [x] Current work: add FireRedASR runtime data Python files to the worktree.
+- [x] Current work: unignore and add missing `semantic_asr/firered_runtime/fireredpunc/data` runtime files found by the continued tests.
+- [x] Current work: rerun the previously failing config/sentence tests.
+- [x] Current work: update TODO/PROGRESS and commit the fix.
+
+Review:
+- `.gitignore` now keeps the top-level/nested generic `data/` ignore but explicitly allows FireRed runtime package data sources under `fireredasr2/data` and `fireredpunc/data`.
+- Added tracked FireRedASR runtime data files: `asr_feat.py` and `token_dict.py`.
+- Continued tests exposed the same ignore-pattern issue for FireRedPunc runtime data, so `hf_bert_tokenizer.py`, `token_dict.py`, and `__init__.py` were also added.
+- Validation passed: previously failing `tests.test_config_runner tests.test_parallel_components tests.test_sentence_boundaries`, targeted MMS/VAD tests, `compileall`, `git diff --check`, and full `python -m unittest discover tests` with 187 tests.
+
 - [x] Current work: record the rule that TODO must be updated before each task.
 - [x] Current work: investigate why `semantic_asr/firered_runtime/fireredasr2/data` is missing in this worktree.
 

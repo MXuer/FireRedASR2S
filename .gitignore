@@ -10,6 +10,10 @@ pretrained_models/
 *.swp
 *.swo
 data/
+!semantic_asr/firered_runtime/fireredasr2/data/
+!semantic_asr/firered_runtime/fireredasr2/data/*.py
+!semantic_asr/firered_runtime/fireredpunc/data/
+!semantic_asr/firered_runtime/fireredpunc/data/*.py
 output/
 service_data/
 *.egg-info/
