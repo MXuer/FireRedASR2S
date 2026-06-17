@@ -1,5 +1,13 @@
 # Todo
 
+- [x] Current work: record the rule that TODO must be updated before each task.
+- [x] Current work: investigate why `semantic_asr/firered_runtime/fireredasr2/data` is missing in this worktree.
+
+Review:
+- The missing `semantic_asr/firered_runtime/fireredasr2/data` directory is caused by `.gitignore` line 12: `data/`.
+- That ignore pattern matches nested directories named `data`, including `semantic_asr/firered_runtime/fireredasr2/data`.
+- The files exist in `/data/duhu/FireRedASR2S/semantic_asr/firered_runtime/fireredasr2/data`, but they are ignored and not tracked by git, so this derived worktree did not check them out.
+
 - [x] Current work: add long ASR context VAD segments while preserving raw VAD segments.
 - [x] Current work: add MMS star-probe gap detection with typed gap stars.
 - [x] Current work: split long alignment context into no-star MMS alignment islands from confirmed gaps.
