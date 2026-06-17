@@ -1,10 +1,18 @@
 # Todo
 
-- [ ] Current work: record the merge/restart plan before touching the main repo.
-- [ ] Current work: merge this worktree HEAD into `/data/duhu/FireRedASR2S` current branch.
-- [ ] Current work: run focused validation from the main repo after merge.
-- [ ] Current work: restart the demo/API/worker service from the main repo path.
-- [ ] Current work: verify port 10086 health and record the handoff.
+- [x] Current work: record the merge/restart plan before touching the main repo.
+- [x] Current work: merge this worktree HEAD into `/data/duhu/FireRedASR2S` current branch.
+- [x] Current work: run focused validation from the main repo after merge.
+- [x] Current work: restart the demo/API/worker service from the main repo path.
+- [x] Current work: verify port 10086 health and record the handoff.
+
+Review:
+- Fast-forward merged this worktree into `/data/duhu/FireRedASR2S` branch `red-asr`, up to `eeb6113`.
+- Left the pre-existing untracked main-repo file `configs/ar_sa copy.json` untouched.
+- Main-repo validation passed: `tests.test_mms_forced_aligner tests.test_punctuation_strategies tests.test_config_runner`, targeted `compileall`, and `git diff --check`.
+- Stopped the demo/API/worker process group that was running from the derived worktree.
+- Restarted the demo/API/worker service from `/data/duhu/FireRedASR2S` on port `10086`, with ASR workers on GPUs `6,7` and two workers per GPU.
+- Health check returned `{"ok":true}`, and process cwd checks confirm the active service is now running from the main repo path.
 
 - [x] Current work: inspect German job `ede8b27b09de431ca03cb56d96d3f6db` around `n. Chr.` abbreviation splits.
 - [x] Current work: identify whether the split happens in punctuation sentence formatting or boundary fusion.

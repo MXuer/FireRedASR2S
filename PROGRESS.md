@@ -2,6 +2,17 @@
 
 Current state:
 
+- This worktree was fast-forward merged into the main repository path
+  `/data/duhu/FireRedASR2S` on branch `red-asr`, up to `eeb6113`. The
+  pre-existing untracked main-repo file `configs/ar_sa copy.json` was left
+  untouched. Main-repo validation passed with
+  `python -m unittest tests.test_mms_forced_aligner tests.test_punctuation_strategies tests.test_config_runner`,
+  targeted `compileall`, and `git diff --check`.
+- The demo/API/worker service has been moved back from this derived worktree to
+  `/data/duhu/FireRedASR2S`. Port `10086` health returned `{"ok":true}`. The
+  active demo service root is `/data/duhu/FireRedASR2S`, ASR workers are on
+  GPUs `6,7` with two workers per GPU, and translation still reuses
+  `10087,10088,10089`.
 - German ASR-native text punctuation now protects `n. Chr.` / `ca.` historical
   abbreviations. The bug in job `ede8b27b09de431ca03cb56d96d3f6db` happened in
   `split_text_by_punctuation()` before sentence-boundary fusion: `n. Chr.` was
