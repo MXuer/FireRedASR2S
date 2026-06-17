@@ -1,5 +1,20 @@
 # Todo
 
+- [x] Current work: choose a Chinese config for `/data/duhu/FireRedASR2S/data/zh-cn-long.wav`.
+- [x] Current work: run the long Chinese audio smoke test on GPU 2.
+- [x] Current work: inspect generated JSON/output health and record the result.
+- [x] Current work: recheck GPU 2 after user confirmed it is free and rerun the full-GPU test.
+- [x] Current work: restore missing `uroman/data` files ignored by the generic `data/` rule after the first run produced empty MMS targets.
+- [x] Current work: validate the new config/data ignore fix and commit the GPU-2 smoke result.
+
+Review:
+- Added `configs/zh_cn_mms_starprobe.json` for a Chinese long-audio smoke profile using Silero VAD, FunASR-Nano ASR, MMS forced alignment with star-probe enabled, and FireRedPunc.
+- Restored and unignored `uroman/data/*.txt`; the first long-audio MMS run produced empty targets because the generic `data/` ignore rule omitted these runtime romanization tables from the derived worktree.
+- Reran `/data/duhu/FireRedASR2S/data/zh-cn-long.wav` on GPU 2 after the card was free. Output was written under `output/experiments/zh_cn_long_mms_starprobe`.
+- Result health: 35 final sentences, 3418 words, 35 timestamp segments, 0 discarded ASR segments, 4 timestamp segments with selected MMS star-probe gaps, and 0 invalid/overlapping sentence or cut intervals.
+- Generated JSON, CSV, SRT and TextGrid successfully.
+- Validation passed: `tests.test_config_runner tests.test_asr_vad_postprocess tests.test_mms_forced_aligner`, `compileall`, JSON config parsing, and `git diff --check`.
+
 - [x] Current work: unignore `semantic_asr/firered_runtime/fireredasr2/data` in `.gitignore`.
 - [x] Current work: add FireRedASR runtime data Python files to the worktree.
 - [x] Current work: unignore and add missing `semantic_asr/firered_runtime/fireredpunc/data` runtime files found by the continued tests.

@@ -14,6 +14,8 @@ data/
 !semantic_asr/firered_runtime/fireredasr2/data/*.py
 !semantic_asr/firered_runtime/fireredpunc/data/
 !semantic_asr/firered_runtime/fireredpunc/data/*.py
+!uroman/data/
+!uroman/data/*.txt
 output/
 service_data/
 *.egg-info/

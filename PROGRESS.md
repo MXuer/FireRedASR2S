@@ -2,6 +2,21 @@
 
 Current state:
 
+- Added `configs/zh_cn_mms_starprobe.json` as a real Chinese long-audio smoke
+  profile for the new MMS star-probe path: Silero VAD, FunASR-Nano ASR, MMS
+  forced alignment with `star_probe_enabled=true`, and FireRedPunc.
+- The generic repository `data/` ignore rule also hid `uroman/data`, which MMS
+  needs for romanization. The missing uroman tables caused an earlier derived
+  worktree run to produce empty MMS targets and mostly discard the recognized
+  text. `.gitignore` now explicitly unignores `uroman/data/*.txt`, and the
+  required runtime tables are tracked.
+- Real GPU smoke passed on GPU 2 for
+  `/data/duhu/FireRedASR2S/data/zh-cn-long.wav` with
+  `configs/zh_cn_mms_starprobe.json`. Outputs are under
+  `output/experiments/zh_cn_long_mms_starprobe`; the final JSON has 35
+  sentences, 3418 words, 35 timestamp segments, 0 discarded ASR segments, 4
+  timestamp segments with selected MMS star-probe gaps, and 0 invalid or
+  overlapping sentence/cut intervals. JSON/CSV/SRT/TextGrid were generated.
 - FireRed runtime package data directories are now explicitly unignored and
   tracked despite the repository-wide `data/` ignore rule. This restores
   `semantic_asr.firered_runtime.fireredasr2.data` and

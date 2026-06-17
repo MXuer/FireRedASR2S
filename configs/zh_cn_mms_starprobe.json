@@ -1,0 +1,40 @@
+{
+  "name": "zh_cn_mms_starprobe",
+  "language": "zh_cn",
+  "components": {
+    "vad": {
+      "name": "silero"
+    },
+    "asr": {
+      "name": "funasr_nano",
+      "params": {
+        "batch_size": 8
+      }
+    },
+    "timestamp": {
+      "name": "mms_forced_aligner",
+      "params": {
+        "model_path": "/data/duhu/FireRedASR2S/pretrained_models/mmsalign/model.pt",
+        "device": "cuda:0",
+        "language": "zh_cn",
+        "star_probe_enabled": true
+      }
+    },
+    "punc": {
+      "name": "firered_punc",
+      "params": {
+        "model_dir": "/data/duhu/FireRedASR2S/pretrained_models/FireRedPunc",
+        "use_gpu": true
+      }
+    }
+  },
+  "pipeline": {
+    "asr_batch_size": 8,
+    "punc_batch_size": 8,
+    "asr_vad_max_segment_s": 30.0,
+    "asr_vad_max_merge_silence_s": 1.0
+  },
+  "output": {
+    "outdir": "output/experiments/zh_cn_long_mms_starprobe"
+  }
+}
