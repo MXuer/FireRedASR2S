@@ -26,7 +26,7 @@ class MmsForcedAlignerConfig:
     estimated_frame_ms: float = 20.0
     star_probe_enabled: bool = True
     star_probe_min_gap_s: float = 0.3
-    star_probe_pad_s: float = 0.1
+    star_probe_pad_s: float = 0.25
     star_probe_speech_prob_mean_threshold: float = 0.2
     star_probe_speech_prob_active_threshold: float = 0.5
 
@@ -150,7 +150,12 @@ class MmsForcedAlignerTimestampProvider:
             return self._align_token_span(tokens, alignment_tokens, names, segment, 0, len(tokens), 0.0, None), []
 
         selected_gaps = self._select_star_probe_gaps(probe_gaps, segment)
-        islands = _alignment_islands(len(tokens), selected_gaps, segment.end_s - segment.start_s, self.config.star_probe_pad_s)
+        islands = _alignment_islands(
+            len(tokens),
+            selected_gaps,
+            segment.end_s - segment.start_s,
+            self.config.star_probe_pad_s,
+        )
         if len(islands) <= 1:
             return self._align_token_span(tokens, alignment_tokens, names, segment, 0, len(tokens), 0.0, None), selected_gaps
 
@@ -422,14 +427,19 @@ def _alignment_islands(
         if gap_end <= gap_start:
             continue
         gap_pad = min(max(float(pad_s), 0.0), (gap_end - gap_start) / 2)
+        left_audio_end_s = min(gap_start + gap_pad, segment_duration_s)
+        right_audio_start_s = max(gap_end - gap_pad, 0.0)
+        gap["star_probe_pad_s"] = gap_pad
+        gap["left_audio_end_s"] = left_audio_end_s
+        gap["right_audio_start_s"] = right_audio_start_s
         islands.append({
             "start_index": token_start,
             "end_index": before_index + 1,
             "audio_start_s": audio_start_s,
-            "audio_end_s": min(gap_start + gap_pad, segment_duration_s),
+            "audio_end_s": left_audio_end_s,
         })
         token_start = after_index
-        audio_start_s = max(gap_end - gap_pad, 0.0)
+        audio_start_s = right_audio_start_s
     islands.append({
         "start_index": token_start,
         "end_index": token_count,

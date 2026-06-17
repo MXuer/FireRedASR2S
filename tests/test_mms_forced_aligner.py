@@ -300,9 +300,12 @@ class MmsForcedAlignerTest(unittest.TestCase):
 
         self.assertEqual([call["transcripts"] for call in provider.aligner.calls], [["hello"], ["world", "again"]])
         self.assertTrue(all(call["use_star"] is False for call in provider.aligner.calls))
-        self.assertEqual(result["timestamp"], [["hello", 0.0, 0.05], ["world", 1.9, 1.95], ["again", 2.0, 2.05]])
+        self.assertEqual(result["timestamp"], [["hello", 0.0, 0.05], ["world", 1.75, 1.8], ["again", 1.85, 1.9]])
         self.assertEqual(result["mms_star_probe_gaps"][0]["before_token_index"], 0)
         self.assertTrue(result["mms_star_probe_gaps"][0]["raw_vad_supported_silence"])
+        self.assertEqual(result["mms_star_probe_gaps"][0]["star_probe_pad_s"], 0.25)
+        self.assertEqual(result["mms_star_probe_gaps"][0]["left_audio_end_s"], 1.25)
+        self.assertEqual(result["mms_star_probe_gaps"][0]["right_audio_start_s"], 1.75)
 
     def test_provider_ignores_short_star_probe_gap(self):
         class FakeAligner:

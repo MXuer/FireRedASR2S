@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: inspect job `54311e25e4d841da9416a137c7bcea28` around `161.458s-166.680s`.
+- [x] Current work: verify whether MMS star-probe gap islanding trims speech at confirmed `<star>` gaps.
+- [x] Current work: add configurable padding for selected MMS star-probe gaps before splitting no-star alignment islands.
+- [x] Current work: add focused tests and validate the MMS forced-aligner path.
+
+Review:
+- The reported German job uses `de_de`, which runs `mms_forced_aligner`; however the target `161.458s-166.680s` boundary had no selected `mms_star_probe_gaps`.
+- Root cause for this case was sentence-boundary snapping: frame-level VAD probability found low-probability valleys at `161.952s` and `166.842s`, but zero-width MMS token gaps forced `_snap_to_boundary_gap()` back to the token seam.
+- Probability-supported silence can now snap zero-token-gap boundaries to the local VAD probability valley instead of clamping to the 0ms token seam.
+- Confirmed MMS star-probe gaps now default to `star_probe_pad_s=0.25` and record `star_probe_pad_s`, `left_audio_end_s`, and `right_audio_start_s` in `mms_star_probe_gaps`.
+- Real GPU validation on job `54311e25e4d841da9416a137c7bcea28` changed the target sentence from `161458-166680ms` to `161952-166842ms`.
+- Validation passed: `tests.test_sentence_boundaries tests.test_mms_forced_aligner`, targeted `compileall`, `git diff --check`, and the real `configs/de_de.json` pipeline rerun on GPU 4.
+
 - [x] Current work: confirm demo task storage paths before deletion.
 - [x] Current work: stop the 10086 demo/API/worker service so the database is not open during cleanup.
 - [x] Current work: delete historical demo jobs, uploads, outputs, and the job SQLite database.

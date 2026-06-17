@@ -2,6 +2,14 @@
 
 Current state:
 
+- German job `54311e25e4d841da9416a137c7bcea28` exposed a zero-token-gap
+  sentence boundary where MMS no-star timestamps were contiguous but frame VAD
+  probability had clear silence valleys. Probability-supported silence now
+  snaps zero-width token gaps to the local VAD probability valley instead of
+  clamping back to the MMS token seam. The target sentence moved from
+  `161458-166680ms` to `161952-166842ms` in a real GPU rerun. Confirmed MMS
+  star-probe gaps also now use a larger default `star_probe_pad_s=0.25` and
+  record the actual island boundaries in `mms_star_probe_gaps`.
 - Demo historical task data has been cleared from the main service data
   directory. The cleanup removed
   `/data/duhu/FireRedASR2S/service_data/demo/jobs.sqlite3`,

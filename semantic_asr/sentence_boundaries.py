@@ -393,7 +393,7 @@ def _boundary_candidate(
     elif prob_supported_silence:
         audio_safe = True
         audio_reason = "vad_prob_silence"
-        snapped_boundary_ms = _snap_to_boundary_gap(
+        snapped_boundary_ms = _snap_to_probability_boundary(
             speech_stats["boundary_ms"],
             previous["end_ms"],
             current["start_ms"],
@@ -605,6 +605,12 @@ def _snap_to_boundary_gap(boundary_ms: int, previous_end_ms: int, current_start_
     if previous_end_ms <= current_start_ms:
         return max(previous_end_ms, min(boundary_ms, current_start_ms))
     return (previous_end_ms + current_start_ms) // 2
+
+
+def _snap_to_probability_boundary(boundary_ms: int, previous_end_ms: int, current_start_ms: int) -> int:
+    if previous_end_ms == current_start_ms:
+        return boundary_ms
+    return _snap_to_boundary_gap(boundary_ms, previous_end_ms, current_start_ms)
 
 
 def _speech_prob_stats(
