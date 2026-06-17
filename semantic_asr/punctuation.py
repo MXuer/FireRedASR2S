@@ -6,6 +6,8 @@ _EDGE_PUNCT = re.compile(r"(^[^\w\u4e00-\u9fff]+)|([^\w\u4e00-\u9fff]+$)")
 _SENTENCE_END = re.compile(r"[。.!?！？؟]+$")
 _SENTENCE_END_CHARS = set("。.!?！？؟")
 _ASCII_WORD = re.compile(r"[a-zA-Z0-9#]")
+_WORD_BEFORE_PERIOD = re.compile(r"([A-Za-z]+)\.$")
+_WORD_AFTER_PERIOD = re.compile(r"\s*([A-Za-z]+)")
 
 
 def strip_timestamp_punctuation(timestamp: Sequence[Sequence]) -> list[list]:
@@ -136,11 +138,35 @@ def _is_sentence_boundary(text: str, index: int) -> bool:
         return True
     previous = text[index - 1] if index > 0 else ""
     following = text[index + 1] if index + 1 < len(text) else ""
+    if _is_christian_era_abbreviation(text, index):
+        return False
     return not (_is_ascii_token_char(previous) and _is_ascii_token_char(following))
 
 
 def _is_ascii_token_char(char: str) -> bool:
     return bool(char and _ASCII_WORD.fullmatch(char))
+
+
+def _is_christian_era_abbreviation(text: str, index: int) -> bool:
+    prefix = text[:index + 1]
+    before_match = _WORD_BEFORE_PERIOD.search(prefix)
+    if not before_match:
+        return False
+    word = before_match.group(1).lower()
+    suffix = text[index + 1:]
+    after_match = _WORD_AFTER_PERIOD.match(suffix)
+    raw_next_word = after_match.group(1) if after_match else ""
+    next_word = raw_next_word.lower()
+    next_nonspace = next((char for char in suffix if not char.isspace()), "")
+    if word == "ca" and next_nonspace.isdigit():
+        return True
+    if word == "n" and next_word == "chr":
+        return True
+    if word != "chr":
+        return False
+    if next_nonspace == ",":
+        return True
+    return bool(raw_next_word and raw_next_word[0].islower())
 
 
 def split_timestamp_by_native_punctuation(timestamp: Sequence[Sequence]) -> list[dict]:

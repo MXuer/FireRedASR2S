@@ -203,6 +203,72 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(len(url_sentences), 1)
         self.assertEqual(url_sentences[0]["end_s"], 1.5)
 
+    def test_text_punctuation_keeps_german_christian_era_abbreviation_with_continuation(self):
+        sentences = split_text_by_punctuation(
+            "Im Jahre 66 n. Chr. soll Nero Rom in Brand gesteckt haben. Danach floh er.",
+            [
+                ["Im", 0.0, 0.1],
+                ["Jahre", 0.1, 0.2],
+                ["66", 0.2, 0.3],
+                ["n.", 0.3, 0.4],
+                ["Chr.", 0.4, 0.5],
+                ["soll", 0.5, 0.6],
+                ["Nero", 0.6, 0.7],
+                ["Rom", 0.7, 0.8],
+                ["in", 0.8, 0.9],
+                ["Brand", 0.9, 1.0],
+                ["gesteckt", 1.0, 1.1],
+                ["haben.", 1.1, 1.2],
+                ["Danach", 1.3, 1.4],
+                ["floh", 1.4, 1.5],
+                ["er.", 1.5, 1.6],
+            ],
+        )
+
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["punc_text"], "Im Jahre 66 n. Chr. soll Nero Rom in Brand gesteckt haben.")
+        self.assertEqual(sentences[0]["end_s"], 1.2)
+
+    def test_text_punctuation_keeps_german_christian_era_abbreviation_before_comma(self):
+        sentences = split_text_by_punctuation(
+            "Plinius der Jüngere, 61-113 n. Chr., der römische Stadthalter. Danach.",
+            [
+                ["Plinius", 0.0, 0.1],
+                ["der", 0.1, 0.2],
+                ["Jüngere,", 0.2, 0.3],
+                ["61-113", 0.3, 0.4],
+                ["n.", 0.4, 0.5],
+                ["Chr.,", 0.5, 0.6],
+                ["der", 0.6, 0.7],
+                ["römische", 0.7, 0.8],
+                ["Stadthalter.", 0.8, 0.9],
+                ["Danach.", 1.0, 1.1],
+            ],
+        )
+
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["punc_text"], "Plinius der Jüngere, 61-113 n. Chr., der römische Stadthalter.")
+        self.assertEqual(sentences[0]["end_s"], 0.9)
+
+    def test_text_punctuation_allows_german_christian_era_abbreviation_before_new_sentence(self):
+        sentences = split_text_by_punctuation(
+            "Tacitus ca. 55-115 n. Chr. Der Historiker berichtet.",
+            [
+                ["Tacitus", 0.0, 0.1],
+                ["ca.", 0.1, 0.2],
+                ["55-115", 0.2, 0.3],
+                ["n.", 0.3, 0.4],
+                ["Chr.", 0.4, 0.5],
+                ["Der", 0.6, 0.7],
+                ["Historiker", 0.7, 0.8],
+                ["berichtet.", 0.8, 0.9],
+            ],
+        )
+
+        self.assertEqual(len(sentences), 2)
+        self.assertEqual(sentences[0]["punc_text"], "Tacitus ca. 55-115 n. Chr.")
+        self.assertEqual(sentences[1]["punc_text"], "Der Historiker berichtet.")
+
     def test_text_punctuation_does_not_fallback_empty_timestamp_slice_to_whole_segment(self):
         sentences = split_text_by_punctuation(
             "first. second. third.",

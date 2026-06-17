@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: inspect German job `ede8b27b09de431ca03cb56d96d3f6db` around `n. Chr.` abbreviation splits.
+- [x] Current work: identify whether the split happens in punctuation sentence formatting or boundary fusion.
+- [x] Current work: add a minimal abbreviation-protection fix and tests if the split is caused by sentence parsing.
+- [x] Current work: rerun/retry the German job or a focused test and verify `n. Chr.` no longer creates a sentence break before comma continuation.
+
+Review:
+- The split happened before sentence-boundary fusion: `AsrTextPunc` / `split_text_by_punctuation()` split `n. Chr.` into `n.` and `Chr.` semantic sentence fragments.
+- Added focused abbreviation protection for German historical abbreviations: `n.` followed by `Chr`, `Chr.` followed by comma/lowercase continuation, and `ca.` followed by a year/number are not treated as sentence boundaries.
+- The rule still allows `n. Chr. Der ...` to split before a new uppercase sentence.
+- Added punctuation strategy tests for `Im Jahre 66 n. Chr. soll ...`, `61-113 n. Chr., der ...`, and `n. Chr. Der ...`.
+- Focused verification on job `ede8b27b09de431ca03cb56d96d3f6db` using its existing timestamp segment now yields `Im Jahre 66 n. Chr. soll ...` and `Plinius der Jüngere, 61-113 n. Chr., der ...` as intact sentences.
+- Validation passed: `tests.test_punctuation_strategies tests.test_config_runner`, targeted `compileall`, and `git diff --check`.
+
 - [x] Current work: compare `l2s.align.ALIGNER` on `/home/duhu/vi_sub.wav` with current `semantic_asr.mms_runtime.MmsAligner`.
 - [x] Current work: run both aligners with the exact provided Vietnamese text and `use_star=True`.
 - [x] Current work: identify code-level differences causing the timing mismatch.

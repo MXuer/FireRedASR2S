@@ -2,6 +2,13 @@
 
 Current state:
 
+- German ASR-native text punctuation now protects `n. Chr.` / `ca.` historical
+  abbreviations. The bug in job `ede8b27b09de431ca03cb56d96d3f6db` happened in
+  `split_text_by_punctuation()` before sentence-boundary fusion: `n. Chr.` was
+  split into `n.` and `Chr.` fragments, and `Chr., der ...` was split before the
+  comma continuation. The new narrow rule keeps `n.` before `Chr`, keeps `Chr.`
+  before comma/lowercase continuation, keeps `ca.` before year-like numbers,
+  and still allows `n. Chr. Der ...` to start a new sentence.
 - MMS waveform handling now matches the l2s/torchaudio input convention. The
   current pipeline reads audio with `soundfile.read(dtype="int16")`; before this
   fix, `semantic_asr.mms_runtime.MmsAligner` converted those int16 PCM values
