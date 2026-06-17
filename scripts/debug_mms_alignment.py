@@ -40,7 +40,17 @@ def main() -> None:
     )
     expanded_items, expanded_tokens = _insert_gap_stars(items, tokens)
 
-    first_pass = _align_expanded_items(aligner, expanded_items, expanded_tokens, clip_wav, sample_rate)
+    first_pass_use_star = aligner.align(
+        sentence_tokens,
+        clip_wav,
+        sample_rate,
+        [f"tok_{index}" for index in range(len(sentence_tokens))],
+        use_star=True,
+        language=language,
+        raw_transcripts=sentence_tokens,
+        alignment_transcripts=sentence_tokens,
+    )
+    first_pass_expanded_debug = _align_expanded_items(aligner, expanded_items, expanded_tokens, clip_wav, sample_rate)
     second_pass = aligner.align(
         sentence_tokens,
         clip_wav,
@@ -61,7 +71,9 @@ def main() -> None:
         "language": args.language,
         "mms_language": language,
         "tokens": sentence_tokens,
-        "first_pass_star_alignment": _with_absolute_ms(first_pass, args.start_ms),
+        "first_pass_use_star_token_alignment": _with_absolute_ms(first_pass_use_star, args.start_ms),
+        "first_pass_inferred_star_gaps": _inferred_gaps(first_pass_use_star, args.start_ms),
+        "first_pass_expanded_star_span_debug": _with_absolute_ms(first_pass_expanded_debug, args.start_ms),
         "second_pass_no_star_alignment": _with_absolute_ms(second_pass, args.start_ms),
     }
     os.makedirs(os.path.dirname(args.out_json), exist_ok=True)
@@ -116,6 +128,29 @@ def _with_absolute_ms(items: list[dict], clip_start_ms: int) -> list[dict]:
         row["abs_end_ms"] = int(round(clip_start_ms + float(item["end"]) * 1000))
         output.append(row)
     return output
+
+
+def _inferred_gaps(items: list[dict], clip_start_ms: int) -> list[dict]:
+    gaps = []
+    for index, (previous, current) in enumerate(zip(items, items[1:])):
+        gap_start = float(previous["end"])
+        gap_end = float(current["start"])
+        if gap_end < gap_start:
+            continue
+        gaps.append({
+            "index": index,
+            "kind": "inferred_star_gap",
+            "before_token_index": index,
+            "after_token_index": index + 1,
+            "before_text": previous.get("text", previous.get("clean_text")),
+            "after_text": current.get("text", current.get("clean_text")),
+            "start": round(gap_start, 3),
+            "end": round(gap_end, 3),
+            "duration": round(gap_end - gap_start, 3),
+            "abs_start_ms": int(round(clip_start_ms + gap_start * 1000)),
+            "abs_end_ms": int(round(clip_start_ms + gap_end * 1000)),
+        })
+    return gaps
 
 
 if __name__ == "__main__":

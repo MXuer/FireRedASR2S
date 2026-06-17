@@ -1,5 +1,25 @@
 # Todo
 
+- [x] Current work: fix `scripts/debug_mms_alignment.py` so first pass uses real `align(..., use_star=True)` token output.
+- [x] Current work: add `first_pass_inferred_star_gaps` derived from adjacent real-token gaps.
+- [x] Current work: rerun the Vietnamese clip debug JSON and compare `có.` / `Trên` with the user's manual output.
+- [x] Current work: validate and commit the corrected debug runner.
+
+Review:
+- `scripts/debug_mms_alignment.py` now writes `first_pass_use_star_token_alignment`, which is the real `align(..., use_star=True)` output after inserted stars are filtered, matching the intended first-pass interpretation.
+- It also writes `first_pass_inferred_star_gaps`, derived from adjacent real-token gaps in the use-star alignment.
+- The old direct expanded-star spans are retained only as `first_pass_expanded_star_span_debug` for low-level debugging.
+- Reran both the TextGrid clip `18.680s-34.331s` and the MMS segment `19.080s-46.900s`; output JSON files were refreshed under `output/vi_mms_alignment_debug/`.
+- The script now exposes the right quantities, but the user's pasted alignment still differs in exact token placement. For exact reproduction, the next comparison needs the exact audio slice and transcript passed to the user's manual align call.
+
+- [x] Current work: inspect the user's pasted MMS alignment output for the same Vietnamese clip.
+- [x] Current work: compare the user's timing convention with `scripts/debug_mms_alignment.py` output and identify why they differ.
+
+Review:
+- The user's output is the real `align(..., use_star=True)` token alignment after inserted `<star>` tokens are filtered out.
+- The previous debug runner output incorrectly emphasized direct expanded `<star>` spans; that is not the right interpretation for estimating how much time `<star>` consumed between real tokens.
+- Correct interpretation should infer `<star>` regions from gaps between adjacent real-token timestamps in the `use_star=True` token alignment.
+
 - [x] Current work: create a standalone Vietnamese alignment-debug test for the problematic `có.` / `Trên` audio region.
 - [x] Current work: output both first-pass `<star>` alignment and second-pass no-star alignment into JSON under `output/`.
 - [x] Current work: inspect the debug JSON around `có.` / `Trên` and report exact timings.
