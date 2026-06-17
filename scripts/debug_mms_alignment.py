@@ -12,8 +12,10 @@ from semantic_asr.mms_runtime.align_utils import get_spans
 def main() -> None:
     parser = argparse.ArgumentParser(description="Dump MMS star/no-star alignment for a clipped region.")
     parser.add_argument("--job-id", required=True)
-    parser.add_argument("--json-path", required=True)
+    parser.add_argument("--json-path")
     parser.add_argument("--wav-path", required=True)
+    parser.add_argument("--text")
+    parser.add_argument("--text-file")
     parser.add_argument("--start-ms", type=int, required=True)
     parser.add_argument("--end-ms", type=int, required=True)
     parser.add_argument("--language", default="vi_vn")
@@ -22,10 +24,7 @@ def main() -> None:
     parser.add_argument("--out-json", required=True)
     args = parser.parse_args()
 
-    with open(args.json_path, encoding="utf-8") as fin:
-        result = json.load(fin)
-
-    sentence_tokens = _tokens_from_sentences(result, args.start_ms, args.end_ms)
+    sentence_tokens = _input_tokens(args)
     wav, sample_rate = sf.read(args.wav_path, dtype="int16")
     clip_wav = wav[int(args.start_ms * sample_rate / 1000):int(args.end_ms * sample_rate / 1000)]
     language = model_language("mms_forced_aligner", args.language)
@@ -66,6 +65,7 @@ def main() -> None:
         "job_id": args.job_id,
         "source_json": args.json_path,
         "source_wav": args.wav_path,
+        "source_text": " ".join(sentence_tokens),
         "clip_start_ms": args.start_ms,
         "clip_end_ms": args.end_ms,
         "language": args.language,
@@ -90,6 +90,19 @@ def _tokens_from_sentences(result: dict, start_ms: int, end_ms: int) -> list[str
     ]
     tokens = " ".join(texts).split()
     return [token for token in tokens if token.strip()]
+
+
+def _input_tokens(args: argparse.Namespace) -> list[str]:
+    if args.text is not None:
+        return [token for token in args.text.split() if token.strip()]
+    if args.text_file is not None:
+        with open(args.text_file, encoding="utf-8") as fin:
+            return [token for token in fin.read().split() if token.strip()]
+    if not args.json_path:
+        raise ValueError("One of --text, --text-file or --json-path is required")
+    with open(args.json_path, encoding="utf-8") as fin:
+        result = json.load(fin)
+    return _tokens_from_sentences(result, args.start_ms, args.end_ms)
 
 
 def _align_expanded_items(

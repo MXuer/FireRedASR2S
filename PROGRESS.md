@@ -2,6 +2,20 @@
 
 Current state:
 
+- MMS waveform handling now matches the l2s/torchaudio input convention. The
+  current pipeline reads audio with `soundfile.read(dtype="int16")`; before this
+  fix, `semantic_asr.mms_runtime.MmsAligner` converted those int16 PCM values
+  directly to float and fed large-amplitude audio to MMS. `generate_emissions()`
+  now normalizes integer PCM waveforms to float `[-1, 1]` before inference and
+  preserves already-float waveforms as-is. The Vietnamese `/home/duhu/vi_sub.wav`
+  alignment with the provided text now matches l2s for the inspected tokens:
+  `có.` at `5.304s-5.384s`, `Trên` at `6.565s-6.665s`, with an inferred
+  use-star gap of `1.181s`.
+- `scripts/debug_mms_alignment.py` now accepts explicit `--text` or
+  `--text-file`, writes real `first_pass_use_star_token_alignment`, and derives
+  `first_pass_inferred_star_gaps` from adjacent real-token gaps. The previous
+  low-level expanded-star spans remain only as
+  `first_pass_expanded_star_span_debug`.
 - Added `scripts/debug_mms_alignment.py` for focused MMS alignment inspection.
   It clips a region from an existing job wav and writes both the first-pass
   inserted-`<star>` alignment and the second-pass no-star alignment into one

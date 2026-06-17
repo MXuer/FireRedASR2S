@@ -516,6 +516,24 @@ class MmsForcedAlignerTest(unittest.TestCase):
         self.assertEqual(gaps[1]["after_token_index"], 1)
         self.assertIsNone(gaps[2]["after_token_index"])
 
+    def test_mms_runtime_normalizes_int16_waveform_like_torchaudio_load(self):
+        waveform = torch.tensor([-32768, 0, 32767], dtype=torch.int16)
+
+        normalized = mms_aligner_module._waveform_to_float_tensor(waveform)
+
+        self.assertEqual(normalized.dtype, torch.float32)
+        self.assertAlmostEqual(float(normalized[0]), -1.0, places=6)
+        self.assertAlmostEqual(float(normalized[1]), 0.0, places=6)
+        self.assertAlmostEqual(float(normalized[2]), 32767 / 32768, places=6)
+
+    def test_mms_runtime_keeps_float_waveform_scale(self):
+        waveform = torch.tensor([-0.5, 0.0, 0.5], dtype=torch.float32)
+
+        normalized = mms_aligner_module._waveform_to_float_tensor(waveform)
+
+        self.assertEqual(normalized.dtype, torch.float32)
+        self.assertEqual(normalized.tolist(), [-0.5, 0.0, 0.5])
+
 
 if __name__ == "__main__":
     unittest.main()

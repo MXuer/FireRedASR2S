@@ -200,7 +200,7 @@ class MmsAligner:
         return segments, stride
 
     def generate_emissions(self, waveform, sample_rate: int):
-        waveform = torch.as_tensor(waveform, dtype=torch.float32)
+        waveform = _waveform_to_float_tensor(waveform)
         if waveform.ndim == 1:
             waveform = waveform.unsqueeze(0)
         elif waveform.ndim == 2 and waveform.shape[0] > waveform.shape[1]:
@@ -244,6 +244,17 @@ class MmsAligner:
 
 def _count_consecutive_repeats(token_indices: list[int]) -> int:
     return sum(1 for previous, current in zip(token_indices, token_indices[1:]) if previous == current)
+
+
+def _waveform_to_float_tensor(waveform) -> torch.Tensor:
+    tensor = torch.as_tensor(waveform)
+    if tensor.is_floating_point():
+        return tensor.to(dtype=torch.float32)
+    if tensor.dtype == torch.bool:
+        return tensor.to(dtype=torch.float32)
+    info = torch.iinfo(tensor.dtype)
+    scale = float(max(abs(info.min), abs(info.max)))
+    return tensor.to(dtype=torch.float32) / scale
 
 
 def _normalize_token_spaces(tokens: list[str]) -> list[str]:

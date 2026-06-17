@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: compare `l2s.align.ALIGNER` on `/home/duhu/vi_sub.wav` with current `semantic_asr.mms_runtime.MmsAligner`.
+- [x] Current work: run both aligners with the exact provided Vietnamese text and `use_star=True`.
+- [x] Current work: identify code-level differences causing the timing mismatch.
+- [x] Current work: decide whether semantic_asr should adopt the l2s behavior for star-gap evidence.
+
+Review:
+- Reproduced the user's pasted l2s result with `/home/duhu/vi_sub.wav`, the provided Vietnamese text, `use_star=True`, and `language='vi_in'`.
+- Root cause: l2s reads audio with `torchaudio.load()`, producing normalized float waveform, while semantic_asr passed `soundfile.read(dtype='int16')` waveform directly into MMS. MMS emissions therefore differed even for the same text and time range.
+- Fixed `semantic_asr.mms_runtime.aligner.generate_emissions()` to normalize integer PCM waveforms to float `[-1, 1]` before MMS inference.
+- Added unit tests for int16 normalization and float waveform preservation.
+- Updated `scripts/debug_mms_alignment.py` to accept explicit `--text`; rerunning `/home/duhu/vi_sub.wav` with the provided text now matches l2s for the inspected tokens and exposes `có.` -> `Trên` inferred star gap `5.384s-6.565s`, duration `1.181s`.
+- Validation passed: `tests.test_mms_forced_aligner`, targeted `compileall`, and `git diff --check`.
+
 - [x] Current work: fix `scripts/debug_mms_alignment.py` so first pass uses real `align(..., use_star=True)` token output.
 - [x] Current work: add `first_pass_inferred_star_gaps` derived from adjacent real-token gaps.
 - [x] Current work: rerun the Vietnamese clip debug JSON and compare `có.` / `Trên` with the user's manual output.
@@ -11,6 +24,7 @@ Review:
 - The old direct expanded-star spans are retained only as `first_pass_expanded_star_span_debug` for low-level debugging.
 - Reran both the TextGrid clip `18.680s-34.331s` and the MMS segment `19.080s-46.900s`; output JSON files were refreshed under `output/vi_mms_alignment_debug/`.
 - The script now exposes the right quantities, but the user's pasted alignment still differs in exact token placement. For exact reproduction, the next comparison needs the exact audio slice and transcript passed to the user's manual align call.
+- User confirmed the manual clip boundaries are also `18.680s-34.331s`. Token lists are identical, and running both the current worktree aligner and the main-repo aligner on this clip gives the same result as the debug runner, not the pasted result. The remaining likely difference is the actual waveform object or preprocessing used by the manual run.
 
 - [x] Current work: inspect the user's pasted MMS alignment output for the same Vietnamese clip.
 - [x] Current work: compare the user's timing convention with `scripts/debug_mms_alignment.py` output and identify why they differ.
