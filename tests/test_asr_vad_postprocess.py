@@ -7,6 +7,7 @@ import soundfile as sf
 from semantic_asr.core import (
     PipelineConfig,
     SemanticAsrPipeline,
+    merge_vad_segments_for_context,
     prepare_asr_vad_segments,
 )
 
@@ -75,7 +76,7 @@ class AsrVadPostprocessTest(unittest.TestCase):
             max_merge_silence_s=1.0,
         )
 
-        self.assertEqual(segments, [(0.0, 1.35), (1.6, 2.4)])
+        self.assertEqual(segments, [(0.0, 2.4)])
 
     def test_drops_isolated_tiny_island(self):
         segments = prepare_asr_vad_segments(
@@ -93,7 +94,16 @@ class AsrVadPostprocessTest(unittest.TestCase):
             max_merge_silence_s=1.0,
         )
 
-        self.assertEqual(segments, [(0.0, 1.7), (2.0, 3.0)])
+        self.assertEqual(segments, [(0.0, 3.0)])
+
+    def test_context_merge_respects_max_segment_duration(self):
+        segments = merge_vad_segments_for_context(
+            [(0.0, 10.0), (10.2, 20.0), (20.2, 35.0)],
+            max_silence_s=1.0,
+            max_segment_s=30.0,
+        )
+
+        self.assertEqual(segments, [(0.0, 20.0), (20.2, 35.0)])
 
     def test_merges_tiny_chain_without_overlap(self):
         segments = prepare_asr_vad_segments(
@@ -125,9 +135,9 @@ class AsrVadPostprocessTest(unittest.TestCase):
             result["raw_vad_segments_ms"],
             [(0, 1000), (1200, 1350), (1600, 2400), (5000, 5200)],
         )
-        self.assertEqual(result["asr_vad_segments_ms"], [(0, 1350), (1600, 2400)])
-        self.assertEqual(timestamp.segment_ranges, [(0.0, 1.35), (1.6, 2.4)])
-        self.assertEqual(asr.uttids, ["sample_s0_e1350", "sample_s1600_e2400"])
+        self.assertEqual(result["asr_vad_segments_ms"], [(0, 2400)])
+        self.assertEqual(timestamp.segment_ranges, [(0.0, 2.4)])
+        self.assertEqual(asr.uttids, ["sample_s0_e2400"])
 
     def test_output_vad_padding_reaches_final_cut_times(self):
         pipeline = SemanticAsrPipeline(
@@ -148,7 +158,7 @@ class AsrVadPostprocessTest(unittest.TestCase):
         self.assertEqual(result["raw_vad_segments_ms"][1], (1200, 1350))
         self.assertIn((1100, 1475), result["vad_segments_ms"])
         self.assertEqual(result["sentences"][0]["cut_start_ms"], 0)
-        self.assertEqual(result["sentences"][0]["cut_end_ms"], 1475)
+        self.assertEqual(result["sentences"][0]["cut_end_ms"], 2600)
 
     def test_timestamp_segments_preserve_fallback_metadata(self):
         pipeline = object.__new__(SemanticAsrPipeline)

@@ -262,6 +262,82 @@ class MmsForcedAlignerTest(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "boom"):
             provider.add_timestamps([{"uttid": "test", "text": "hello"}], [segment])
 
+    def test_provider_uses_star_probe_gap_to_realign_no_star_islands(self):
+        class FakeAligner:
+            def __init__(inner_self):
+                inner_self.calls = []
+
+            def probe_star_gaps(inner_self, *args, **kwargs):
+                return [{
+                    "kind": "gap_star",
+                    "start": 1.0,
+                    "end": 2.0,
+                    "duration": 1.0,
+                    "before_token_index": 0,
+                    "after_token_index": 1,
+                }]
+
+            def align(inner_self, transcripts, waveform, sample_rate, names, **kwargs):
+                inner_self.calls.append({
+                    "transcripts": list(transcripts),
+                    "sample_count": len(waveform),
+                    "alignment_transcripts": list(kwargs["alignment_transcripts"]),
+                    "use_star": kwargs["use_star"],
+                })
+                return [
+                    {"text": token, "start": index * 0.1, "end": index * 0.1 + 0.05}
+                    for index, token in enumerate(transcripts)
+                ]
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        provider.last_discarded_segments = []
+        provider.set_vad_evidence({"timestamps": [(0.0, 0.8), (2.2, 6.0)]})
+        segment = SpeechSegment("test", 0.0, 6.0, 16000, [0.0] * (6 * 16000))
+
+        [result] = provider.add_timestamps([{"uttid": "test", "text": "hello world again"}], [segment])
+
+        self.assertEqual([call["transcripts"] for call in provider.aligner.calls], [["hello"], ["world", "again"]])
+        self.assertTrue(all(call["use_star"] is False for call in provider.aligner.calls))
+        self.assertEqual(result["timestamp"], [["hello", 0.0, 0.05], ["world", 1.9, 1.95], ["again", 2.0, 2.05]])
+        self.assertEqual(result["mms_star_probe_gaps"][0]["before_token_index"], 0)
+        self.assertTrue(result["mms_star_probe_gaps"][0]["raw_vad_supported_silence"])
+
+    def test_provider_ignores_short_star_probe_gap(self):
+        class FakeAligner:
+            def __init__(inner_self):
+                inner_self.calls = []
+
+            def probe_star_gaps(inner_self, *args, **kwargs):
+                return [{
+                    "kind": "gap_star",
+                    "start": 1.0,
+                    "end": 1.1,
+                    "duration": 0.1,
+                    "before_token_index": 0,
+                    "after_token_index": 1,
+                }]
+
+            def align(inner_self, transcripts, *args, **kwargs):
+                inner_self.calls.append(list(transcripts))
+                return [
+                    {"text": token, "start": index * 0.1, "end": index * 0.1 + 0.05}
+                    for index, token in enumerate(transcripts)
+                ]
+
+        provider = object.__new__(MmsForcedAlignerTimestampProvider)
+        provider.config = MmsForcedAlignerConfig(language="en_us")
+        provider.aligner = FakeAligner()
+        provider.last_discarded_segments = []
+        provider.set_vad_evidence({})
+        segment = SpeechSegment("test", 0.0, 3.0, 16000, [0.0] * (3 * 16000))
+
+        [result] = provider.add_timestamps([{"uttid": "test", "text": "hello world"}], [segment])
+
+        self.assertEqual(provider.aligner.calls, [["hello", "world"]])
+        self.assertNotIn("mms_star_probe_gaps", result)
+
     def test_mms_runtime_rejects_empty_target_before_torchaudio(self):
         aligner = object.__new__(mms_aligner_module.MmsAligner)
         aligner.device = "cpu"
@@ -402,6 +478,43 @@ class MmsForcedAlignerTest(unittest.TestCase):
         self.assertEqual(captured["align_tokens"], ["o"])
         self.assertEqual(captured["span_tokens"], ["o"])
         self.assertEqual([item["text"] for item in aligned], ["ok"])
+
+    def test_mms_runtime_probe_star_gaps_returns_inserted_gap_spans(self):
+        aligner = object.__new__(mms_aligner_module.MmsAligner)
+        aligner.uroman_path = "uroman/bin"
+        aligner.device = "cpu"
+
+        def fake_uromanize(tokens, language):
+            return ["<star>" if token == "<star>" else token for token in tokens]
+
+        def fake_get_alignments(waveform, sample_rate, tokens):
+            return [], 10.0
+
+        def fake_get_spans(tokens, segments):
+            return [[Segment(token, index * 10, index * 10 + 9)] for index, token in enumerate(tokens)]
+
+        original_get_spans = mms_aligner_module.get_spans
+        try:
+            aligner._uromanize_alignment_tokens = fake_uromanize
+            aligner.get_alignments = fake_get_alignments
+            mms_aligner_module.get_spans = fake_get_spans
+            gaps = aligner.probe_star_gaps(
+                ["hello", "world"],
+                [0.0] * 16000,
+                16000,
+                ["sample_0", "sample_1"],
+                language="eng",
+                raw_transcripts=["hello", "world"],
+                alignment_transcripts=["hello", "world"],
+            )
+        finally:
+            mms_aligner_module.get_spans = original_get_spans
+
+        self.assertEqual(len(gaps), 3)
+        self.assertIsNone(gaps[0]["before_token_index"])
+        self.assertEqual(gaps[1]["before_token_index"], 0)
+        self.assertEqual(gaps[1]["after_token_index"], 1)
+        self.assertIsNone(gaps[2]["after_token_index"])
 
 
 if __name__ == "__main__":

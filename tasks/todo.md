@@ -1,5 +1,20 @@
 # Todo
 
+- [x] Current work: add long ASR context VAD segments while preserving raw VAD segments.
+- [x] Current work: add MMS star-probe gap detection with typed gap stars.
+- [x] Current work: split long alignment context into no-star MMS alignment islands from confirmed gaps.
+- [x] Current work: keep punctuation/semantic splitting on long ASR context and map back to final timestamps.
+- [x] Current work: add unit tests for VAD context merging and MMS star-probe island splitting.
+- [x] Current work: update PROGRESS and commit the implementation.
+
+Review:
+- Added `asr_vad_max_segment_s` and long ASR context merging after tiny VAD island cleanup, while preserving `raw_vad_segments_ms`.
+- MMS final timestamps still use `use_star=false`; a separate star-probe pass now detects likely real token gaps and splits long contexts into no-star alignment islands.
+- Numeric/currency placeholder `<star>` tokens remain separate from inserted gap-probe stars.
+- Selected MMS star-probe gaps are recorded in `timestamp_segments[].mms_star_probe_gaps` for debugging.
+- Validation passed: `tests.test_asr_vad_postprocess`, `tests.test_mms_forced_aligner`, `compileall semantic_asr tests/test_asr_vad_postprocess.py tests/test_mms_forced_aligner.py`, and `git diff --check`.
+- Broader config/sentence tests were attempted; the two failures are unrelated FireRedASR import errors in this worktree because `semantic_asr/firered_runtime/fireredasr2/data` is missing.
+
 - [x] Current work: add upload progress UI for multi-file demo uploads.
 - [x] Current work: report current file index, upload percent, and approximate upload speed.
 - [x] Current work: switch job creation upload request to XMLHttpRequest so browser upload progress is available.

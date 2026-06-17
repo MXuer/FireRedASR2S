@@ -47,39 +47,15 @@ class MmsAligner:
         raw_transcripts: list[str],
         alignment_transcripts: list[str] | None = None,
     ) -> list[dict]:
-        alignment_transcripts = alignment_transcripts or transcripts
-        items = [
-            {
-                "transcript": transcript,
-                "raw_transcript": raw_transcript,
-                "alignment_transcript": alignment_transcript,
-                "name": name,
-                "inserted_star": False,
-            }
-            for transcript, raw_transcript, alignment_transcript, name in zip(
-                transcripts,
-                raw_transcripts,
-                alignment_transcripts,
-                names,
-            )
-            if str(transcript).strip() and str(alignment_transcript).strip()
-        ]
-        tokens = self._uromanize_alignment_tokens(
-            [str(item["alignment_transcript"]).strip().lower() for item in items],
+        items, tokens = self._prepare_items_and_tokens(
+            transcripts,
+            names,
             language,
+            raw_transcripts,
+            alignment_transcripts,
         )
-        tokens = _normalize_token_spaces(tokens)
-        items, tokens = _drop_empty_alignment_tokens(items, tokens)
         if use_star:
-            expanded_items = [{"inserted_star": True}]
-            expanded_tokens = ["<star>"]
-            for item, token in zip(items, tokens):
-                expanded_items.append(item)
-                expanded_tokens.append(token)
-                expanded_items.append({"inserted_star": True})
-                expanded_tokens.append("<star>")
-            items = expanded_items
-            tokens = expanded_tokens
+            items, tokens = _insert_gap_stars(items, tokens)
         segments, stride = self.get_alignments(waveform, sample_rate, tokens)
         spans = get_spans(tokens, segments)
         align_segments = []
@@ -98,6 +74,78 @@ class MmsAligner:
                 "name": item["name"],
             })
         return align_segments
+
+    def probe_star_gaps(
+        self,
+        transcripts: list[str],
+        waveform,
+        sample_rate: int,
+        names: list[str],
+        language: str,
+        raw_transcripts: list[str],
+        alignment_transcripts: list[str] | None = None,
+    ) -> list[dict]:
+        items, tokens = self._prepare_items_and_tokens(
+            transcripts,
+            names,
+            language,
+            raw_transcripts,
+            alignment_transcripts,
+        )
+        if not items:
+            return []
+
+        expanded_items, expanded_tokens = _insert_gap_stars(items, tokens)
+        segments, stride = self.get_alignments(waveform, sample_rate, expanded_tokens)
+        spans = get_spans(expanded_tokens, segments)
+        gaps = []
+        for item, span in zip(expanded_items, spans):
+            if not item.get("inserted_star"):
+                continue
+            audio_start = round(span[0].start * stride / 1000, 3)
+            audio_end = round(span[-1].end * stride / 1000, 3)
+            gaps.append({
+                "kind": "gap_star",
+                "start": round(audio_start, 3),
+                "end": round(audio_end, 3),
+                "duration": round(audio_end - audio_start, 3),
+                "before_token_index": item.get("before_token_index"),
+                "after_token_index": item.get("after_token_index"),
+            })
+        return gaps
+
+    def _prepare_items_and_tokens(
+        self,
+        transcripts: list[str],
+        names: list[str],
+        language: str,
+        raw_transcripts: list[str],
+        alignment_transcripts: list[str] | None = None,
+    ) -> tuple[list[dict], list[str]]:
+        alignment_transcripts = alignment_transcripts or transcripts
+        items = [
+            {
+                "transcript": transcript,
+                "raw_transcript": raw_transcript,
+                "alignment_transcript": alignment_transcript,
+                "name": name,
+                "token_index": index,
+                "inserted_star": False,
+            }
+            for index, (transcript, raw_transcript, alignment_transcript, name) in enumerate(zip(
+                transcripts,
+                raw_transcripts,
+                alignment_transcripts,
+                names,
+            ))
+            if str(transcript).strip() and str(alignment_transcript).strip()
+        ]
+        tokens = self._uromanize_alignment_tokens(
+            [str(item["alignment_transcript"]).strip().lower() for item in items],
+            language,
+        )
+        tokens = _normalize_token_spaces(tokens)
+        return _drop_empty_alignment_tokens(items, tokens)
 
     def _uromanize_alignment_tokens(self, alignment_transcripts: list[str], language: str) -> list[str]:
         uroman_inputs = [token for token in alignment_transcripts if token != "<star>"]
@@ -213,3 +261,26 @@ def _drop_empty_alignment_tokens(items: list[dict], tokens: list[str]) -> tuple[
             kept_items.append(item)
             kept_tokens.append(token)
     return kept_items, kept_tokens
+
+
+def _insert_gap_stars(items: list[dict], tokens: list[str]) -> tuple[list[dict], list[str]]:
+    expanded_items = []
+    expanded_tokens = []
+    for index, (item, token) in enumerate(zip(items, tokens)):
+        if index == 0:
+            expanded_items.append({
+                "inserted_star": True,
+                "before_token_index": None,
+                "after_token_index": item.get("token_index"),
+            })
+            expanded_tokens.append("<star>")
+        expanded_items.append(item)
+        expanded_tokens.append(token)
+        next_item = items[index + 1] if index + 1 < len(items) else None
+        expanded_items.append({
+            "inserted_star": True,
+            "before_token_index": item.get("token_index"),
+            "after_token_index": next_item.get("token_index") if next_item else None,
+        })
+        expanded_tokens.append("<star>")
+    return expanded_items, expanded_tokens

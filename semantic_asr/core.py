@@ -22,6 +22,7 @@ class PipelineConfig:
     strip_punctuation_before_punc: bool = True
     asr_vad_min_segment_s: float = 0.5
     asr_vad_max_merge_silence_s: float = 1.0
+    asr_vad_max_segment_s: float = 30.0
     output_vad_min_silence_merge_s: float = 0.2
     output_vad_pad_s: float = 0.2
     preserve_sentence_gaps: bool = False
@@ -85,9 +86,12 @@ class SemanticAsrPipeline:
             raw_vad_result["timestamps"],
             min_segment_s=self.config.asr_vad_min_segment_s,
             max_merge_silence_s=self.config.asr_vad_max_merge_silence_s,
+            max_segment_s=self.config.asr_vad_max_segment_s,
         )
         segments = self._build_segments(uttid, wav_np, sample_rate, asr_vad_segments)
         asr_results, asr_segments = self._transcribe(segments)
+        if hasattr(self.timestamp_provider, "set_vad_evidence"):
+            self.timestamp_provider.set_vad_evidence(raw_vad_result)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
         discarded_asr_segments = list(getattr(self.timestamp_provider, "last_discarded_segments", []))
         self._require_timestamps(asr_results)
@@ -322,6 +326,8 @@ class SemanticAsrPipeline:
             }
             if asr_result.get("timestamp_fallback"):
                 timestamp_segment["timestamp_fallback"] = asr_result["timestamp_fallback"]
+            if asr_result.get("mms_star_probe_gaps"):
+                timestamp_segment["mms_star_probe_gaps"] = asr_result["mms_star_probe_gaps"]
             timestamp_segments.append(timestamp_segment)
         return timestamp_segments
 
@@ -392,10 +398,15 @@ def prepare_asr_vad_segments(
     timestamps: Sequence[tuple[float, float]],
     min_segment_s: float = 0.5,
     max_merge_silence_s: float = 1.0,
+    max_segment_s: float | None = None,
 ) -> list[tuple[float, float]]:
     segments = _normalize_segments(timestamps)
     if not segments or min_segment_s <= 0:
-        return segments
+        return merge_vad_segments_for_context(
+            segments,
+            max_silence_s=max_merge_silence_s,
+            max_segment_s=max_segment_s,
+        )
 
     max_gap = max(float(max_merge_silence_s), 0.0)
     while True:
@@ -431,7 +442,38 @@ def prepare_asr_vad_segments(
             changed = True
             break
         if not changed:
-            return segments
+            return merge_vad_segments_for_context(
+                segments,
+                max_silence_s=max_merge_silence_s,
+                max_segment_s=max_segment_s,
+            )
+
+
+def merge_vad_segments_for_context(
+    timestamps: Sequence[tuple[float, float]],
+    max_silence_s: float = 1.0,
+    max_segment_s: float | None = 30.0,
+) -> list[tuple[float, float]]:
+    segments = _normalize_segments(timestamps)
+    if not segments:
+        return []
+    if max_segment_s is not None and float(max_segment_s) <= 0:
+        return segments
+
+    max_gap = max(float(max_silence_s), 0.0)
+    max_duration = float(max_segment_s) if max_segment_s is not None else float("inf")
+    merged = []
+    cur_start, cur_end = segments[0]
+    for start, end in segments[1:]:
+        gap_s = start - cur_end
+        merged_duration_s = end - cur_start
+        if gap_s <= max_gap and merged_duration_s <= max_duration:
+            cur_end = max(cur_end, end)
+            continue
+        merged.append((cur_start, cur_end))
+        cur_start, cur_end = start, end
+    merged.append((cur_start, cur_end))
+    return merged
 
 
 def pad_vad_segments(

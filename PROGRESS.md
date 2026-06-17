@@ -2,6 +2,17 @@
 
 Current state:
 
+- ASR VAD postprocessing now builds longer ASR context segments: tiny raw VAD
+  islands are still merged/skipped first, then adjacent speech islands are
+  merged up to `asr_vad_max_segment_s` when the silence gap is within
+  `asr_vad_max_merge_silence_s`. Raw VAD remains preserved for final cuts and
+  JSON debugging.
+- MMS forced alignment now uses `<star>` as an optional probe signal rather
+  than as the final timestamp strategy. The adapter runs a star-probe pass to
+  identify likely real token gaps, filters them with duration plus raw
+  VAD/frame-probability evidence when available, then splits the long context
+  into no-star alignment islands for final token timestamps. Numeric/currency
+  placeholder stars remain distinct from temporary gap-probe stars.
 - The web demo upload form now shows browser upload progress for multi-file
   submissions. Job creation requests use `XMLHttpRequest` so the UI can display
   current file index, per-file percentage, overall progress, and approximate

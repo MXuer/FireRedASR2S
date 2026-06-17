@@ -78,13 +78,22 @@ When the package is not installed, use `python -m semantic_asr.cli ...`.
 ASR and timestamp providers receive a postprocessed ASR VAD segment list derived
 from raw VAD. Tiny speech islands shorter than `asr_vad_min_segment_s` are
 merged into a nearby segment when the silence gap is no more than
-`asr_vad_max_merge_silence_s`; isolated tiny islands are skipped. This prevents
-forced aligners such as MMS from receiving 50-300ms snippets that can trigger
-ASR hallucinations and impossible CTC alignment paths.
+`asr_vad_max_merge_silence_s`; isolated tiny islands are skipped. The remaining
+speech islands are then merged into longer ASR context segments up to
+`asr_vad_max_segment_s` when the intervening silence is still within
+`asr_vad_max_merge_silence_s`. This gives ASR and punctuation models enough
+context while still preserving long silences as hard context boundaries.
 
 Raw VAD remains available as `raw_vad_segments_ms` and is still used for final
 cut segments. The postprocessed ASR/timestamp inputs are recorded separately as
 `asr_vad_segments_ms`.
+
+For MMS forced alignment, `<star>` is used only as a probe signal by default:
+the adapter first runs a star-probe alignment to identify likely real token
+gaps, then splits the long context into alignment islands and performs final
+timestamps with no inserted gap stars. Numeric/currency placeholders that MMS
+cannot align remain separate from probe gap stars and are restored to their
+original surface text.
 
 Semantic sentence merging happens after timestamps are available, using
 punctuation, token timestamps, raw VAD, frame-level VAD speech probabilities

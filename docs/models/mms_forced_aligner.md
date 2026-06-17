@@ -31,16 +31,20 @@ timestamps as:
 [token, start_s, end_s]
 ```
 
-The pipeline feeds MMS with ASR VAD segments derived from raw VAD. Very short
-raw VAD islands are merged into nearby speech when possible, or skipped when
-isolated, before ASR and MMS alignment. Semantic sentence merging is performed
-after token timestamps are available.
+The pipeline feeds MMS with ASR context segments derived from raw VAD. Very
+short raw VAD islands are merged into nearby speech when possible, or skipped
+when isolated. Remaining islands are merged into longer ASR context segments up
+to `asr_vad_max_segment_s` when the silence gap is no more than
+`asr_vad_max_merge_silence_s`. Semantic sentence merging is performed after
+token timestamps are available.
 
-`use_star` is fixed to `False` in the adapter. This avoids inserting `<star>`
-between every input token, which can otherwise force gaps between adjacent
-tokens and make word timestamps less precise. Because `use_star=False` assigns
-the full segment span across tokens, ASR VAD postprocessing keeps MMS close to
-real speech while avoiding isolated microsegments that are too short for CTC.
+`use_star` remains fixed to `False` for final token timestamps. The adapter can
+still run an internal star-probe pass first: it inserts MMS gap `<star>` tokens
+only to detect likely real silence/noise gaps between ASR tokens. Confirmed
+gaps are selected using star duration plus raw VAD/frame-probability evidence
+when available. The adapter then splits the long segment into no-star alignment
+islands and aligns each island separately. This keeps long ASR/punctuation
+context without letting inserted `<star>` tokens steal time from normal tokens.
 
 Before calling torchaudio forced alignment, the adapter checks whether the ASR
 segment is alignable:
@@ -112,8 +116,12 @@ grouped into one timestamp token before alignment so MMS only sees one
 placeholder for the unsupported expression.
 
 This placeholder is distinct from the optional `use_star` noise tokens inserted
-by MMS; inserted stars are filtered, numeric placeholder stars are restored to
-their original text.
+by MMS. Internally these are treated as different kinds of star:
+
+- numeric placeholder stars replace MMS-unsupported tokens and are restored to
+  their original text;
+- gap-probe stars are temporary silence candidates and are never returned as
+  token timestamps.
 
 ## Standalone Test
 

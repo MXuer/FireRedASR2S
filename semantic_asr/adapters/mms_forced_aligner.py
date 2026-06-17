@@ -24,6 +24,11 @@ class MmsForcedAlignerConfig:
     short_hallucination_segment_s: float = 0.8
     short_hallucination_target_rate: float = 50.0
     estimated_frame_ms: float = 20.0
+    star_probe_enabled: bool = True
+    star_probe_min_gap_s: float = 0.3
+    star_probe_pad_s: float = 0.1
+    star_probe_speech_prob_mean_threshold: float = 0.2
+    star_probe_speech_prob_active_threshold: float = 0.5
 
 
 @dataclass
@@ -49,6 +54,10 @@ class MmsForcedAlignerTimestampProvider:
             uroman_path=self.config.uroman_path,
         )
         self.last_discarded_segments: list[dict] = []
+        self._vad_evidence: dict = {}
+
+    def set_vad_evidence(self, vad_result: dict) -> None:
+        self._vad_evidence = dict(vad_result or {})
 
     def add_timestamps(self, batch_asr_result: Sequence[dict], batch_segments: Sequence[SpeechSegment]) -> list[dict]:
         results = []
@@ -63,16 +72,13 @@ class MmsForcedAlignerTimestampProvider:
 
             names = [f"{asr_result['uttid']}_{i}" for i in range(len(tokens))]
             fallback = None
+            star_probe_gaps = []
             try:
-                aligned = self.aligner.align(
+                aligned, star_probe_gaps = self._align_with_optional_star_probe(
                     tokens,
-                    segment.wav,
-                    segment.sample_rate,
+                    alignment_tokens,
                     names,
-                    use_star=self.config.use_star,
-                    language=model_language("mms_forced_aligner", self.config.language),
-                    raw_transcripts=tokens,
-                    alignment_transcripts=alignment_tokens,
+                    segment,
                 )
             except MmsAlignmentFeasibilityError as exc:
                 check = _AlignmentCheck(
@@ -104,10 +110,139 @@ class MmsForcedAlignerTimestampProvider:
 
             timestamped = dict(asr_result)
             timestamped["timestamp"] = self._normalize_alignment(aligned)
+            if star_probe_gaps:
+                timestamped["mms_star_probe_gaps"] = star_probe_gaps
             if fallback is not None:
                 timestamped["timestamp_fallback"] = fallback
             results.append(timestamped)
         return results
+
+    def _align_with_optional_star_probe(
+        self,
+        tokens: Sequence[str],
+        alignment_tokens: Sequence[str],
+        names: Sequence[str],
+        segment: SpeechSegment,
+    ) -> tuple[list[dict], list[dict]]:
+        if not self.config.star_probe_enabled or not hasattr(self.aligner, "probe_star_gaps"):
+            return self._align_token_span(tokens, alignment_tokens, names, segment, 0, len(tokens), 0.0, None), []
+
+        language = model_language("mms_forced_aligner", self.config.language)
+        try:
+            probe_gaps = self.aligner.probe_star_gaps(
+                list(tokens),
+                segment.wav,
+                segment.sample_rate,
+                list(names),
+                language=language,
+                raw_transcripts=list(tokens),
+                alignment_transcripts=list(alignment_tokens),
+            )
+        except MmsAlignmentFeasibilityError as exc:
+            logger.warning(
+                "MMS star-probe infeasible for %s: %s; falling back to no-star alignment",
+                segment.uttid,
+                exc,
+            )
+            return self._align_token_span(tokens, alignment_tokens, names, segment, 0, len(tokens), 0.0, None), []
+        except Exception as exc:  # noqa: BLE001 - star probe is optional evidence, final alignment can continue.
+            logger.warning("MMS star-probe failed for %s: %s; falling back to no-star alignment", segment.uttid, exc)
+            return self._align_token_span(tokens, alignment_tokens, names, segment, 0, len(tokens), 0.0, None), []
+
+        selected_gaps = self._select_star_probe_gaps(probe_gaps, segment)
+        islands = _alignment_islands(len(tokens), selected_gaps, segment.end_s - segment.start_s, self.config.star_probe_pad_s)
+        if len(islands) <= 1:
+            return self._align_token_span(tokens, alignment_tokens, names, segment, 0, len(tokens), 0.0, None), selected_gaps
+
+        aligned = []
+        for island in islands:
+            aligned.extend(self._align_token_span(
+                tokens,
+                alignment_tokens,
+                names,
+                segment,
+                island["start_index"],
+                island["end_index"],
+                island["audio_start_s"],
+                island["audio_end_s"],
+            ))
+        return aligned, selected_gaps
+
+    def _align_token_span(
+        self,
+        tokens: Sequence[str],
+        alignment_tokens: Sequence[str],
+        names: Sequence[str],
+        segment: SpeechSegment,
+        start_index: int,
+        end_index: int,
+        audio_start_s: float,
+        audio_end_s: float | None,
+    ) -> list[dict]:
+        span_tokens = list(tokens[start_index:end_index])
+        span_alignment_tokens = list(alignment_tokens[start_index:end_index])
+        span_names = list(names[start_index:end_index])
+        span_end_s = float(audio_end_s) if audio_end_s is not None else float(segment.end_s - segment.start_s)
+        span_start_s = max(float(audio_start_s), 0.0)
+        span_end_s = max(span_end_s, span_start_s)
+        span_segment = _slice_speech_segment(segment, span_start_s, span_end_s)
+        check = self._alignment_check(span_alignment_tokens, span_segment)
+        if check.reason is not None:
+            raise MmsAlignmentFeasibilityError(
+                check.reason or "alignment_check_failed",
+                check.frame_count,
+                check.target_count,
+                check.repeat_count,
+            )
+        aligned = self.aligner.align(
+            span_tokens,
+            span_segment.wav,
+            span_segment.sample_rate,
+            span_names,
+            use_star=self.config.use_star,
+            language=model_language("mms_forced_aligner", self.config.language),
+            raw_transcripts=span_tokens,
+            alignment_transcripts=span_alignment_tokens,
+        )
+        if span_start_s <= 0:
+            return aligned
+        shifted = []
+        for item in aligned:
+            shifted_item = dict(item)
+            shifted_item["start"] = round(float(item["start"]) + span_start_s, 3)
+            shifted_item["end"] = round(float(item["end"]) + span_start_s, 3)
+            shifted_item["duration"] = round(shifted_item["end"] - shifted_item["start"], 3)
+            shifted.append(shifted_item)
+        return shifted
+
+    def _select_star_probe_gaps(self, probe_gaps: Sequence[dict], segment: SpeechSegment) -> list[dict]:
+        selected = []
+        for gap in probe_gaps:
+            before_index = gap.get("before_token_index")
+            after_index = gap.get("after_token_index")
+            if before_index is None or after_index is None:
+                continue
+            duration_s = float(gap.get("duration") or 0.0)
+            if duration_s < float(self.config.star_probe_min_gap_s):
+                continue
+            enriched = dict(gap)
+            enriched["absolute_start_ms"] = int((segment.start_s + float(gap["start"])) * 1000)
+            enriched["absolute_end_ms"] = int((segment.start_s + float(gap["end"])) * 1000)
+            vad_evidence = getattr(self, "_vad_evidence", {})
+            prob_stats = _frame_prob_stats(vad_evidence.get("frame_speech_probs"), enriched)
+            raw_silence = _raw_vad_supports_silence(vad_evidence.get("timestamps") or [], enriched)
+            prob_silence = (
+                prob_stats is None
+                or (
+                    prob_stats["mean"] <= float(self.config.star_probe_speech_prob_mean_threshold)
+                    and prob_stats["max"] <= float(self.config.star_probe_speech_prob_active_threshold)
+                )
+            )
+            if raw_silence or prob_silence:
+                enriched["raw_vad_supported_silence"] = raw_silence
+                enriched["speech_prob_stats"] = prob_stats
+                selected.append(enriched)
+        return selected
 
     def _alignment_check(self, alignment_tokens: Sequence[str], segment: SpeechSegment) -> "_AlignmentCheck":
         if not alignment_tokens:
@@ -243,6 +378,101 @@ class MmsForcedAlignerTimestampProvider:
                 "name": f"{segment.uttid}_{index}",
             })
         return aligned
+
+
+def _slice_speech_segment(segment: SpeechSegment, start_s: float, end_s: float) -> SpeechSegment:
+    sample_rate = int(segment.sample_rate)
+    start_sample = max(int(start_s * sample_rate), 0)
+    end_sample = max(int(end_s * sample_rate), start_sample)
+    segment_wav = segment.wav[start_sample:end_sample]
+    return SpeechSegment(
+        uttid=f"{segment.uttid}_a{int(start_s * 1000)}_b{int(end_s * 1000)}",
+        start_s=segment.start_s + start_s,
+        end_s=segment.start_s + end_s,
+        sample_rate=sample_rate,
+        wav=segment_wav,
+    )
+
+
+def _alignment_islands(
+    token_count: int,
+    selected_gaps: Sequence[dict],
+    segment_duration_s: float,
+    pad_s: float,
+) -> list[dict]:
+    if token_count <= 0:
+        return []
+    gaps = sorted(
+        (
+            gap for gap in selected_gaps
+            if gap.get("before_token_index") is not None and gap.get("after_token_index") is not None
+        ),
+        key=lambda item: int(item["before_token_index"]),
+    )
+    islands = []
+    token_start = 0
+    audio_start_s = 0.0
+    for gap in gaps:
+        before_index = int(gap["before_token_index"])
+        after_index = int(gap["after_token_index"])
+        if before_index < token_start or after_index <= before_index or after_index >= token_count:
+            continue
+        gap_start = max(float(gap["start"]), 0.0)
+        gap_end = min(float(gap["end"]), float(segment_duration_s))
+        if gap_end <= gap_start:
+            continue
+        gap_pad = min(max(float(pad_s), 0.0), (gap_end - gap_start) / 2)
+        islands.append({
+            "start_index": token_start,
+            "end_index": before_index + 1,
+            "audio_start_s": audio_start_s,
+            "audio_end_s": min(gap_start + gap_pad, segment_duration_s),
+        })
+        token_start = after_index
+        audio_start_s = max(gap_end - gap_pad, 0.0)
+    islands.append({
+        "start_index": token_start,
+        "end_index": token_count,
+        "audio_start_s": audio_start_s,
+        "audio_end_s": float(segment_duration_s),
+    })
+    return [island for island in islands if island["end_index"] > island["start_index"]]
+
+
+def _frame_prob_stats(frame_speech_probs: dict | None, gap: dict) -> dict | None:
+    if not frame_speech_probs:
+        return None
+    probs = frame_speech_probs.get("probs") or []
+    frame_shift_ms = float(frame_speech_probs.get("frame_shift_ms") or 0.0)
+    frame_length_ms = float(frame_speech_probs.get("frame_length_ms") or frame_shift_ms)
+    if not probs or frame_shift_ms <= 0:
+        return None
+    start_ms = int(gap["absolute_start_ms"])
+    end_ms = int(gap["absolute_end_ms"])
+    selected = []
+    for index, prob in enumerate(probs):
+        frame_start_ms = index * frame_shift_ms
+        frame_end_ms = frame_start_ms + frame_length_ms
+        if frame_start_ms < end_ms and frame_end_ms > start_ms:
+            selected.append(float(prob))
+    if not selected:
+        return None
+    return {
+        "mean": sum(selected) / len(selected),
+        "max": max(selected),
+        "min": min(selected),
+    }
+
+
+def _raw_vad_supports_silence(raw_vad_segments: Sequence[tuple[float, float]], gap: dict) -> bool:
+    start_s = float(gap["absolute_start_ms"]) / 1000.0
+    end_s = float(gap["absolute_end_ms"]) / 1000.0
+    if end_s <= start_s:
+        return False
+    for vad_start_s, vad_end_s in raw_vad_segments:
+        if float(vad_start_s) < end_s and float(vad_end_s) > start_s:
+            return False
+    return True
 
 
 _NUMERIC_PREFIX_WORDS = {
