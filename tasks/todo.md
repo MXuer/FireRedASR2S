@@ -1,5 +1,11 @@
 # Todo
 
+- [ ] Current work: record the merge/restart plan before touching the main repo.
+- [ ] Current work: merge this worktree HEAD into `/data/duhu/FireRedASR2S` current branch.
+- [ ] Current work: run focused validation from the main repo after merge.
+- [ ] Current work: restart the demo/API/worker service from the main repo path.
+- [ ] Current work: verify port 10086 health and record the handoff.
+
 - [x] Current work: inspect German job `ede8b27b09de431ca03cb56d96d3f6db` around `n. Chr.` abbreviation splits.
 - [x] Current work: identify whether the split happens in punctuation sentence formatting or boundary fusion.
 - [x] Current work: add a minimal abbreviation-protection fix and tests if the split is caused by sentence parsing.
