@@ -1,5 +1,44 @@
 # Todo
 
+- [x] Current work: create a standalone Vietnamese alignment-debug test for the problematic `có.` / `Trên` audio region.
+- [x] Current work: output both first-pass `<star>` alignment and second-pass no-star alignment into JSON under `output/`.
+- [x] Current work: inspect the debug JSON around `có.` / `Trên` and report exact timings.
+
+Review:
+- Added `scripts/debug_mms_alignment.py`, a focused MMS debug runner that clips a region from a job wav and writes both first-pass inserted-`<star>` alignment and second-pass no-star alignment into one JSON file.
+- Ran the Vietnamese debug clip `18.680s-34.331s` for job `dbac1886ef0b438f98cfda640bb59e18`.
+- Output JSON: `output/vi_mms_alignment_debug/dbac1886ef0b438f98cfda640bb59e18_clip_18680_34331.json`.
+- In the standalone clip, first-pass `<star>` between token 22 `có.` and token 23 `Trên` is `24.484s-24.504s`, duration `20ms`.
+- Second-pass no-star alignment gives `có.` as `24.364s-24.504s` and `Trên` as `24.524s-25.044s`.
+- This confirms the sentence boundary has no meaningful silence; the first-pass `<star>` gap is tiny, and the second-pass no-star token boundary is still too close to the next word onset for an independent cut.
+
+- [x] Current work: inspect whether Vietnamese job `dbac1886ef0b438f98cfda640bb59e18` saved raw MMS `<star>` probe token timestamps around `có.` / `Trên`.
+- [x] Current work: if raw star-probe timestamps are not saved, identify whether they can be reproduced from the stored audio/config for the 19.080s-46.900s segment.
+
+Review:
+- Existing JSON only saved final no-star timestamps for the 19.080s-46.900s MMS segment; it did not save raw star-probe token/gap timestamps because no gap around 24.484s passed the `star_probe_min_gap_s=0.3` selection threshold.
+- Reproduced `probe_star_gaps()` on the stored audio segment. The raw inserted `<star>` between token 22 `có.` and token 23 `Trên` is 5.364s-5.444s relative to the segment, i.e. 24.444s-24.524s absolute, duration 80ms.
+- This confirms the boundary is not a meaningful long silence from star-probe; it is too short and should not have justified an independent sentence cut inside the same raw VAD island.
+
+- [x] Current work: inspect Vietnamese job `dbac1886ef0b438f98cfda640bb59e18` interval 6/7 boundary at 24.484s.
+- [x] Current work: compare sentence timestamps, cut timestamps, raw/output VAD, word timestamps, and MMS star-probe gaps around the boundary.
+- [x] Current work: identify whether the clipped word comes from star-probe island splitting, sentence fusion, or final cut alignment.
+- [x] Current work: propose the smallest timing-policy fix if needed.
+
+Review:
+- The 24.484s boundary is not from MMS star-probe island splitting; `timestamp_segments` has one long segment from 19.080s to 46.900s and no `mms_star_probe_gaps` around this boundary.
+- Raw VAD says 19.080s-25.000s is continuous speech, so cutting at 24.484s is inside a raw speech island.
+- The boundary decision was `reason=vad_prob_silence`, `same_raw_vad=true`, `token_gap_ms=0`, with the probability valley at 24.982s. Because `_snap_to_boundary_gap()` clamps probability valleys to the token gap, and the token gap is zero, the final boundary stayed at 24.484s.
+- Final `cut_segments_ms` then split the padded output VAD segment at that same sentence boundary, producing adjacent TextGrid intervals with no protective pad at the internal sentence boundary.
+- Smallest policy fix: do not treat frame-probability silence as a cut-safe boundary inside the same raw VAD island when token gap is zero/too small unless the snapped probability valley can be used as an actual non-overlapping gap; otherwise merge the sentences.
+
+- [x] Current work: inspect failed demo jobs uploaded after switching to the current worktree.
+- [x] Current work: collect each failed job's config, wav path, error and traceback.
+- [x] Current work: identify the shared root cause instead of patching blindly.
+- [x] Current work: fix the root cause if it is in the current worktree/runtime setup.
+- [x] Current work: rerun or requeue a representative failed job and verify it succeeds.
+- [ ] Current work: update TODO/PROGRESS and commit any required fix.
+
 - [x] Current work: locate running main-branch demo/API/worker processes under `/data/duhu/FireRedASR2S`.
 - [x] Current work: stop only the main-branch server workers and web UI, leaving translation services alone.
 - [x] Current work: start the demo API/UI and workers from this worktree for user testing.

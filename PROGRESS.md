@@ -2,6 +2,16 @@
 
 Current state:
 
+- Added `scripts/debug_mms_alignment.py` for focused MMS alignment inspection.
+  It clips a region from an existing job wav and writes both the first-pass
+  inserted-`<star>` alignment and the second-pass no-star alignment into one
+  JSON file. The Vietnamese case
+  `dbac1886ef0b438f98cfda640bb59e18`, clip `18.680s-34.331s`, was written to
+  `output/vi_mms_alignment_debug/dbac1886ef0b438f98cfda640bb59e18_clip_18680_34331.json`.
+  In that standalone clip, the first-pass `<star>` between `có.` and `Trên` is
+  only `24.484s-24.504s` (20ms), while the second-pass no-star alignment places
+  `có.` at `24.364s-24.504s` and `Trên` at `24.524s-25.044s`. This is not a
+  meaningful silence boundary.
 - The previous demo/API/worker process group running from the main repository
   path `/data/duhu/FireRedASR2S` has been stopped. The unrelated
   `/data/duhu/semantic-asr-trans-api` service on port 8000 was left untouched.

@@ -6,6 +6,7 @@ __pycache__/
 text
 wav.scp
 utt2event
+pretrained_models
 pretrained_models/
 *.swp
 *.swo
