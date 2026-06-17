@@ -1,5 +1,16 @@
 # Todo
 
+- [x] Current work: inspect demo service running/queued job state after stale running report.
+- [x] Current work: stop workers, reset stale `running` jobs back to `queued`, and restart with eight workers.
+- [x] Current work: verify active `running` count matches worker capacity and queued jobs remain queued.
+
+Review:
+- Found 15 jobs marked `running` while only the service process group existed and no corresponding live worker state could own all of them.
+- Stopped the 10086 service, backed up `service_data/demo/jobs.sqlite3` to `service_data/demo/jobs.sqlite3.before_requeue_running`, and reset all `running` jobs to `queued` with `progress={"stage":"queued"}`.
+- Restarted the demo service with `SEMANTIC_ASR_DEMO_WORKER_DEVICES=6,7` and `SEMANTIC_ASR_DEMO_WORKERS_PER_DEVICE=4`, giving 8 ASR workers total.
+- Verification passed: `/health` returned `{"ok":true}`, process list shows 8 worker processes, and DB counts are now `running=8`, `queued=19`, `failed=0`, `succeeded=22`.
+
+
 - [x] Current work: inspect failed zh_cn job `182c593e5a6743a7b3d33f2c28aeab28` and confirm ct-punc failure mode.
 - [x] Current work: change ct-punc adapter to call FunASR one item at a time because ct-transformer asserts `len(data_in) == 1`.
 - [x] Current work: remove misleading ct-punc batch config from Chinese profiles and update tests/docs.
