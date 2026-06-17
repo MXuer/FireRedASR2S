@@ -2,6 +2,15 @@
 
 Current state:
 
+- Demo historical task data has been cleared from the main service data
+  directory. The cleanup removed
+  `/data/duhu/FireRedASR2S/service_data/demo/jobs.sqlite3`,
+  `service_data/demo/jobs/`, and `service_data/demo/uploads/`, then recreated
+  empty `jobs/` and `uploads/` directories. The 10086 API/worker process group
+  was stopped before cleanup and restarted afterward from
+  `/data/duhu/FireRedASR2S`; health returned `{"ok":true}`. The new
+  `jobs.sqlite3` has a `jobs` table with 0 rows, and both task directories are
+  empty.
 - This worktree was fast-forward merged into the main repository path
   `/data/duhu/FireRedASR2S` on branch `red-asr`, up to `eeb6113`. The
   pre-existing untracked main-repo file `configs/ar_sa copy.json` was left

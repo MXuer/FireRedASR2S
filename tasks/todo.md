@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: confirm demo task storage paths before deletion.
+- [x] Current work: stop the 10086 demo/API/worker service so the database is not open during cleanup.
+- [x] Current work: delete historical demo jobs, uploads, outputs, and the job SQLite database.
+- [x] Current work: recreate empty service data directories and restart the service from the main repo.
+- [x] Current work: verify the service is healthy and historical task storage is empty.
+
+Review:
+- Historical demo tasks were stored under `/data/duhu/FireRedASR2S/service_data/demo/jobs.sqlite3`, `service_data/demo/jobs/`, and `service_data/demo/uploads/`.
+- Stopped the active 10086 API/worker process group before deleting the database and directories.
+- Deleted the job SQLite database plus all historical job output/upload directories, including the old `translation_smoke_hunyuan_mt` demo job directory.
+- Recreated empty `jobs/` and `uploads/` directories and restarted the service from `/data/duhu/FireRedASR2S`.
+- Verification passed: `/health` returned `{"ok":true}`, `jobs` table has 0 rows, and `jobs/` plus `uploads/` contain 0 entries.
+
 - [x] Current work: record the merge/restart plan before touching the main repo.
 - [x] Current work: merge this worktree HEAD into `/data/duhu/FireRedASR2S` current branch.
 - [x] Current work: run focused validation from the main repo after merge.
