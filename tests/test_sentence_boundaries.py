@@ -234,6 +234,45 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(decisions[0]["boundary_ms"], 5350)
         self.assertEqual(decisions[0]["speech_prob_boundary_ms"], 5350)
 
+    def test_short_previous_fragment_without_terminal_merges_into_following_sentence(self):
+        sentences = [
+            {"start_ms": 105272, "end_ms": 106612, "text": "Hiện tại CNP", "asr_confidence": 0.8},
+            {
+                "start_ms": 106612,
+                "end_ms": 125000,
+                "text": "sử dụng i-Sign cho việc ký hợp đồng liên quan đến việc tuyển dụng.",
+                "asr_confidence": 0.7,
+            },
+        ]
+        words = [
+            {"start_ms": 105870, "end_ms": 106590, "text": "CNP"},
+            {"start_ms": 106620, "end_ms": 107060, "text": "sử"},
+        ]
+        frame_probs = {
+            "frame_shift_ms": 10,
+            "frame_length_ms": 25,
+            "probs": [0.9] * 10655 + [0.05] * 20 + [0.9] * 18325,
+        }
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(94390, 106610), (106620, 125000)],
+            np.ones(16000 * 130, dtype=np.float32),
+            16000,
+            self.config,
+            frame_probs,
+        )
+
+        self.assertEqual(len(fused), 1)
+        self.assertEqual(
+            fused[0]["text"],
+            "Hiện tại CNP sử dụng i-Sign cho việc ký hợp đồng liên quan đến việc tuyển dụng.",
+        )
+        self.assertEqual(decisions[0]["action"], "merge")
+        self.assertEqual(decisions[0]["reason"], "merged_semantic_incomplete")
+        self.assertEqual(decisions[0]["semantic_reason"], "previous_short_incomplete_fragment")
+
     def test_high_probability_terminal_boundary_caps_max_duration(self):
         sentences = [
             {"start_ms": 0, "end_ms": 29950, "text": "first.", "asr_confidence": 0.8},

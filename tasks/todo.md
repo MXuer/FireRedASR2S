@@ -1,5 +1,17 @@
 # Todo
 
+- [x] Current work: inspect job `62addd9043b446a798784baaf0fc685f` around Vietnamese `Hiện tại CNP` split.
+- [x] Current work: identify which boundary-fusion rule kept the boundary before `sử dụng i-Sign`.
+- [x] Current work: decide whether incomplete fragments should merge across this boundary and add a focused regression if needed.
+
+Review:
+- The split was not a `CNP`-specific rule. The `Hiện tại CNP` fragment had no terminal punctuation and lasted only `1.34s`, but the following sentence made the combined span exceed `target_sentence_s`, so `_semantic_boundary()` returned `duration_target_without_terminal`.
+- Because the boundary had low VAD speech probability, `_decide_boundary()` kept it as `vad_prob_silence`, producing a standalone incomplete interval.
+- Short previous fragments without terminal punctuation now return `previous_short_incomplete_fragment` and are merged into the following sentence unless a stronger hard boundary such as long VAD silence applies.
+- Focused fusion replay on job `62addd9043b446a798784baaf0fc685f` now merges `Hiện tại CNP` with `sử dụng i-Sign ...`.
+- Validation passed: `tests.test_sentence_boundaries`, targeted `compileall`, and `git diff --check`.
+
+
 - [x] Current work: inspect job `54311e25e4d841da9416a137c7bcea28` around `161.458s-166.680s`.
 - [x] Current work: verify whether MMS star-probe gap islanding trims speech at confirmed `<star>` gaps.
 - [x] Current work: add configurable padding for selected MMS star-probe gaps before splitting no-star alignment islands.

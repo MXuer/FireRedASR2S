@@ -2,6 +2,14 @@
 
 Current state:
 
+- Vietnamese job `62addd9043b446a798784baaf0fc685f` exposed a short incomplete
+  prefix fragment: `Hiện tại CNP` was kept separately because the next sentence
+  made the combined duration exceed `target_sentence_s` and the boundary had
+  low VAD speech probability. Boundary fusion now treats previous fragments
+  under 3s with no terminal punctuation as `previous_short_incomplete_fragment`
+  and merges them into the following sentence unless a stronger hard boundary
+  applies. Replaying fusion on the existing JSON merges `Hiện tại CNP sử dụng
+  i-Sign ...` as expected.
 - German job `54311e25e4d841da9416a137c7bcea28` exposed a zero-token-gap
   sentence boundary where MMS no-star timestamps were contiguous but frame VAD
   probability had clear silence valleys. Probability-supported silence now

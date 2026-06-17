@@ -402,6 +402,7 @@ def _boundary_candidate(
     semantic_complete, semantic_reason = _semantic_boundary(
         previous["text"],
         current["text"],
+        previous["end_ms"] - previous["start_ms"],
         current["end_ms"] - current["start_ms"],
         combined_duration_ms,
         config,
@@ -466,6 +467,9 @@ def _decide_boundary(candidate: BoundaryCandidate, config: SentenceBoundaryFusio
         reason = "merged_active_speech_prob" if candidate.prob_active_boundary else "merged_active_speech"
         return "merge", reason
 
+    if candidate.semantic_reason == "previous_short_incomplete_fragment":
+        return "merge", "merged_semantic_incomplete"
+
     if candidate.audio_safe and candidate.semantic_complete:
         return "keep", candidate.audio_reason or "semantic_boundary"
 
@@ -494,6 +498,7 @@ def _decide_boundary(candidate: BoundaryCandidate, config: SentenceBoundaryFusio
 def _semantic_boundary(
     previous_text: str,
     current_text: str,
+    previous_duration_ms: int,
     current_duration_ms: int,
     combined_duration_ms: int,
     config: SentenceBoundaryFusionConfig,
@@ -509,6 +514,8 @@ def _semantic_boundary(
     if _TERMINAL_SENTENCE_PUNCTUATION.search(previous):
         return True, "terminal_punctuation"
     target_ms = int(config.target_sentence_s * 1000)
+    if previous_duration_ms < 3000:
+        return False, "previous_short_incomplete_fragment"
     if current_duration_ms < 3000 and combined_duration_ms < target_ms:
         return False, "short_incomplete_fragment"
     if combined_duration_ms < target_ms:
