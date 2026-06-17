@@ -2,6 +2,12 @@
 
 Current state:
 
+- CT-Punc does not support native batch inference in FunASR 1.3.1:
+  `ct_transformer/model.py` asserts `len(data_in) == 1`. Failed Chinese job
+  `182c593e5a6743a7b3d33f2c28aeab28` hit this because the pipeline sent an
+  8-item punctuation batch. `ct_punc` now processes the outer batch one item at
+  a time with `batch_size=1`, and Chinese configs no longer set a ct-punc
+  `batch_size`.
 - Chinese punctuation now uses FunASR `ct-punc` via the registered `ct_punc`
   component. `configs/zh_cn.json` and `configs/zh_cn_mms_starprobe.json` have
   been switched from `firered_punc` to `ct_punc`. The adapter reconstructs text

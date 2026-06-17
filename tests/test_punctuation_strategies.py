@@ -121,13 +121,14 @@ class PunctuationStrategyTest(unittest.TestCase):
 
     def test_ct_punc_maps_funasr_text_output_to_timestamps(self):
         class FakeModel:
+            def __init__(self):
+                self.calls = []
+
             def generate(self, input, batch_size=1):
-                self.input = input
-                self.batch_size = batch_size
+                self.calls.append((input, batch_size))
                 return [{"text": "那今天的会就到这里吧，happy new year,明年见。"}]
 
         adapter = object.__new__(CtPunc)
-        adapter.config = type("Config", (), {"batch_size": 4})()
         adapter.model = FakeModel()
         timestamp = [
             ["那", 0.0, 0.1],
@@ -148,10 +149,15 @@ class PunctuationStrategyTest(unittest.TestCase):
             ["见", 2.0, 2.1],
         ]
 
-        result = adapter.process_with_timestamp([timestamp], ["sample"])[0]
+        result = adapter.process_with_timestamp([timestamp, timestamp], ["sample", "sample2"])[0]
 
-        self.assertEqual(adapter.model.input, ["那今天的会就到这里吧 happy new year 明年见"])
-        self.assertEqual(adapter.model.batch_size, 4)
+        self.assertEqual(
+            adapter.model.calls,
+            [
+                ("那今天的会就到这里吧 happy new year 明年见", 1),
+                ("那今天的会就到这里吧 happy new year 明年见", 1),
+            ],
+        )
         self.assertEqual(len(result["punc_sentences"]), 1)
         self.assertEqual(result["punc_sentences"][0]["punc_text"], "那今天的会就到这里吧，happy new year,明年见。")
         self.assertEqual(result["punc_sentences"][0]["end_s"], 2.1)

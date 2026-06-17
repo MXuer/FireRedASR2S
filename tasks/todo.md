@@ -1,5 +1,18 @@
 # Todo
 
+- [x] Current work: inspect failed zh_cn job `182c593e5a6743a7b3d33f2c28aeab28` and confirm ct-punc failure mode.
+- [x] Current work: change ct-punc adapter to call FunASR one item at a time because ct-transformer asserts `len(data_in) == 1`.
+- [x] Current work: remove misleading ct-punc batch config from Chinese profiles and update tests/docs.
+- [ ] Current work: rerun tests, smoke ct-punc, and restart 10086.
+
+Review:
+- The failed job used `zh_cn` and crashed in FunASR CT-Transformer punctuation with `AssertionError` at `assert len(data_in) == 1`.
+- `ct_punc` now marks `supports_batch=False` and processes the outer pipeline batch one item at a time with `model.generate(input=text, batch_size=1)`.
+- Removed misleading `batch_size` params from `configs/zh_cn.json` and `configs/zh_cn_mms_starprobe.json`.
+- Updated docs to note that ct-punc does not support native batch inference.
+- Validation passed: `tests.test_punctuation_strategies tests.test_language_support tests.test_config_runner`, targeted `compileall`, `git diff --check`, and a real two-item ct-punc adapter smoke.
+
+
 - [x] Current work: add FunASR `ct-punc` punctuation adapter for Chinese.
 - [x] Current work: register `ct_punc` in the punctuation registry and language support metadata.
 - [x] Current work: switch Chinese profile punctuation to `ct_punc`.

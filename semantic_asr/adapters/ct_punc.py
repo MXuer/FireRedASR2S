@@ -12,11 +12,10 @@ _ASCII_WORD = re.compile(r"[A-Za-z0-9#]")
 class CtPuncConfig:
     model: str = "ct-punc"
     disable_update: bool = True
-    batch_size: int = 1
 
 
 class CtPunc:
-    supports_batch: bool = True
+    supports_batch: bool = False
 
     def __init__(self, config: CtPuncConfig | None = None):
         self.config = config or CtPuncConfig()
@@ -25,17 +24,14 @@ class CtPunc:
         self.model = AutoModel(model=self.config.model, disable_update=self.config.disable_update)
 
     def process_with_timestamp(self, batch_timestamp: Sequence[list], batch_uttid: Sequence[str]) -> list[dict]:
-        texts = [_timestamp_to_text(timestamp) for timestamp in batch_timestamp]
-        raw_outputs = self.model.generate(input=texts, batch_size=max(1, int(self.config.batch_size)))
-        if isinstance(raw_outputs, dict):
-            raw_outputs = [raw_outputs]
-        return [
-            {
+        results = []
+        for timestamp, uttid in zip(batch_timestamp, batch_uttid):
+            raw_output = self.model.generate(input=_timestamp_to_text(timestamp), batch_size=1)
+            results.append({
                 "uttid": uttid,
                 "punc_sentences": split_text_by_punctuation(_output_text(raw_output), timestamp),
-            }
-            for uttid, raw_output, timestamp in zip(batch_uttid, raw_outputs, batch_timestamp)
-        ]
+            })
+        return results
 
 
 def _timestamp_to_text(timestamp: Sequence[Sequence]) -> str:
@@ -53,6 +49,10 @@ def _timestamp_to_text(timestamp: Sequence[Sequence]) -> str:
 
 
 def _output_text(raw_output) -> str:
+    if isinstance(raw_output, (list, tuple)):
+        if not raw_output:
+            return ""
+        return _output_text(raw_output[0])
     if isinstance(raw_output, dict):
         return str(raw_output.get("text") or "").strip()
     return str(raw_output or "").strip()

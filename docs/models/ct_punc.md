@@ -23,20 +23,14 @@ be available from the local ModelScope/FunASR cache.
 ## Pipeline Behavior
 
 `semantic_asr.adapters.ct_punc.CtPunc` receives timestamp tokens, reconstructs
-plain text with the same token joining rule as the pipeline, calls FunASR
-`AutoModel(model="ct-punc")`, then maps the returned punctuated `text` back onto
-the original timestamp sequence with `split_text_by_punctuation()`.
+plain text with Chinese tokens joined directly and English/digit runs separated
+by spaces, calls FunASR `AutoModel(model="ct-punc")`, then maps the returned
+punctuated `text` back onto the original timestamp sequence with
+`split_text_by_punctuation()`.
 
-The adapter supports batched calls through:
-
-```json
-{
-  "name": "ct_punc",
-  "params": {
-    "batch_size": 8
-  }
-}
-```
+The underlying FunASR CT-Transformer inference path asserts `len(data_in) == 1`,
+so this adapter intentionally calls `generate()` one item at a time even when
+the outer pipeline sends a punctuation batch.
 
 `configs/zh_cn.json` and `configs/zh_cn_mms_starprobe.json` now use `ct_punc`
 instead of `firered_punc`.

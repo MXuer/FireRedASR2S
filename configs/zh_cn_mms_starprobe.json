@@ -21,10 +21,7 @@
       }
     },
     "punc": {
-      "name": "ct_punc",
-      "params": {
-        "batch_size": 8
-      }
+      "name": "ct_punc"
     }
   },
   "pipeline": {
