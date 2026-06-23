@@ -1,5 +1,7 @@
 # Todo
 
+- [x] Current work: apply single-worker ASR batch-size settings, switch Dolphin/Seamless adapters to native batch, and restart the demo service.
+
 - [x] Current work: measure ASR batch-size upper bounds, including native Dolphin and Seamless batch probes, and update the benchmark report.
 
 - [x] Current work: record GPU resource strategy and benchmark single-GPU ASR batch-size scaling.

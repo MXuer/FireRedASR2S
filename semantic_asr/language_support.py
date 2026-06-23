@@ -155,6 +155,7 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
         notes="Dolphin supports 40 Eastern languages plus Chinese dialect region codes; configure a canonical language-region id and the adapter derives native symbols.",
         has_native_timestamps=True,
         has_native_punctuation=True,
+        supports_batch=True,
     ),
     ModelLanguageSupport(
         role="asr",
@@ -167,6 +168,7 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
         },
         notes="The current adapter mapping covers ten validated languages; configure a canonical language-region id and the adapter derives the Seamless/FLORES code.",
         has_native_punctuation=True,
+        supports_batch=True,
     ),
     ModelLanguageSupport(
         role="timestamp",

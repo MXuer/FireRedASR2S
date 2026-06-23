@@ -1,9 +1,7 @@
 from dataclasses import dataclass
-import os
-import tempfile
 from typing import Any, Sequence
 
-import soundfile as sf
+import numpy as np
 import torch
 import torchaudio.functional as audio_functional
 
@@ -19,10 +17,11 @@ class SeamlessM4TConfig:
     target_language: str | None = None
     task: str = "transcribe"
     max_new_tokens: int = 256
+    batch_size: int = 128
 
 
 class SeamlessM4TAsr:
-    supports_batch: bool = False
+    supports_batch: bool = True
 
     def __init__(self, config: SeamlessM4TConfig | None = None):
         patch_torch_pytree_for_transformers()
@@ -31,34 +30,31 @@ class SeamlessM4TAsr:
         self.config = config or SeamlessM4TConfig()
         self.processor = AutoProcessor.from_pretrained(self.config.model)
         self.model = SeamlessM4Tv2ForSpeechToText.from_pretrained(self.config.model).to(self.config.device)
+        self._set_recommended_batch_size()
+
+    def _set_recommended_batch_size(self) -> None:
+        self.recommended_batch_size = max(1, int(self.config.batch_size))
 
     def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
-        results = []
-        for uttid, (sample_rate, wav) in zip(batch_uttid, batch_wav):
-            wav_path = self._write_temp_wav(wav, sample_rate)
-            try:
-                raw_result = self._transcribe_file(wav_path)
-            finally:
-                os.unlink(wav_path)
-            results.append({
+        raw_results = self._decode_batch(batch_wav)
+        if len(raw_results) != len(batch_uttid):
+            raise ValueError(f"Seamless returned {len(raw_results)} results for {len(batch_uttid)} inputs")
+        return [
+            {
                 "uttid": uttid,
                 "text": raw_result.strip(),
                 "confidence": 0,
                 "timestamp": [],
                 "sample_rate": sample_rate,
-            })
-        return results
+            }
+            for uttid, (sample_rate, _wav), raw_result in zip(batch_uttid, batch_wav, raw_results)
+        ]
 
-    def _transcribe_file(self, wav_path: str) -> str:
-        wav, sample_rate = sf.read(wav_path, dtype="float32")
-        if wav.ndim > 1:
-            wav = wav.mean(axis=1)
-        if sample_rate != 16000:
-            wav = audio_functional.resample(torch.from_numpy(wav), sample_rate, 16000).numpy()
-            sample_rate = 16000
+    def _decode_batch(self, batch_wav: Sequence[tuple[int, Any]]) -> list[str]:
+        audios = [_to_16k_float32_mono(wav, sample_rate) for sample_rate, wav in batch_wav]
         inputs = self.processor(
-            audios=wav,
-            sampling_rate=sample_rate,
+            audios=audios,
+            sampling_rate=16000,
             src_lang=model_language("seamless_m4t_v2_large", self.config.language),
             return_tensors="pt",
         )
@@ -69,11 +65,18 @@ class SeamlessM4TAsr:
             kwargs["tgt_lang"] = model_language("seamless_m4t_v2_large", target_language)
         with torch.no_grad():
             output_ids = self.model.generate(**inputs, **kwargs)
-        return self.processor.batch_decode(output_ids, skip_special_tokens=True)[0]
+        return [text.strip() for text in self.processor.batch_decode(output_ids, skip_special_tokens=True)]
 
-    @staticmethod
-    def _write_temp_wav(wav: Any, sample_rate: int) -> str:
-        tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        tmp.close()
-        sf.write(tmp.name, wav, sample_rate)
-        return tmp.name
+
+def _to_16k_float32_mono(wav: Any, sample_rate: int) -> np.ndarray:
+    array = np.asarray(wav)
+    if array.ndim > 1:
+        array = array.mean(axis=1)
+    if np.issubdtype(array.dtype, np.integer):
+        scale = max(abs(np.iinfo(array.dtype).min), np.iinfo(array.dtype).max)
+        array = array.astype(np.float32) / float(scale)
+    else:
+        array = array.astype(np.float32, copy=False)
+    if sample_rate != 16000:
+        array = audio_functional.resample(torch.from_numpy(array), sample_rate, 16000).numpy()
+    return array.astype(np.float32, copy=False)

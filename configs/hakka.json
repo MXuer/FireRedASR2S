@@ -13,7 +13,7 @@
       "name": "qwen3_asr_1_7b",
       "params": {
         "model": "/data_151/duhu/DBC/ASR/23281_龙岩客家ASR转写模型/models/checkpoint-780",
-        "max_inference_batch_size": 32
+        "max_inference_batch_size": 256
       }
     },
     "timestamp": {

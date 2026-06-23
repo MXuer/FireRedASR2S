@@ -2,6 +2,12 @@
 
 Current state:
 
+- 2026-06-23: Reconfigured ASR batch defaults for the single-worker-per-GPU
+  service shape: Whisper large 96, Qwen3-ASR 256, GigaAM-v3 192, FireRedASR
+  128, Dolphin 16, Seamless 128. Dolphin and Seamless adapters now use native
+  batch inference instead of item-by-item loops. The demo service was restarted
+  on `0.0.0.0:10086` with one ASR worker on GPU6 and one on GPU7; `/health`
+  returned `{"ok": true}`.
 - 2026-06-23: Extended the single-GPU ASR batch-size benchmark to measure upper
   bounds and native batch probes for Dolphin and Seamless. On A40 GPU2:
   Whisper large succeeded through batch 128 and failed at 160; GigaAM-v3

@@ -14,7 +14,7 @@
         "model_name": "v3_e2e_rnnt",
         "model_dir": "pretrained_models/gigaam_v3",
         "device": "cuda:0",
-        "batch_size": 16
+        "batch_size": 192
       }
     },
     "timestamp": {

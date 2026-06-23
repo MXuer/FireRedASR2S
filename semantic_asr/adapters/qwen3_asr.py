@@ -14,7 +14,7 @@ class Qwen3AsrConfig:
     forced_aligner: str | None = None
     dtype: str = "bfloat16"
     device_map: str = "cuda:0"
-    max_inference_batch_size: int = 8
+    max_inference_batch_size: int = 256
     max_new_tokens: int | None = 512
     language: str | None = None
     return_time_stamps: bool = False

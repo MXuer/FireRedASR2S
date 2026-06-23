@@ -14,7 +14,7 @@ class GigaAmV3Config:
     model_dir: str = "pretrained_models/gigaam_v3"
     repo_dir: str | None = None
     device: str = "cuda:0"
-    batch_size: int = 16
+    batch_size: int = 192
     num_workers: int = 0
     model_workers: int = 1
     fp16_encoder: bool = True

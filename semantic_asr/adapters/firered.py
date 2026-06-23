@@ -12,6 +12,7 @@ class FireRedAsrAdapterConfig:
     asr_type: str = "aed"
     model_dir: str = "pretrained_models/FireRedASR2-AED"
     return_timestamp: bool = True
+    batch_size: int = 128
     config: FireRedAsr2Config = field(default_factory=FireRedAsr2Config)
 
 
@@ -24,6 +25,7 @@ class FireRedAsrAdapter:
             self.config.model_dir,
             self.config.config,
         )
+        self.recommended_batch_size = max(1, int(self.config.batch_size))
 
     def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
         return self.model.transcribe(batch_uttid, batch_wav)

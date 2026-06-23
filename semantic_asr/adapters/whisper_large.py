@@ -26,7 +26,7 @@ class WhisperLargeConfig:
     short_temperature: float | None = 0.0
     short_beam_size: int | None = 5
     short_length_penalty: float | None = 0.0
-    batch_size: int = 24
+    batch_size: int = 96
     num_workers: int = 1
 
 

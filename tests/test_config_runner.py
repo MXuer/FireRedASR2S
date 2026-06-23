@@ -166,7 +166,7 @@ class ConfigRunnerTest(unittest.TestCase):
         profile = parse_pipeline_profile(raw)
 
         self.assertEqual(profile.components["asr"].name, "gigaam_v3")
-        self.assertEqual(profile.components["asr"].params["batch_size"], 16)
+        self.assertEqual(profile.components["asr"].params["batch_size"], 192)
         self.assertEqual(profile.components["timestamp"].name, "gigaam_v3_native")
         self.assertEqual(profile.components["punc"].name, "asr_text")
 

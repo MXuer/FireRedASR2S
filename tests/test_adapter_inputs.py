@@ -2,7 +2,7 @@ import unittest
 
 import numpy as np
 
-from semantic_asr.adapters.dolphin import _get_text, _normalize_timestamps
+from semantic_asr.adapters.dolphin import DolphinAsr, DolphinAsrConfig, _get_text, _normalize_timestamps
 from semantic_asr.adapters.funasr_nano import FunAsrNano, FunAsrNanoConfig
 from semantic_asr.adapters.gigaam_v3 import (
     GigaAmV3Asr,
@@ -11,6 +11,7 @@ from semantic_asr.adapters.gigaam_v3 import (
     _normalize_words,
 )
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig, _to_float32, normalize_qwen3_asr_language
+from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
 from semantic_asr.adapters.whisper_large import WhisperLarge, WhisperLargeConfig
 
 
@@ -69,6 +70,44 @@ class AdapterInputTest(unittest.TestCase):
 
         self.assertEqual(_get_text(raw_result), "привет")
         self.assertEqual(_normalize_timestamps(raw_result), [["привет", 0.1, 0.5]])
+
+    def test_dolphin_transcribes_batch_in_one_native_call(self):
+        adapter = object.__new__(DolphinAsr)
+        adapter.config = DolphinAsrConfig(language="ru_ru", batch_size=16)
+        adapter._set_recommended_batch_size()
+        calls = []
+        adapter._decode_batch = lambda batch_wav: calls.append(batch_wav) or [
+            {"text_nospecial": "привет", "word_timestamps": [["привет", 0.0, 0.4]]},
+            {"text_nospecial": "пока", "word_timestamps": [["пока", 0.0, 0.3]]},
+        ]
+
+        results = adapter.transcribe(
+            ["utt1", "utt2"],
+            [(16000, np.zeros(16000, dtype=np.float32)), (16000, np.zeros(16000, dtype=np.float32))],
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(calls[0]), 2)
+        self.assertEqual(adapter.recommended_batch_size, 16)
+        self.assertEqual([item["text"] for item in results], ["привет", "пока"])
+        self.assertEqual(results[0]["timestamp"], [["привет", 0.0, 0.4]])
+
+    def test_seamless_transcribes_batch_in_one_native_call(self):
+        adapter = object.__new__(SeamlessM4TAsr)
+        adapter.config = SeamlessM4TConfig(language="ru_ru", batch_size=128)
+        adapter._set_recommended_batch_size()
+        calls = []
+        adapter._decode_batch = lambda batch_wav: calls.append(batch_wav) or ["первый", "второй"]
+
+        results = adapter.transcribe(
+            ["utt1", "utt2"],
+            [(16000, np.zeros(16000, dtype=np.float32)), (16000, np.zeros(16000, dtype=np.float32))],
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(len(calls[0]), 2)
+        self.assertEqual(adapter.recommended_batch_size, 128)
+        self.assertEqual([item["text"] for item in results], ["первый", "второй"])
 
     def test_qwen_integer_audio_is_normalized_to_float32(self):
         wav = np.array([-32768, 0, 32767], dtype=np.int16)
