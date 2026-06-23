@@ -1,13 +1,13 @@
-AGENTS.md:
+# AGENTS.md
 ## 每次会话开始时（上班打卡）
 
-1. 读 PROGRESS.md 了解当前状态
-2. 读 DECISIONS.md 了解重要决策
-3. 从 PROGRESS.md 的"下一步"部分继续工作
+1. 读 tasks/progress.md 了解当前状态
+2. 读 tasks/decisions.md 了解重要决策
+3. 从 tasks/progress.md 的"下一步"部分继续工作
 
 ## 每次会话结束前（下班打卡）
 
-1. 更新 PROGRESS.md
+1. 更新 tasks/progress.md
 2. 提交所有已完成的工作
 
 ## 1. 编码前思考
@@ -128,3 +128,86 @@ AGENTS.md:
 
 - **不偷懒**：定位根因。不要贴临时补丁。按资深开发者标准交付。
 - **最小影响面**：改动只动该动的地方，避免引入新 bug。
+
+## Semantic ASR 项目规则
+
+### 沟通入口
+
+新会话或切换到独立仓库时，先读取：
+
+1. `AGENTS.md`
+2. `tasks/progress.md`
+3. `tasks/decisions.md`
+4. `docs/codex_context.md`
+5. `tasks/lessons.md`
+
+用户给出 bug 时，优先索取或定位这些信息：
+
+- 配置文件，例如 `configs/de_de.json`
+- 音频路径或 `job_id`
+- 输出 JSON/TextGrid/CSV 路径
+- 具体异常时间段和文本
+- 用户期望：合并、拆分、扩边、不切语音、翻译修复等
+
+### 模型接入规则
+
+每新增一个模型，必须同时补齐：
+
+- `docs/models/<model>.md`：安装、下载、环境变量、模型路径、调用示例
+- standalone smoke example 或单测
+- `semantic_asr/language_support.py` 里的支持语种和能力 metadata
+- 是否支持 batch
+- 是否自带 token/word timestamp
+- 是否自带 punctuation
+- 推荐测试音频和验证命令
+
+### 句意切音规则
+
+当前目标是：在保证不切到语音的前提下，按句意切成可配置长度的 segment。
+
+优先级固定为：
+
+1. 不切到语音
+2. 控制输出长度可用性
+3. 句意完整
+
+策略代码问题必须先分析具体 case，再改代码。不要只看现象就直接兜底。
+
+排查 sentence boundary 时必须看：
+
+- `raw_vad_segments_ms`
+- `asr_vad_segments_ms`
+- token/word timestamps
+- `sentence_boundary_decisions`
+- `cut_segments_ms`
+- `cut_start_ms` / `cut_end_ms`
+
+TextGrid/CSV/SRT writer 不允许静默修复 overlap。出现 overlap 就说明上游策略有问题。
+
+CJK 语言在 MMS 中通常是 char-level timestamp，不能用空格分词数消费 timestamp。
+
+### 服务和运行规则
+
+- WebUI/API 默认本地端口：`0.0.0.0:10086`
+- demo token 默认：`demo-local`
+- ASR worker 和 translation worker 是两个独立资源池
+- GPU、端口、worker 数、日志路径都要写进 `tasks/progress.md`
+- 普通用户的主路径不要依赖 backfill；backfill 只用于修复历史数据
+
+### 仓库边界
+
+不要提交：
+
+- `data/`
+- `output/`
+- `logs/`
+- `service_data/`
+- `pretrained_models/`
+- `*.egg-info`
+- `__pycache__/`
+
+必须保留：
+
+- `uroman/data/*.txt`
+- `semantic_asr/firered_runtime/fireredasr2/data/*.py`
+- `semantic_asr/firered_runtime/fireredpunc/data/*.py`

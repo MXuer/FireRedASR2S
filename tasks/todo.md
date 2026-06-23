@@ -1,5 +1,62 @@
 # Todo
 
+- [x] Current work: align current repository documentation structure with the standalone repository.
+
+- [x] Current work: fix batch worker lifecycle, result validation, parallel timestamp empty returns, service lease, wav.scp parsing, and package hygiene.
+
+- [x] Current work: convert README documentation map paths to clickable GitHub links.
+
+- [x] Current work: inspect `/data/duhu/semantic-asr` after manual rsync fix and add README documentation navigation.
+
+- [x] Current work: add standalone repository collaboration rules to `AGENT.md`.
+- [x] Current work: add architecture and maintenance docs for pipeline, boundary strategy, service runtime, debugging and model matrix.
+- [x] Current work: add Mermaid/drawio diagrams for the migrated standalone repository.
+- [ ] Current work: sync docs to `/data/duhu/semantic-asr`, validate, commit and push.
+
+- [x] Current work: add GitHub remote `MXuer/semantic-asr` to `/data/duhu/semantic-asr` and push `main`.
+
+- [x] Current work: create a clean standalone `/data/duhu/semantic-asr` repository from the current semantic ASR code.
+- [x] Current work: copy only source/config/docs/tests/scripts/task context, excluding data/output/logs/service runtime artifacts.
+- [x] Current work: add a `docs/codex_context.md` handoff summary so future Codex threads can recover project context.
+- [x] Current work: initialize git in the new repo and verify the migrated package imports/tests at a lightweight level.
+
+- [x] Current work: make WebUI default API token `demo-local` and restart the 10086 API page service.
+
+- [x] Current work: raise GPU5 translation per-interface concurrency from 1 to 2 and restart WebUI with matching main-path translation concurrency.
+
+- [x] Current work: inspect failed restarted jobs, starting with `97d918ca342a407ea3cdd5c140a12a00`.
+- [x] Current work: identify whether failures are worker lifecycle, GPU OOM, config/model, or translation-stage errors.
+- [x] Current work: apply the smallest operational/code fix and verify one failed job reruns cleanly.
+
+- [x] Current work: check whether the 180 imported job translations are complete.
+- [ ] Current work: stop GPU2/3/4 translation services if translation is complete.
+- [x] Current work: start translation service on GPU5.
+- [x] Current work: restart WebUI with ASR workers on GPU6/7 and translation pointing to GPU5.
+
+- [x] Current work: delete yesterday's imported Korean jobs that used full local paths and bad translations.
+- [x] Current work: randomly import 30 successful JSON results from each of the six recent batch output directories into the demo DB.
+- [ ] Current work: start Hunyuan translation services on GPUs 2/3/4 and backfill zh_cn translations for the imported jobs.
+- [ ] Current work: verify DB counts and translation cache output.
+
+- [x] Current work: inspect why batch jobs OOM after recent changes.
+- [x] Current work: verify current GPU occupancy and whether `--num-workers` over-subscribes the first listed GPU.
+- [x] Current work: start requested Korean/German batch jobs in a safe order with logs.
+- [x] Current work: fix batch `--num-workers` to mean workers per GPU, not total workers.
+- [x] Current work: stop the old 4-total-worker batch chains and restart with 4 workers per selected GPU.
+
+- [x] Current work: inspect current demo job error distribution and representative tracebacks.
+- [x] Current work: correlate failures with live worker count, GPU memory pressure, and startup logs.
+- [x] Current work: reduce unsafe worker concurrency if failures are OOM-related and requeue only retryable OOM jobs.
+- [x] Current work: verify the service comes back healthy with bounded running count.
+- [ ] Current work: inspect Korean batch `batch2-o` error.json files and identify root causes.
+- [ ] Current work: apply the smallest fix for Korean batch errors and validate on representative cases.
+- [ ] Current work: import a random 100 successful Korean batch outputs into the demo DB with audio-name job ids.
+- [ ] Current work: run or backfill Chinese translations for the imported Korean jobs so the web UI can review them.
+- [x] Current work: inspect Korean job `18e024e3-edf0-4425-a054-ce2a45eec46a` translation cache for sentence-index/content mismatch.
+- [ ] Current work: make translation caches per-job so imported batch jobs sharing one outdir do not collide.
+- [ ] Current work: regenerate affected Korean imported job translations with the fixed cache path.
+- [ ] Current work: update TODO/PROGRESS and commit the operational fix record.
+
 - [x] Current work: inspect demo service running/queued job state after stale running report.
 - [x] Current work: stop workers, reset stale `running` jobs back to `queued`, and restart with eight workers.
 - [x] Current work: verify active `running` count matches worker capacity and queued jobs remain queued.

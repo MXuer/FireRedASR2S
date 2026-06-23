@@ -43,10 +43,48 @@ configs/            JSON/YAML pipeline profiles
 examples/           runnable examples and compatibility wrappers
 tests/              unit and orchestration tests
 tasks/todo.md
-PROGRESS.md
-DECISIONS.md
+tasks/progress.md
+tasks/decisions.md
 requirements.txt
 ```
+
+## Documentation Map
+
+Start here when entering the project:
+
+- [AGENTS.md](AGENTS.md): collaboration rules for Codex and maintainers.
+- [tasks/progress.md](tasks/progress.md): current status, recent fixes, validation commands and service notes.
+- [tasks/decisions.md](tasks/decisions.md): durable architecture and product decisions.
+- [docs/codex_context.md](docs/codex_context.md): compact handoff summary of the long Codex build history.
+- [docs/maintenance_index.md](docs/maintenance_index.md): reading order for architecture, debugging, models and service docs.
+
+Architecture and strategy:
+
+- [docs/architecture/current_pipeline.md](docs/architecture/current_pipeline.md): end-to-end VAD, ASR, timestamp, punctuation, fusion and export flow.
+- [docs/architecture/current_pipeline.drawio](docs/architecture/current_pipeline.drawio): draw.io diagram for the current pipeline.
+- [docs/architecture/sentence_boundary_strategy.md](docs/architecture/sentence_boundary_strategy.md): current split/merge strategy and decision rules.
+- [docs/architecture/service_runtime.md](docs/architecture/service_runtime.md): HTTP API, worker, WebUI and translation runtime layout.
+- [docs/architecture/service_runtime.drawio](docs/architecture/service_runtime.drawio): draw.io diagram for service deployment.
+
+Debugging and operations:
+
+- [docs/debugging/debug_boundary_case.md](docs/debugging/debug_boundary_case.md): checklist for investigating bad cuts, over-merge, overlap and timestamp issues.
+- [docs/sentence_boundary_fusion.md](docs/sentence_boundary_fusion.md): lower-level notes on boundary fusion.
+- [docs/sentence_split_merge_strategy_audit.md](docs/sentence_split_merge_strategy_audit.md): historical strategy audit and simplification notes.
+- [docs/hunyuan_mt_translation_design.md](docs/hunyuan_mt_translation_design.md): translation sidecar design.
+
+Models and language support:
+
+- [docs/model_matrix.md](docs/model_matrix.md): current VAD/ASR/timestamp/punctuation/translation capability matrix.
+- [docs/models/](docs/models/): per-model install, configuration and smoke-test notes.
+- [docs/language_configuration.md](docs/language_configuration.md): canonical language id and adapter mapping rules.
+- [docs/test_audio_matrix.md](docs/test_audio_matrix.md): multilingual test audio planning.
+
+Codex workflow:
+
+- [codex_skills/semantic-asr/SKILL.md](codex_skills/semantic-asr/SKILL.md): versioned draft of the project-specific Codex skill.
+- [tasks/todo.md](tasks/todo.md): active and historical task checklist.
+- [tasks/lessons.md](tasks/lessons.md): corrections and lessons that should guide future work.
 
 ## Environment
 

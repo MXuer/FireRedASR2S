@@ -2,6 +2,50 @@
 
 Current state:
 
+- The current repository documentation structure has been aligned with the
+  standalone `/data/duhu/semantic-asr` layout for next week's sync:
+  `AGENT.md` is now `AGENTS.md`, root `PROGRESS.md` and `DECISIONS.md` now live
+  at `tasks/progress.md` and `tasks/decisions.md`, README and maintenance docs
+  point at the new paths, and `docs/models/README.md` has been added as the
+  model documentation index.
+- Code-review fixes from the 5.5 pro feedback were applied in the current
+  `/data/duhu/FireRedASR2S` worktree only, not synced to the standalone repo.
+  Batch workers now reuse one SDK pipeline per worker, report top-level
+  failures without hanging the parent, avoid per-worker JSONL appends, parse
+  `wav.scp` as either `path` or `uttid path` with duplicate checks, validate
+  ASR/Punc/Timestamp `uttid` alignment explicitly, preserve MMS parallel
+  discard metadata, emit TextGrid token tiers from high-level writers, requeue
+  stale running service jobs after `SEMANTIC_ASR_STALE_RUNNING_SECONDS`, and
+  keep pytest collection under `tests/`.
+- Added standalone maintenance documentation for the migrated Semantic ASR
+  repository. New docs cover current pipeline architecture, sentence-boundary
+  strategy, service runtime, boundary-case debugging, model matrix, maintenance
+  reading order, and a versioned Codex skill draft under
+  `codex_skills/semantic-asr/SKILL.md`. `AGENT.md` now includes project-specific
+  rules for model onboarding, sentence-boundary debugging, service operations,
+  repo boundaries, and required runtime data exceptions.
+- The standalone repo README now includes a documentation map linking the
+  main collaboration, architecture, debugging, model, service and Codex workflow
+  documents. The earlier non-relative rsync mistake placed some docs at the
+  repository root; those root-level duplicates should be removed in the next
+  standalone repo commit, leaving canonical paths under `docs/` and `tasks/`.
+- Standalone repository migration trial completed at `/data/duhu/semantic-asr`.
+  The new repo was initialized on branch `main` from the current working tree
+  source/config/docs/tests/scripts/task context, excluding runtime-heavy
+  directories such as `data/`, `output/`, `logs/`, `service_data/`,
+  `pretrained_models/`, `*.egg-info`, and Python bytecode caches. Required
+  runtime data exceptions were preserved: `uroman/data/*.txt`,
+  `semantic_asr/firered_runtime/fireredasr2/data/*.py`, and
+  `semantic_asr/firered_runtime/fireredpunc/data/*.py`. Added
+  `docs/codex_context.md` as a future Codex handoff document covering the
+  project goal, model families, boundary strategy, service architecture,
+  operational lessons, and migration scope. Lightweight validation passed from
+  the new repo with
+  `PYTHONDONTWRITEBYTECODE=1 conda run -n fireredasr2s python -m unittest tests.test_language_mapping tests.test_config_runner`
+  (12 tests). The initial migration commit is `b70b1df`.
+- The standalone repository was pushed to GitHub at
+  `git@github.com:MXuer/semantic-asr.git`; local `/data/duhu/semantic-asr`
+  tracks `origin/main`.
 - CT-Punc does not support native batch inference in FunASR 1.3.1:
   `ct_transformer/model.py` asserts `len(data_in) == 1`. Failed Chinese job
   `182c593e5a6743a7b3d33f2c28aeab28` hit this because the pipeline sent an
