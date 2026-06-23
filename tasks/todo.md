@@ -1,5 +1,7 @@
 # Todo
 
+- [x] Current work: measure ASR batch-size upper bounds, including native Dolphin and Seamless batch probes, and update the benchmark report.
+
 - [x] Current work: record GPU resource strategy and benchmark single-GPU ASR batch-size scaling.
 
 - [x] Current work: remove bad `ru_ru_gigaam_v3` Web DB imports, document the mismatch cause, rerun fixed GigaAM batch recognition, import clean jobs, and translate them.

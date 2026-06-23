@@ -2,18 +2,18 @@
 
 Current state:
 
+- 2026-06-23: Extended the single-GPU ASR batch-size benchmark to measure upper
+  bounds and native batch probes for Dolphin and Seamless. On A40 GPU2:
+  Whisper large succeeded through batch 128 and failed at 160; GigaAM-v3
+  succeeded through 320 and failed at 384; Qwen3-ASR-1.7B succeeded through
+  640 and failed at 704; FireRedASR succeeded through 512 and failed at 640;
+  Dolphin native batch succeeded through 64 and failed at 96; Seamless M4T v2
+  large native batch succeeded through 512 and failed at 640. The updated
+  recommendations are in `docs/experiments/asr_batch_benchmark_20260623.md`.
 - 2026-06-23: Added `docs/architecture/gpu_resource_strategy.md` to record
   the staged GPU resource plan: model resource profiles, role-specific workers,
   keep-warm ASR, separate timestamp/punctuation/translation services, and a
   future profile-level `resource_policy`.
-- 2026-06-23: Ran single-GPU ASR batch-size benchmarks on GPU2 and documented
-  results in `docs/experiments/asr_batch_benchmark_20260623.md`. Whisper large
-  and GigaAM-v3 were tested up to batch size 64 on repeated 30s Russian
-  segments; Qwen3-ASR-1.7B was tested up to batch size 32 on repeated 10s
-  English segments; FireRedASR was tested up to batch size 8 on repeated 10s
-  Chinese audio. Fun-ASR-Nano could not be benchmarked in the current
-  environment because the installed FunASR package did not register the local
-  model and attempted Hub lookup.
 - 2026-06-23: Diagnosed and removed the bad `ru_ru_gigaam_v3` Web DB records.
   They were imported from pressure-test outputs generated with
   `--max_seconds 60`, so the result JSON referenced temporary clipped wav
