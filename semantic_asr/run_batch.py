@@ -3,6 +3,7 @@ import json
 import logging
 import multiprocessing as mp
 import os
+import queue as queue_module
 import sys
 import traceback
 from dataclasses import dataclass
@@ -52,8 +53,8 @@ def run_batch(
     items = read_wav_scp(wav_scp)
     if not items:
         return []
-    worker_count = max(1, min(int(num_workers), len(items)))
     devices = visible_cuda_devices()
+    worker_count = effective_worker_count(num_workers, devices, len(items))
     worker_devices = assign_worker_devices(worker_count, devices)
     chunks = split_round_robin(items, worker_count)
     ctx = mp.get_context("spawn")
@@ -77,10 +78,31 @@ def run_batch(
         processes.append(process)
 
     results = []
-    for _ in processes:
-        message = queue.get()
+    pending = len(processes)
+    while pending:
+        try:
+            message = queue.get(timeout=1.0)
+        except queue_module.Empty:
+            failed = [process for process in processes if process.exitcode not in (None, 0)]
+            if failed:
+                for process in processes:
+                    if process.is_alive():
+                        process.terminate()
+                for process in processes:
+                    process.join()
+                failed_indexes = [process.name for process in failed]
+                raise RuntimeError(f"Batch worker process failed before reporting: failed workers={failed_indexes}")
+            continue
+        pending -= 1
         if message["ok"]:
             results.extend(message["outputs"])
+        else:
+            for process in processes:
+                if process.is_alive():
+                    process.terminate()
+            for process in processes:
+                process.join()
+            raise RuntimeError(message["error"])
     for process in processes:
         process.join()
     failed = [process for process in processes if process.exitcode != 0]
@@ -97,12 +119,20 @@ def read_wav_scp(path: str) -> list[BatchItem]:
             line = line.strip()
             if not line or line.startswith("#"):
                 continue
-            parts = line.split()
-            wav_path = parts[-1]
+            parts = line.split(maxsplit=1)
+            if len(parts) == 1:
+                wav_path = parts[0]
+                uttid = os.path.splitext(os.path.basename(wav_path))[0]
+            else:
+                uttid, wav_path = parts
             if not os.path.exists(wav_path):
                 raise FileNotFoundError(f"{path}:{line_number}: wav path does not exist: {wav_path}")
-            uttid = os.path.splitext(os.path.basename(wav_path))[0]
             items.append(BatchItem(wav_path=wav_path, uttid=uttid))
+    seen = set()
+    for item in items:
+        if item.uttid in seen:
+            raise ValueError(f"{path}: duplicate uttid: {item.uttid}")
+        seen.add(item.uttid)
     return items
 
 
@@ -117,6 +147,12 @@ def assign_worker_devices(worker_count: int, devices: list[str]) -> list[str]:
     if not devices:
         devices = [str(index) for index in range(8)]
     return [devices[index % len(devices)] for index in range(worker_count)]
+
+
+def effective_worker_count(num_workers_per_device: int, devices: list[str], item_count: int) -> int:
+    device_count = max(1, len(devices))
+    requested = int(num_workers_per_device) * device_count
+    return max(1, min(requested, item_count))
 
 
 def split_round_robin(items: list[BatchItem], worker_count: int) -> list[list[BatchItem]]:
@@ -136,18 +172,18 @@ def _worker_main(
     queue,
 ) -> None:
     os.environ["CUDA_VISIBLE_DEVICES"] = str(device)
-    from semantic_asr.run_pipeline import run_from_config
-
-    outputs = run_batch_items(
-        items=items,
-        config_path=config_path,
-        outdir=outdir,
-        max_seconds=max_seconds,
-        device=device,
-        worker_index=worker_index,
-        runner=run_from_config,
-    )
-    queue.put({"ok": True, "outputs": outputs})
+    try:
+        outputs = run_batch_items(
+            items=items,
+            config_path=config_path,
+            outdir=outdir,
+            max_seconds=max_seconds,
+            device=device,
+            worker_index=worker_index,
+        )
+        queue.put({"ok": True, "outputs": outputs})
+    except Exception:
+        queue.put({"ok": False, "error": traceback.format_exc()})
 
 
 def run_batch_items(
@@ -160,7 +196,17 @@ def run_batch_items(
     runner: Callable[..., dict] | None = None,
 ) -> list[dict]:
     if runner is None:
-        from semantic_asr.run_pipeline import run_from_config as runner
+        from semantic_asr.api import SemanticASR
+
+        sdk = SemanticASR.from_config(config_path)
+
+        def runner(**kwargs):
+            return sdk.transcribe(
+                wav_path=kwargs["wav_path"],
+                uttid=kwargs["uttid"],
+                outdir=kwargs["outdir"],
+                max_seconds=kwargs["max_seconds"],
+            )["outputs"]
 
     outputs = []
     for item in items:

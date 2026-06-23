@@ -214,7 +214,9 @@ def create_app(
     @app.get("/v1/jobs/{job_id}/translations/{target_language}")
     def get_translation(job_id: str, target_language: str, user=Depends(_require_user)):
         job = _get_authorized_job(store, job_id, user)
-        path = translation_cache_path(job["outdir"], target_language)
+        path = translation_cache_path(job["outdir"], target_language, job_id=job["job_id"])
+        if not os.path.exists(path):
+            path = translation_cache_path(job["outdir"], target_language)
         if not os.path.exists(path):
             raise HTTPException(status_code=404, detail="Translation is not available")
         return FileResponse(path, media_type="application/json", filename=os.path.basename(path))

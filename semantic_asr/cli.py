@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from typing import Sequence
 
 from semantic_asr.api import SemanticASR, list_model_languages, list_models
+from semantic_asr.run_batch import run_batch
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -73,14 +74,14 @@ def _run_transcribe(args) -> dict:
 
 
 def _run_batch(args) -> list[dict]:
-    sdk = SemanticASR.from_config(args.config)
-    return sdk.transcribe_batch(
-        wav_scp=args.wav_scp,
-        outdir=args.outdir,
-        num_workers=args.num_workers,
-        max_seconds=args.max_seconds,
-        devices=args.devices,
-    )
+    with _temporary_cuda_visible_devices(args.devices):
+        return run_batch(
+            config_path=args.config,
+            wav_scp=args.wav_scp,
+            outdir=args.outdir,
+            num_workers=args.num_workers,
+            max_seconds=args.max_seconds,
+        )
 
 
 def _parse_formats(value: str) -> tuple[str, ...]:

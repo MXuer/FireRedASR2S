@@ -39,26 +39,35 @@ class ParallelTimestampProvider:
     def add_timestamps(self, batch_asr_result: Sequence[dict], batch_segments: Sequence[Any]) -> list[dict]:
         if self.num_workers <= 1 or len(batch_asr_result) <= 1:
             component = self.component_cls(self.config)
-            return component.add_timestamps(batch_asr_result, batch_segments)
+            results = component.add_timestamps(batch_asr_result, batch_segments)
+            self.last_discarded_segments = list(getattr(component, "last_discarded_segments", []))
+            return results
 
         tasks = [
             (index, asr_result, segment)
             for index, (asr_result, segment) in enumerate(zip(batch_asr_result, batch_segments))
         ]
-        return _run_parallel_tasks(
+        indexed_results = _run_parallel_tasks(
             self.component_cls,
             self.config,
             self.num_workers,
             _parallel_timestamp_task,
             tasks,
         )
+        results = []
+        discarded = []
+        for item in indexed_results:
+            results.extend(item["results"])
+            discarded.extend(item["discarded"])
+        self.last_discarded_segments = discarded
+        return results
 
 
 def _run_parallel_tasks(
     component_cls: type,
     config: Any,
     num_workers: int,
-    worker_fn: Callable[[tuple], tuple[int, dict]],
+    worker_fn: Callable[[tuple], tuple[int, Any]],
     tasks: list[tuple],
 ) -> list[dict]:
     if not tasks:
@@ -88,5 +97,8 @@ def _parallel_asr_task(task: tuple) -> tuple[int, dict]:
 
 def _parallel_timestamp_task(task: tuple) -> tuple[int, dict]:
     index, asr_result, segment = task
-    [result] = _WORKER_COMPONENT.add_timestamps([asr_result], [segment])
-    return index, result
+    results = _WORKER_COMPONENT.add_timestamps([asr_result], [segment])
+    return index, {
+        "results": results,
+        "discarded": list(getattr(_WORKER_COMPONENT, "last_discarded_segments", [])),
+    }

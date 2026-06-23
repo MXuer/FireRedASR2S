@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 
 from semantic_asr_service.settings import ServiceSettings, load_settings
@@ -28,8 +29,7 @@ def find_missing_translation_jobs(
         for job in jobs:
             if job["status"] != "succeeded":
                 continue
-            cache_path = translation_cache_path(job["outdir"], target_language)
-            if os.path.exists(cache_path):
+            if _has_job_translation_cache(job, target_language):
                 continue
             result_path = os.path.join(job["outdir"], f"{job['job_id']}.json")
             if not os.path.exists(result_path):
@@ -39,6 +39,21 @@ def find_missing_translation_jobs(
                 return missing
         offset += page_size
     return missing
+
+
+def _has_job_translation_cache(job: dict, target_language: str) -> bool:
+    job_cache = translation_cache_path(job["outdir"], target_language, job_id=job["job_id"])
+    if os.path.exists(job_cache):
+        return True
+    legacy_cache = translation_cache_path(job["outdir"], target_language)
+    if not os.path.exists(legacy_cache):
+        return False
+    try:
+        with open(legacy_cache, encoding="utf-8") as fin:
+            payload = json.load(fin)
+    except (OSError, json.JSONDecodeError):
+        return False
+    return payload.get("job_id") == job["job_id"]
 
 
 def backfill_translations(

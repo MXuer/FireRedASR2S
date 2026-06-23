@@ -1,7 +1,7 @@
 import json
 import os
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 
@@ -157,10 +157,20 @@ class JobStore:
             clauses.append("1 = 1")
         return " AND ".join(clauses), tuple(params)
 
-    def claim_next_job(self) -> dict[str, Any] | None:
+    def claim_next_job(self, stale_after_s: float | None = None) -> dict[str, Any] | None:
         now = _utc_now()
         with self.connect() as conn:
             conn.execute("BEGIN IMMEDIATE")
+            if stale_after_s and stale_after_s > 0:
+                stale_before = (datetime.now(timezone.utc) - timedelta(seconds=float(stale_after_s))).isoformat()
+                conn.execute(
+                    """
+                    UPDATE jobs
+                    SET status = 'queued', progress = ?, started_at = NULL, error = NULL
+                    WHERE status = 'running' AND started_at IS NOT NULL AND started_at < ?
+                    """,
+                    (json.dumps({"stage": "queued", "requeued_from_stale_running": True}), stale_before),
+                )
             row = conn.execute(
                 "SELECT * FROM jobs WHERE status = 'queued' ORDER BY created_at LIMIT 1"
             ).fetchone()

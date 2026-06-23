@@ -170,7 +170,7 @@ def _write_selected_outputs(
             uttid,
             result["dur_s"],
             result["sentences"],
-            None,
+            result.get("words"),
         )
     if "srt" in formats:
         outputs["srt"] = write_srt(os.path.join(outdir, "asr_srt"), uttid, result["sentences"])

@@ -79,7 +79,8 @@ class SemanticAsrPipeline:
         wav_np, sample_rate = sf.read(wav_path, dtype="int16")
         dur_s = wav_np.shape[0] / sample_rate
         if self.config.sample_rate is not None:
-            assert sample_rate == self.config.sample_rate
+            if sample_rate != self.config.sample_rate:
+                raise ValueError(f"Expected sample_rate={self.config.sample_rate}, got {sample_rate}")
 
         raw_vad_result = self._detect(wav_path)
         asr_vad_segments = prepare_asr_vad_segments(
@@ -94,6 +95,7 @@ class SemanticAsrPipeline:
             self.timestamp_provider.set_vad_evidence(raw_vad_result)
         asr_results = self.timestamp_provider.add_timestamps(asr_results, asr_segments)
         discarded_asr_segments = list(getattr(self.timestamp_provider, "last_discarded_segments", []))
+        self._validate_timestamp_results(asr_results, asr_segments, discarded_asr_segments)
         self._require_timestamps(asr_results)
         timestamp_segments = self._format_timestamp_segments(asr_results)
         if self.config.strip_punctuation_before_punc:
@@ -205,6 +207,7 @@ class SemanticAsrPipeline:
             batch_wav = [(s.sample_rate, s.wav) for s in batch_segments]
             batch_asr_results = self.asr.transcribe(batch_uttid, batch_wav)
             logger.info("ASR: %s", batch_asr_results)
+            self._validate_uttid_results("ASR", batch_asr_results, batch_uttid)
 
             for asr_result in batch_asr_results:
                 text = asr_result.get("text", "").strip()
@@ -249,6 +252,7 @@ class SemanticAsrPipeline:
         if hasattr(self.punc, "process_asr_results"):
             batch_result = self.punc.process_asr_results(asr_results)
             logger.info("Punc: %s", batch_result)
+            self._validate_uttid_results("Punc", batch_result, [item["uttid"] for item in asr_results])
             return batch_result
 
         punc_results = []
@@ -262,6 +266,7 @@ class SemanticAsrPipeline:
 
             batch_result = self.punc.process_with_timestamp(batch_timestamp, batch_uttid)
             logger.info("Punc: %s", batch_result)
+            self._validate_uttid_results("Punc", batch_result, batch_uttid)
             punc_results.extend(batch_result)
 
             batch_uttid = []
@@ -274,10 +279,10 @@ class SemanticAsrPipeline:
         asr_results: Sequence[dict],
         punc_results: Sequence[dict],
     ) -> tuple[list[dict], list[dict]]:
+        self._validate_uttid_results("Punc", punc_results, [item["uttid"] for item in asr_results])
         sentences = []
         words = []
         for asr_result, punc_result in zip(asr_results, punc_results):
-            assert asr_result["uttid"] == punc_result["uttid"], f"{asr_result} | {punc_result}"
             segment_start_ms, segment_end_ms = self._parse_uttid_ms(asr_result["uttid"])
 
             punc_sentences = punc_result["punc_sentences"]
@@ -334,8 +339,28 @@ class SemanticAsrPipeline:
     @staticmethod
     def _parse_uttid_ms(uttid: str) -> tuple[int, int]:
         start_ms, end_ms = uttid.split("_")[-2:]
-        assert start_ms.startswith("s") and end_ms.startswith("e")
+        if not start_ms.startswith("s") or not end_ms.startswith("e"):
+            raise ValueError(f"Invalid segment uttid timestamp suffix: {uttid}")
         return int(start_ms[1:]), int(end_ms[1:])
+
+    @staticmethod
+    def _validate_uttid_results(stage: str, results: Sequence[dict], expected_uttids: Sequence[str]) -> None:
+        got_uttids = [result.get("uttid") for result in results]
+        expected = list(expected_uttids)
+        if got_uttids != expected:
+            raise ValueError(f"{stage} returned uttids {got_uttids}, expected {expected}")
+
+    @staticmethod
+    def _validate_timestamp_results(
+        results: Sequence[dict],
+        segments: Sequence[SpeechSegment],
+        discarded_segments: Sequence[dict],
+    ) -> None:
+        returned = [result.get("uttid") for result in results]
+        discarded = {item.get("uttid") for item in discarded_segments}
+        expected = [segment.uttid for segment in segments if segment.uttid not in discarded]
+        if returned != expected:
+            raise ValueError(f"Timestamp provider returned uttids {returned}, expected {expected}")
 
     @staticmethod
     def _sentence(start_ms: int, end_ms: int, text: str, asr_result: dict) -> dict:
@@ -541,16 +566,47 @@ def align_sentences_to_output_vad(
 
 
 def remove_sentence_overlaps(sentences: Sequence[dict]) -> list[dict]:
-    adjusted = [dict(sentence) for sentence in sentences]
-    for index in range(1, len(adjusted)):
-        previous = adjusted[index - 1]
-        current = adjusted[index]
+    adjusted: list[dict] = []
+    for sentence in sentences:
+        current = dict(sentence)
+        if not adjusted:
+            if current["end_ms"] <= current["start_ms"]:
+                continue
+            adjusted.append(current)
+            continue
+        previous = adjusted[-1]
+        if current["end_ms"] <= current["start_ms"]:
+            previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
+            previous["text"] = _merge_adjacent_sentence_text(previous.get("text", ""), current.get("text", ""))
+            previous["asr_confidence"] = min(previous.get("asr_confidence", 0), current.get("asr_confidence", 0))
+            continue
         if current["start_ms"] >= previous["end_ms"]:
+            adjusted.append(current)
             continue
         boundary_ms = (previous["end_ms"] + current["start_ms"]) // 2
-        previous["end_ms"] = max(previous["start_ms"], boundary_ms)
-        current["start_ms"] = min(current["end_ms"], boundary_ms)
+        previous_end_ms = max(previous["start_ms"], boundary_ms)
+        current_start_ms = min(current["end_ms"], boundary_ms)
+        if previous_end_ms <= previous["start_ms"] or current["end_ms"] <= current_start_ms:
+            previous["end_ms"] = max(previous["end_ms"], current["end_ms"])
+            previous["text"] = _merge_adjacent_sentence_text(previous.get("text", ""), current.get("text", ""))
+            previous["asr_confidence"] = min(previous.get("asr_confidence", 0), current.get("asr_confidence", 0))
+            continue
+        previous["end_ms"] = previous_end_ms
+        current["start_ms"] = current_start_ms
+        adjusted.append(current)
     return adjusted
+
+
+def _merge_adjacent_sentence_text(previous: str, current: str) -> str:
+    previous = str(previous).rstrip()
+    current = str(current).lstrip()
+    if not previous:
+        return current
+    if not current:
+        return previous
+    cjk_pattern = r"[\u3040-\u30ff\u3400-\u9fff\uf900-\ufaff\uac00-\ud7af\u1100-\u11ff\u3130-\u318f]"
+    separator = "" if re.search(cjk_pattern + "$", previous) and re.match(cjk_pattern, current) else " "
+    return previous + separator + current
 
 
 def add_sentence_cut_segments(

@@ -104,8 +104,7 @@ def translate_job_result(
     translator: Translator | None = None,
 ) -> dict:
     source = _load_translation_source(job, settings, target_language)
-    cache_path = translation_cache_path(job["outdir"], target_language)
-    cached = _read_valid_cache(cache_path, source["source_hash"])
+    cached = _read_valid_job_cache(job, target_language, source["source_hash"])
     if cached:
         return cached
     if _should_skip_translation(source["source_language"], target_language):
@@ -139,8 +138,7 @@ def stream_translate_job_result(
     translator: Translator | None = None,
 ):
     source = _load_translation_source(job, settings, target_language)
-    cache_path = translation_cache_path(job["outdir"], target_language)
-    cached = _read_valid_cache(cache_path, source["source_hash"])
+    cached = _read_valid_job_cache(job, target_language, source["source_hash"])
     if cached:
         for sentence in cached.get("sentences") or []:
             yield {"type": "sentence", "sentence": sentence, "cached": True}
@@ -186,8 +184,11 @@ def stream_translate_job_result(
     yield {"type": "done", "payload": payload}
 
 
-def translation_cache_path(outdir: str, target_language: str) -> str:
+def translation_cache_path(outdir: str, target_language: str, job_id: str | None = None) -> str:
     safe_target = re.sub(r"[^a-zA-Z0-9_-]+", "_", target_language)
+    if job_id:
+        safe_job_id = re.sub(r"[^a-zA-Z0-9_.-]+", "_", job_id)
+        return os.path.join(outdir, "translations", f"{safe_job_id}.{safe_target}.json")
     return os.path.join(outdir, "translations", f"{safe_target}.json")
 
 
@@ -437,11 +438,23 @@ def _write_translation_payload(
         "source_signature": source["source_hash"],
         "sentences": translated_sentences,
     }
-    cache_path = translation_cache_path(job["outdir"], target_language)
+    cache_path = translation_cache_path(job["outdir"], target_language, job_id=job["job_id"])
     os.makedirs(os.path.dirname(cache_path), exist_ok=True)
     with open(cache_path, "w", encoding="utf-8") as fout:
         json.dump(payload, fout, ensure_ascii=False, indent=2)
     return payload
+
+
+def _read_valid_job_cache(job: dict, target_language: str, source_signature: dict) -> dict | None:
+    paths = [
+        translation_cache_path(job["outdir"], target_language, job_id=job["job_id"]),
+        translation_cache_path(job["outdir"], target_language),
+    ]
+    for path in paths:
+        cached = _read_valid_cache(path, source_signature)
+        if cached and cached.get("job_id") == job["job_id"]:
+            return cached
+    return None
 
 
 def _read_valid_cache(path: str, source_signature: dict) -> dict | None:

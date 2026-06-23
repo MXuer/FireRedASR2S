@@ -6,6 +6,7 @@ import threading
 import time
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 from unittest import mock
 
@@ -385,6 +386,35 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertEqual(job["formats"], ["json", "srt", "csv"])
         self.assertEqual(job["progress"], {"stage": "queued"})
 
+    def test_claim_next_job_requeues_stale_running_jobs(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            store = JobStore(settings.db_path)
+            stale = store.create_job(
+                "stale",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "stale", "outputs"),
+                ["json"],
+            )
+            store.create_job(
+                "fresh",
+                "alice",
+                "zh_cn",
+                self._write_wav(tmpdir),
+                os.path.join(tmpdir, "jobs", "fresh", "outputs"),
+                ["json"],
+            )
+            store.claim_next_job()
+            old_started_at = (datetime.now(timezone.utc) - timedelta(seconds=10)).isoformat()
+            with store.connect() as conn:
+                conn.execute("UPDATE jobs SET started_at = ? WHERE job_id = ?", (old_started_at, stale["job_id"]))
+
+            claimed = store.claim_next_job(stale_after_s=1)
+
+        self.assertEqual(claimed["job_id"], "stale")
+
     def test_config_must_be_allowlisted(self):
         settings = self._settings(tempfile.mkdtemp())
 
@@ -613,7 +643,7 @@ class SemanticAsrServiceTest(unittest.TestCase):
         self.assertIs(called_settings, settings)
         self.assertEqual(called_target, "zh_cn")
 
-    def test_worker_marks_failed_when_required_auto_translation_fails(self):
+    def test_worker_keeps_asr_success_when_auto_translation_fails(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             settings = self._settings(tmpdir)
             settings.translation_base_url = "http://translation.local"
@@ -637,8 +667,8 @@ class SemanticAsrServiceTest(unittest.TestCase):
             with mock.patch("semantic_asr_service.translation.translate_job_result", side_effect=RuntimeError("translate boom")):
                 result = run_worker_once(settings, store, runner=ok_runner)
 
-        self.assertEqual(result["status"], "failed")
-        self.assertIn("translate boom", result["error"])
+        self.assertEqual(result["status"], "succeeded")
+        self.assertIn("translate boom", result["progress"]["translation_error"])
 
     def test_translate_job_result_writes_and_reuses_cache(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -738,9 +768,9 @@ class SemanticAsrServiceTest(unittest.TestCase):
                     json.dump({"sentences": [{"start_ms": 0, "end_ms": 1, "text": "hello"}]}, fout)
                 store.mark_succeeded(job["job_id"])
             store.mark_failed(failed["job_id"], "boom")
-            os.makedirs(os.path.dirname(translation_cache_path(cached["outdir"], "zh_cn")), exist_ok=True)
-            with open(translation_cache_path(cached["outdir"], "zh_cn"), "w", encoding="utf-8") as fout:
-                json.dump({"source_signature": {}}, fout)
+            os.makedirs(os.path.dirname(translation_cache_path(cached["outdir"], "zh_cn", job_id=cached["job_id"])), exist_ok=True)
+            with open(translation_cache_path(cached["outdir"], "zh_cn", job_id=cached["job_id"]), "w", encoding="utf-8") as fout:
+                json.dump({"job_id": "cached", "source_signature": {}}, fout)
 
             found = find_missing_translation_jobs(settings, store, "zh_cn")
 
@@ -863,7 +893,37 @@ class SemanticAsrServiceTest(unittest.TestCase):
             sentence_events = [event for event in events if event["type"] == "sentence"]
             self.assertEqual(len(sentence_events), 2)
             self.assertEqual(events[-1]["type"], "done")
-            self.assertTrue(os.path.exists(translation_cache_path(job["outdir"], "zh_cn")))
+            self.assertTrue(os.path.exists(translation_cache_path(job["outdir"], "zh_cn", job_id=job["job_id"])))
+
+    def test_translation_cache_is_per_job_when_jobs_share_outdir(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            settings = self._settings(tmpdir)
+            settings.translation_targets = {"zh_cn"}
+            store = JobStore(settings.db_path)
+            shared_outdir = os.path.join(tmpdir, "shared")
+            jobs = []
+            for job_id, text in [("job1", "안녕하세요."), ("job2", "감사합니다.")]:
+                job = store.create_job(
+                    job_id,
+                    "alice",
+                    "ko_kr",
+                    self._write_wav(tmpdir),
+                    shared_outdir,
+                    ["json"],
+                )
+                os.makedirs(job["outdir"], exist_ok=True)
+                with open(artifact_path(job["outdir"], job["job_id"], "json"), "w", encoding="utf-8") as fout:
+                    json.dump({"sentences": [{"start_ms": 0, "end_ms": 100, "text": text}]}, fout)
+                store.mark_succeeded(job_id)
+                jobs.append(store.get_job(job_id))
+
+            first = translate_job_result(jobs[0], settings, "zh_cn", translator=self.FakeTranslator())
+            second = translate_job_result(jobs[1], settings, "zh_cn", translator=self.FakeTranslator())
+
+            self.assertEqual(first["sentences"][0]["translation"], "Chinese::안녕하세요.")
+            self.assertEqual(second["sentences"][0]["translation"], "Chinese::감사합니다.")
+            self.assertTrue(os.path.exists(translation_cache_path(shared_outdir, "zh_cn", job_id="job1")))
+            self.assertTrue(os.path.exists(translation_cache_path(shared_outdir, "zh_cn", job_id="job2")))
 
     def test_stream_translate_job_result_skips_chinese_to_chinese_model_call(self):
         with tempfile.TemporaryDirectory() as tmpdir:

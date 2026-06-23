@@ -4,7 +4,7 @@ import unittest
 
 from textgrid import TextGrid
 
-from semantic_asr.outputs import write_csv, write_srt, write_textgrid
+from semantic_asr.outputs import write_all_outputs, write_csv, write_srt, write_textgrid
 
 
 class OutputWriterTest(unittest.TestCase):
@@ -100,6 +100,18 @@ class OutputWriterTest(unittest.TestCase):
                     [{"start_ms": 0, "end_ms": 3000, "text": "sentence"}],
                     words=words,
                 )
+
+    def test_write_all_outputs_includes_token_tier(self):
+        result = {
+            "dur_s": 2.0,
+            "sentences": [{"start_ms": 0, "end_ms": 1000, "text": "hello"}],
+            "words": [{"start_ms": 0, "end_ms": 500, "text": "hello"}],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outputs = write_all_outputs(tmpdir, "sample", result, write_srt_output=False, write_csv_output=False)
+            tg = TextGrid.fromFile(outputs["textgrid"])
+
+        self.assertIsNotNone(tg.getFirst("token"))
 
 
 if __name__ == "__main__":

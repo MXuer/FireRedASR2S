@@ -34,6 +34,11 @@ class RecordingAsr:
         ]
 
 
+class WrongUttidAsr(RecordingAsr):
+    def transcribe(self, batch_uttid, batch_wav):
+        return [{"uttid": "wrong_s0_e1000", "text": "hello", "confidence": 0, "timestamp": []}]
+
+
 class FakeTimestamp:
     def __init__(self):
         self.segment_ranges = []
@@ -66,6 +71,11 @@ class FakePunc:
             }
             for uttid, timestamp in zip(batch_uttid, batch_timestamp)
         ]
+
+
+class WrongUttidPunc(FakePunc):
+    def process_with_timestamp(self, batch_timestamp, batch_uttid):
+        return [{"uttid": "wrong_s0_e1000", "punc_sentences": []}]
 
 
 class AsrVadPostprocessTest(unittest.TestCase):
@@ -193,6 +203,30 @@ class AsrVadPostprocessTest(unittest.TestCase):
 
         self.assertEqual(result["sentences"], [])
         self.assertEqual(result["discarded_asr_segments"][0]["reason"], "short_segment_hallucination")
+
+    def test_pipeline_rejects_mismatched_asr_uttid(self):
+        pipeline = SemanticAsrPipeline(
+            vad=FakeVad(),
+            asr=WrongUttidAsr(),
+            timestamp_provider=FakeTimestamp(),
+            punc=FakePunc(),
+            config=PipelineConfig(asr_vad_min_segment_s=0.5, asr_vad_max_merge_silence_s=1.0),
+        )
+
+        with self.assertRaises(ValueError):
+            pipeline.process(self._write_silence_wav(), "sample")
+
+    def test_pipeline_rejects_mismatched_punc_uttid(self):
+        pipeline = SemanticAsrPipeline(
+            vad=FakeVad(),
+            asr=RecordingAsr(),
+            timestamp_provider=FakeTimestamp(),
+            punc=WrongUttidPunc(),
+            config=PipelineConfig(asr_vad_min_segment_s=0.5, asr_vad_max_merge_silence_s=1.0),
+        )
+
+        with self.assertRaises(ValueError):
+            pipeline.process(self._write_silence_wav(), "sample")
 
     @staticmethod
     def _write_silence_wav() -> str:

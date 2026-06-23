@@ -16,15 +16,20 @@ def run_worker_once(
     store: JobStore,
     runner: Runner | None = None,
 ) -> dict | None:
-    job = store.claim_next_job()
+    job = store.claim_next_job(stale_after_s=settings.stale_running_seconds)
     if job is None:
         return None
     _log(f"claimed job_id={job['job_id']} config={job['config']} wav={job['wav_path']}")
     runner = runner or run_job
     try:
         runner(job, settings)
-        _auto_translate(job, settings)
-        store.mark_succeeded(job["job_id"])
+        progress = {"stage": "done"}
+        try:
+            _auto_translate(job, settings)
+        except Exception:
+            progress = {"stage": "done", "translation_error": traceback.format_exc()}
+            _log(f"auto translation failed job_id={job['job_id']}\n{progress['translation_error']}")
+        store.mark_succeeded(job["job_id"], progress=progress)
         _log(f"succeeded job_id={job['job_id']}")
     except Exception:
         error = traceback.format_exc()
@@ -45,7 +50,7 @@ def run_job(job: dict, settings: ServiceSettings) -> None:
         uttid=job["job_id"],
         outdir=job["outdir"],
         formats=job["formats"],
-        use_cache=False,
+        use_cache=True,
     )
 
 

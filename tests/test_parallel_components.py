@@ -43,6 +43,18 @@ class FakeTimestampProvider:
         return results
 
 
+class DiscardingTimestampProvider:
+    def __init__(self, config: FakeConfig):
+        self.last_discarded_segments = []
+
+    def add_timestamps(self, batch_asr_result, batch_segments):
+        self.last_discarded_segments = [
+            {"uttid": asr_result["uttid"], "reason": "discarded"}
+            for asr_result in batch_asr_result
+        ]
+        return []
+
+
 class RecordingAsr:
     recommended_batch_size = 2
 
@@ -89,6 +101,22 @@ class ParallelComponentsTest(unittest.TestCase):
         self.assertEqual([result["uttid"] for result in results], ["b", "a"])
         self.assertEqual(results[0]["timestamp"], [["ts", 0.0, 1.5]])
         self.assertEqual(results[1]["timestamp"], [["ts", 0.0, 2.0]])
+
+    def test_parallel_timestamp_provider_allows_discarded_segments(self):
+        provider = ParallelTimestampProvider(DiscardingTimestampProvider, FakeConfig(), num_workers=2)
+        asr_results = [{"uttid": "b", "text": "b"}, {"uttid": "a", "text": "a"}]
+        segments = [
+            SpeechSegment("b", 0.0, 1.5, 16000, [0]),
+            SpeechSegment("a", 0.0, 2.0, 16000, [0]),
+        ]
+
+        results = provider.add_timestamps(asr_results, segments)
+
+        self.assertEqual(results, [])
+        self.assertEqual(
+            sorted(item["uttid"] for item in provider.last_discarded_segments),
+            ["a", "b"],
+        )
 
     def test_registry_wraps_whisper_when_num_workers_is_set(self):
         component = create_default_registry().build(

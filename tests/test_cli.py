@@ -46,27 +46,34 @@ class SemanticAsrCliTest(unittest.TestCase):
         self.assertEqual(payload["result"]["text"], "ok")
 
     def test_batch_command_exposes_num_workers_and_devices(self):
-        sdk = mock.Mock()
-        sdk.transcribe_batch.return_value = [{"ok": True}]
+        seen_env = {}
 
-        with mock.patch("semantic_asr.cli.SemanticASR.from_config", return_value=sdk):
+        def fake_run_batch(**kwargs):
+            seen_env["CUDA_VISIBLE_DEVICES"] = os.environ.get("CUDA_VISIBLE_DEVICES")
+            self.assertEqual(kwargs["config_path"], "config.json")
+            return [{"ok": True}]
+
+        with mock.patch("semantic_asr.cli.run_batch", side_effect=fake_run_batch) as mocked_run_batch:
             with mock.patch("semantic_asr.cli.print") as mocked_print:
-                main([
-                    "batch",
-                    "--config", "config.json",
-                    "--wav-scp", "wav.scp",
-                    "--outdir", "out",
-                    "--num-workers", "12",
-                    "--devices", "4,5,6,7",
-                    "--max-seconds", "300",
-                ])
+                with mock.patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "0"}, clear=True):
+                    main([
+                        "batch",
+                        "--config", "config.json",
+                        "--wav-scp", "wav.scp",
+                        "--outdir", "out",
+                        "--num-workers", "4",
+                        "--devices", "4,5,6,7",
+                        "--max-seconds", "300",
+                    ])
+                    self.assertEqual(os.environ["CUDA_VISIBLE_DEVICES"], "0")
 
-        sdk.transcribe_batch.assert_called_once_with(
+        self.assertEqual(seen_env["CUDA_VISIBLE_DEVICES"], "4,5,6,7")
+        mocked_run_batch.assert_called_once_with(
+            config_path="config.json",
             wav_scp="wav.scp",
             outdir="out",
-            num_workers=12,
+            num_workers=4,
             max_seconds=300.0,
-            devices="4,5,6,7",
         )
         self.assertEqual(json.loads(mocked_print.call_args.args[0]), [{"ok": True}])
 

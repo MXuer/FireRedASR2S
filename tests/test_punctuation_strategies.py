@@ -397,6 +397,17 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(sentences[0]["end_ms"], 181972)
         self.assertEqual(sentences[1]["start_ms"], 181972)
 
+    def test_sentence_overlap_merges_when_split_would_create_zero_width_sentence(self):
+        sentences = remove_sentence_overlaps([
+            {"start_ms": 22000, "end_ms": 22092, "text": "감회가", "asr_confidence": 0},
+            {"start_ms": 22092, "end_ms": 22092, "text": "새롭습니다.", "asr_confidence": 0},
+        ])
+
+        self.assertEqual(len(sentences), 1)
+        self.assertEqual(sentences[0]["start_ms"], 22000)
+        self.assertEqual(sentences[0]["end_ms"], 22092)
+        self.assertEqual(sentences[0]["text"], "감회가새롭습니다.")
+
     def test_sentence_cut_segments_expand_to_overlapping_raw_vad_speech_islands(self):
         [sentence] = add_sentence_cut_segments(
             [

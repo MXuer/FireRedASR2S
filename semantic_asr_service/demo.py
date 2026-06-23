@@ -386,7 +386,7 @@ DEMO_HTML = """<!doctype html>
       </div>
       <div class="field">
         <label for="token">API Token</label>
-        <input id="token" type="password" value="dev-token" autocomplete="off">
+        <input id="token" type="password" value="demo-local" autocomplete="off">
       </div>
       <div class="field">
         <label for="config">Language / Profile</label>
@@ -491,6 +491,7 @@ DEMO_HTML = """<!doctype html>
     };
     const userNameInput = document.getElementById("user-name");
     const tokenInput = document.getElementById("token");
+    const DEFAULT_TOKEN = "demo-local";
     const configSelect = document.getElementById("config");
     const fileInput = document.getElementById("audio");
     const jobsBody = document.getElementById("jobs");
@@ -983,6 +984,7 @@ DEMO_HTML = """<!doctype html>
       if (reviewAudio.src) {
         URL.revokeObjectURL(reviewAudio.src);
       }
+      clearSegmentStopTimer();
       reviewAudio.src = audioUrl;
       const buffer = await decodeAudioFile(audioFile);
       const segments = normalizeSegments(result.sentences || []);
@@ -996,6 +998,7 @@ DEMO_HTML = """<!doctype html>
         displayMode: DEFAULT_DISPLAY_MODE,
         zoom: DEFAULT_WAVE_ZOOM,
         playUntilMs: null,
+        stopTimer: null,
         peaksByWidth: new Map(),
       };
       renderSegmentList(segments);
@@ -1121,7 +1124,7 @@ DEMO_HTML = """<!doctype html>
       const userName = localStorage.getItem("semanticAsrDemo.userName");
       const token = localStorage.getItem("semanticAsrDemo.token");
       if (userName) userNameInput.value = userName;
-      if (token) tokenInput.value = token;
+      tokenInput.value = token && token !== "dev-token" ? token : DEFAULT_TOKEN;
     }
 
     function drawWaveform() {
@@ -1267,17 +1270,43 @@ DEMO_HTML = """<!doctype html>
       }
       reviewAudio.currentTime = segment.startMs / 1000;
       reviewState.playUntilMs = segment.endMs;
+      scheduleSegmentStop(reviewState);
       scrollToTime(segment.startMs);
       reviewAudio.play();
       drawWaveform();
     }
 
+    function scheduleSegmentStop(reviewState) {
+      if (reviewState.stopTimer) {
+        clearTimeout(reviewState.stopTimer);
+      }
+      const delayMs = Math.max(0, reviewState.playUntilMs - reviewAudio.currentTime * 1000);
+      reviewState.stopTimer = setTimeout(stopAtSegmentEnd, delayMs);
+    }
+
+    function stopAtSegmentEnd() {
+      const reviewState = state.review;
+      if (!reviewState || reviewState.playUntilMs === null) {
+        return;
+      }
+      reviewAudio.pause();
+      reviewAudio.currentTime = reviewState.playUntilMs / 1000;
+      reviewState.playUntilMs = null;
+      reviewState.stopTimer = null;
+      drawWaveform();
+    }
+
+    function clearSegmentStopTimer() {
+      if (state.review && state.review.stopTimer) {
+        clearTimeout(state.review.stopTimer);
+        state.review.stopTimer = null;
+      }
+    }
+
     function handleAudioTimeUpdate() {
       const reviewState = state.review;
       if (reviewState && reviewState.playUntilMs !== null && reviewAudio.currentTime * 1000 >= reviewState.playUntilMs) {
-        reviewAudio.pause();
-        reviewAudio.currentTime = reviewState.playUntilMs / 1000;
-        reviewState.playUntilMs = null;
+        stopAtSegmentEnd();
       }
       drawWaveform();
     }
@@ -1470,6 +1499,7 @@ DEMO_HTML = """<!doctype html>
       const ratio = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
       if (reviewAudio.duration) {
         if (state.review) {
+          clearSegmentStopTimer();
           state.review.playUntilMs = null;
         }
         reviewAudio.currentTime = ratio * reviewAudio.duration;
