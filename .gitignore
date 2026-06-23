@@ -19,5 +19,6 @@ data/
 !uroman/data/*.txt
 output/
 service_data/
+logs/
 *.egg-info/
 qwen_api.md
