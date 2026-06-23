@@ -159,6 +159,15 @@ class ConfigRunnerTest(unittest.TestCase):
         self.assertEqual(captured["asr"]["language"], "zh_cn")
         self.assertEqual(captured["timestamp"]["language"], "zh_cn")
 
+    def test_gigaam_profile_uses_native_timestamps(self):
+        with open("configs/ru_ru_gigaam_v3.json", encoding="utf-8") as fin:
+            raw = json.load(fin)
+
+        profile = parse_pipeline_profile(raw)
+
+        self.assertEqual(profile.components["asr"].name, "gigaam_v3")
+        self.assertEqual(profile.components["timestamp"].name, "gigaam_v3_native")
+
     def test_firered_asr_registry_builds_with_native_timestamps_enabled(self):
         registry = create_default_registry()
         fake_model = mock.Mock()

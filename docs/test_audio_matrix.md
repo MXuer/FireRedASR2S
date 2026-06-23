@@ -22,7 +22,7 @@ regression languages `zh_cn`, `en_us` and `ru_ru`.
 | Language | Why it is needed | Main module paths covered |
 | --- | --- | --- |
 | `zh_cn` | Primary Chinese path and FireRed punctuation coverage. Also checks Chinese token splitting for aligners. | Silero/FunASR native timestamp/FireRedPunc; FireRed VAD; Qwen3-ASR + Qwen3 aligner or MMS aligner; Dolphin word timestamps; XLM-R punctuation for Chinese. |
-| `en_us` | Broad baseline for Whisper, Qwen3-ASR, Seamless and MMS. | Whisper native timestamps/punctuation; Qwen3-ASR + Qwen3 aligner or MMS aligner; Seamless + forced aligner; XLM-R punctuation. |
+| `en_us` | Broad baseline for Whisper, Qwen3-ASR, Seamless and MMS. | Whisper + forced aligner; Qwen3-ASR + Qwen3 aligner or MMS aligner; Seamless + forced aligner; XLM-R punctuation. |
 | `ru_ru` | Existing Russian profile and non-Chinese multilingual regression. | FireRed VAD + Whisper + Qwen3-ForcedAligner + ASR text punctuation; Whisper/Qwen/Dolphin overlap; MMS forced aligner; XLM-R punctuation. |
 | `ja_jp` | CJK language with different tokenization from Chinese. | FunASR, Whisper, Qwen3-ASR, Dolphin, Qwen3 aligner, MMS aligner and XLM-R punctuation. |
 | `th_th` | No-space script; useful for sentence-boundary and alignment stress. | Whisper, Qwen3-ASR, Dolphin, Qwen3 aligner and MMS aligner. |

@@ -9,10 +9,7 @@
       }
     },
     "asr": {
-      "name": "whisper_large",
-      "params": {
-        "word_timestamps": false
-      }
+      "name": "whisper_large"
     },
     "timestamp": {
       "name": "qwen3_forced_aligner"

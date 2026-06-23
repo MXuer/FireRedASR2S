@@ -80,9 +80,19 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
         aliases={
             "en": ("english", "en-us", "en-gb"),
         },
-        notes="Whisper large multilingual ASR. Word timestamps are requested by adapter config.",
+        notes="Whisper large multilingual batched ASR. Use a forced aligner for timestamps.",
+        has_native_punctuation=True,
+        supports_batch=True,
+    ),
+    ModelLanguageSupport(
+        role="asr",
+        name="gigaam_v3",
+        languages=("ru",),
+        aliases={"ru": ("russian", "ru-ru")},
+        notes="GigaAM-v3 e2e RNNT Russian ASR with punctuation, text normalization and word timestamps.",
         has_native_timestamps=True,
         has_native_punctuation=True,
+        supports_batch=True,
     ),
     ModelLanguageSupport(
         role="asr",
@@ -178,9 +188,10 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="timestamp",
-        name="whisper_native",
-        languages=(ANY_LANGUAGE,),
-        notes="Validates Whisper word timestamps when word_timestamps=True.",
+        name="gigaam_v3_native",
+        languages=("ru",),
+        aliases={"ru": ("russian", "ru-ru")},
+        notes="Validates GigaAM-v3 PyTorch word timestamps.",
     ),
     ModelLanguageSupport(
         role="timestamp",

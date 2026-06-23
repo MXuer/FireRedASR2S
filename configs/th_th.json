@@ -12,7 +12,7 @@
       "name": "whisper_large"
     },
     "timestamp": {
-      "name": "whisper_native"
+      "name": "mms_forced_aligner"
     },
     "punc": {
       "name": "asr_text"

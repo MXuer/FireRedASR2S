@@ -18,7 +18,8 @@ and this document when adding or changing a model.
 | --- | --- | --- | --- | --- | --- |
 | `funasr_nano` | `zh`, `en`, `ja` | yes | yes | yes | Fun-ASR-Nano-2512. |
 | `firered_asr` | `zh` | yes | yes | no | FireRedASR2 AED Chinese ASR. Use `return_timestamp=true` with `firered_asr_native`. |
-| `whisper_large` | multilingual Whisper set | adapter-dependent | yes | yes | Word timestamps requested by adapter config. |
+| `whisper_large` | multilingual Whisper set | yes | no | yes | Batched mel decode; use forced aligner for timestamps. |
+| `gigaam_v3` | `ru` | yes | yes | yes | Russian GigaAM-v3 e2e RNNT PyTorch path; keeps official word timestamps. |
 | `qwen3_asr_1_7b` | `ar`, `cs`, `da`, `de`, `el`, `en`, `es`, `fa`, `fi`, `fil`, `fr`, `hi`, `hu`, `id`, `it`, `ja`, `ko`, `mk`, `ms`, `nl`, `pl`, `pt`, `ro`, `ru`, `sv`, `th`, `tr`, `vi`, `yue`, `zh` | yes | no | yes | Adapter maps canonical ids to full model language names. |
 | `dolphin` | 40 Eastern languages plus Chinese dialect aliases | no | yes | yes | Word timestamps require `word_timestamp`; `predict_time` is sentence-level only. |
 | `seamless_m4t_v2_large` | currently mapped: `ar`, `en`, `hi`, `ja`, `ko`, `pt`, `ru`, `th`, `vi`, `zh` | no | no | yes | Adapter maps canonical ids to Seamless/FLORES codes. |
@@ -29,7 +30,7 @@ and this document when adding or changing a model.
 | --- | --- | --- | --- | --- | --- |
 | `funasr_native` | `zh`, `en`, `ja` | no | validates ASR-native | no | Validates Fun-ASR-Nano token timestamps. |
 | `firered_asr_native` | `zh` | no | validates ASR-native | no | Validates FireRedASR2 timestamps. |
-| `whisper_native` | `*` | no | validates ASR-native | no | Validates Whisper word timestamps. |
+| `gigaam_v3_native` | `ru` | no | validates ASR-native | no | Validates GigaAM-v3 word timestamps. |
 | `qwen3_forced_aligner` | `de`, `en`, `es`, `fr`, `it`, `ja`, `ko`, `pt`, `ru`, `th`, `zh` | yes | forced alignment | no | Official Qwen3 forced aligner. |
 | `mms_forced_aligner` | `ar_sa`, `bg_bg`, `bn_bd`, `de_de`, `en_us`, `en_gb`, `es_mx`, `fa_ir`, `fr_fr`, `hi_in`, `ja_jp`, `ko_kr`, `pt_br`, `ru_ru`, `th_th`, `vi_vn`, `zh_cn`, and other mapped MMS ids | adapter supports parallel workers | forced alignment | no | Vendored MMS runtime. CJK should be treated as char-level. |
 

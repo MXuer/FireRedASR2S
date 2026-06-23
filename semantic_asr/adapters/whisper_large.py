@@ -5,7 +5,6 @@ from typing import Any, Sequence
 
 import soundfile as sf
 
-from semantic_asr.core import SpeechSegment
 from semantic_asr.language_mapping import model_language
 
 
@@ -18,7 +17,6 @@ class WhisperLargeConfig:
     task: str = "transcribe"
     fp16: bool = True
     condition_on_previous_text: bool = False
-    word_timestamps: bool = True
     temperature: float | None = None
     beam_size: int | None = None
     best_of: int | None = None
@@ -28,11 +26,12 @@ class WhisperLargeConfig:
     short_temperature: float | None = 0.0
     short_beam_size: int | None = 5
     short_length_penalty: float | None = 0.0
+    batch_size: int = 24
     num_workers: int = 1
 
 
 class WhisperLarge:
-    supports_batch: bool = False
+    supports_batch: bool = True
 
     def __init__(self, config: WhisperLargeConfig | None = None):
         import whisper
@@ -43,32 +42,47 @@ class WhisperLarge:
             device=self.config.device,
             download_root=self.config.download_root,
         )
+        self._set_recommended_batch_size()
+
+    def _set_recommended_batch_size(self) -> None:
+        self.recommended_batch_size = max(1, int(self.config.batch_size))
 
     def transcribe(self, batch_uttid: Sequence[str], batch_wav: Sequence[tuple[int, Any]]) -> list[dict]:
+        decoded = self._decode_batch(batch_wav)
         results = []
-        for uttid, (sample_rate, wav) in zip(batch_uttid, batch_wav):
-            wav_path = self._write_temp_wav(wav, sample_rate)
-            try:
-                decode_kwargs = self._decode_kwargs(sample_rate, wav)
-                raw_result = self.model.transcribe(
-                    wav_path,
-                    language=model_language("whisper_large", self.config.language) if self.config.language else None,
-                    task=self.config.task,
-                    fp16=self.config.fp16,
-                    word_timestamps=self.config.word_timestamps,
-                    condition_on_previous_text=self.config.condition_on_previous_text,
-                    **decode_kwargs,
-                )
-            finally:
-                os.unlink(wav_path)
+        for uttid, (sample_rate, _wav), raw_result in zip(batch_uttid, batch_wav, decoded):
             results.append({
                 "uttid": uttid,
-                "text": raw_result.get("text", "").strip(),
+                "text": str(getattr(raw_result, "text", "")).strip(),
                 "confidence": 0,
-                "timestamp": self._normalize_timestamps(raw_result),
+                "timestamp": [],
                 "sample_rate": sample_rate,
                 "asr_metadata": self._metadata(raw_result),
             })
+        return results
+
+    def _decode_batch(self, batch_wav: Sequence[tuple[int, Any]]) -> list[Any]:
+        import torch
+        from whisper import DecodingOptions
+
+        prepared = [(sample_rate, wav, self._prepare_mel(wav, sample_rate)) for sample_rate, wav in batch_wav]
+        results: list[Any] = [None] * len(prepared)
+        groups: dict[tuple[tuple[str, Any], ...], list[tuple[int, Any]]] = {}
+        for index, (sample_rate, wav, mel) in enumerate(prepared):
+            key = tuple(sorted(self._decode_kwargs(sample_rate, wav).items()))
+            groups.setdefault(key, []).append((index, mel))
+
+        for key, items in groups.items():
+            options = DecodingOptions(
+                language=model_language("whisper_large", self.config.language) if self.config.language else None,
+                task=self.config.task,
+                fp16=self.config.fp16,
+                **dict(key),
+            )
+            mel_batch = torch.stack([torch.as_tensor(mel) for _index, mel in items]).to(self.model.device)
+            decoded = self.model.decode(mel_batch, options)
+            for (index, _mel), raw_result in zip(items, decoded):
+                results[index] = raw_result
         return results
 
     def _decode_kwargs(self, sample_rate: int, wav: Any) -> dict:
@@ -97,30 +111,29 @@ class WhisperLarge:
         sf.write(tmp.name, wav, sample_rate)
         return tmp.name
 
-    @staticmethod
-    def _normalize_timestamps(raw_result: dict) -> list[list]:
-        timestamps = []
-        for segment in raw_result.get("segments", []):
-            for word in segment.get("words", []):
-                token = str(word.get("word", "")).strip()
-                if token:
-                    timestamps.append([token, float(word["start"]), float(word["end"])])
-        return timestamps
+    def _prepare_mel(self, wav: Any, sample_rate: int):
+        import whisper
+        from whisper.audio import N_FRAMES, N_SAMPLES
+
+        wav_path = self._write_temp_wav(wav, sample_rate)
+        try:
+            return whisper.pad_or_trim(
+                whisper.log_mel_spectrogram(
+                    wav_path,
+                    n_mels=self.model.dims.n_mels,
+                    padding=N_SAMPLES,
+                ),
+                length=N_FRAMES,
+            )
+        finally:
+            os.unlink(wav_path)
 
     @staticmethod
-    def _metadata(raw_result: dict) -> dict:
-        segments = raw_result.get("segments", [])
+    def _metadata(raw_result: Any) -> dict:
         return {
-            "segments": [
-                {
-                    "start": segment.get("start"),
-                    "end": segment.get("end"),
-                    "avg_logprob": segment.get("avg_logprob"),
-                    "no_speech_prob": segment.get("no_speech_prob"),
-                    "compression_ratio": segment.get("compression_ratio"),
-                }
-                for segment in segments
-            ],
+            "avg_logprob": getattr(raw_result, "avg_logprob", None),
+            "no_speech_prob": getattr(raw_result, "no_speech_prob", None),
+            "compression_ratio": getattr(raw_result, "compression_ratio", None),
         }
 
 
@@ -129,11 +142,3 @@ def _duration_s(sample_rate: int, wav: Any) -> float:
         return len(wav) / float(sample_rate)
     except TypeError:
         return 0.0
-
-
-class WhisperLargeTimestampProvider:
-    def add_timestamps(self, batch_asr_result: Sequence[dict], batch_segments: Sequence[SpeechSegment]) -> list[dict]:
-        for asr_result in batch_asr_result:
-            if not asr_result.get("timestamp"):
-                raise ValueError(f"Whisper large must return word timestamps for {asr_result.get('uttid')}")
-        return list(batch_asr_result)

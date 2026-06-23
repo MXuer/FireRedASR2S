@@ -1,0 +1,33 @@
+{
+  "name": "ru_ru_gigaam_v3",
+  "language": "ru_ru",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "use_gpu": true
+      }
+    },
+    "asr": {
+      "name": "gigaam_v3",
+      "params": {
+        "model_name": "v3_e2e_rnnt",
+        "model_dir": "pretrained_models/gigaam_v3",
+        "device": "cuda:0",
+        "batch_size": 16
+      }
+    },
+    "timestamp": {
+      "name": "gigaam_v3_native"
+    },
+    "punc": {
+      "name": "asr_native"
+    }
+  },
+  "pipeline": {
+    "strip_punctuation_before_punc": false
+  },
+  "output": {
+    "outdir": "output/experiments/ru_ru_gigaam_v3"
+  }
+}

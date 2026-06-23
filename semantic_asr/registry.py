@@ -52,9 +52,10 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("asr", "qwen3_asr_1_7b", _build_qwen3_asr)
     registry.register("asr", "dolphin", _build_dolphin)
     registry.register("asr", "seamless_m4t_v2_large", _build_seamless_m4t)
+    registry.register("asr", "gigaam_v3", _build_gigaam_v3)
     registry.register("timestamp", "funasr_native", _build_funasr_native_timestamp)
     registry.register("timestamp", "firered_asr_native", _build_firered_asr_native_timestamp)
-    registry.register("timestamp", "whisper_native", _build_whisper_native_timestamp)
+    registry.register("timestamp", "gigaam_v3_native", _build_gigaam_v3_native_timestamp)
     registry.register("timestamp", "qwen3_forced_aligner", _build_qwen3_forced_aligner)
     registry.register("timestamp", "mms_forced_aligner", _build_mms_forced_aligner)
     registry.register("punc", "firered_punc", _build_firered_punc)
@@ -142,6 +143,16 @@ def _build_seamless_m4t(params: Mapping[str, Any]) -> AsrModel:
     return SeamlessM4TAsr(_dataclass_from_mapping(SeamlessM4TConfig, params))
 
 
+def _build_gigaam_v3(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.gigaam_v3 import GigaAmV3Asr, GigaAmV3Config
+    from semantic_asr.parallel_components import ParallelAsrModel
+
+    config = _dataclass_from_mapping(GigaAmV3Config, params)
+    if config.model_workers > 1:
+        return ParallelAsrModel(GigaAmV3Asr, config, config.model_workers)
+    return GigaAmV3Asr(config)
+
+
 def _build_funasr_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
     from semantic_asr.adapters.funasr_nano import FunAsrNanoTimestampProvider
 
@@ -156,10 +167,10 @@ def _build_firered_asr_native_timestamp(params: Mapping[str, Any]) -> TimestampP
     return AsrTimestampProvider()
 
 
-def _build_whisper_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
-    from semantic_asr.adapters.whisper_large import WhisperLargeTimestampProvider
+def _build_gigaam_v3_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
+    from semantic_asr.adapters.gigaam_v3 import GigaAmV3TimestampProvider
 
-    return WhisperLargeTimestampProvider()
+    return GigaAmV3TimestampProvider()
 
 
 def _build_qwen3_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:

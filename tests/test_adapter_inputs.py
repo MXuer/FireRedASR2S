@@ -4,6 +4,7 @@ import numpy as np
 
 from semantic_asr.adapters.dolphin import _get_text, _normalize_timestamps
 from semantic_asr.adapters.funasr_nano import FunAsrNano, FunAsrNanoConfig
+from semantic_asr.adapters.gigaam_v3 import GigaAmV3Asr, GigaAmV3Config, _normalize_words
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig, _to_float32, normalize_qwen3_asr_language
 from semantic_asr.adapters.whisper_large import WhisperLarge, WhisperLargeConfig
 
@@ -31,6 +32,26 @@ class _WhisperModel:
     def transcribe(self, wav_path, **kwargs):
         self.kwargs = kwargs
         return {"text": "ok", "segments": []}
+
+
+class _BatchWhisperModel:
+    def __init__(self):
+        self.decode_batch_size = None
+        self.options = None
+        self.device = "cpu"
+
+    def decode(self, mel_batch, options):
+        self.decode_batch_size = len(mel_batch)
+        self.options = options
+        return [
+            type("Result", (), {
+                "text": f"text-{index}",
+                "avg_logprob": -0.1,
+                "compression_ratio": 1.0,
+                "no_speech_prob": 0.0,
+            })()
+            for index in range(len(mel_batch))
+        ]
 
 
 class AdapterInputTest(unittest.TestCase):
@@ -83,21 +104,68 @@ class AdapterInputTest(unittest.TestCase):
         adapter = object.__new__(WhisperLarge)
         adapter.config = WhisperLargeConfig(
             language="ar_sa",
-            word_timestamps=False,
             short_audio_threshold_s=1.0,
             short_beam_size=5,
             short_length_penalty=0.0,
             short_temperature=0.0,
         )
-        adapter.model = _WhisperModel()
+        adapter.model = _BatchWhisperModel()
+        adapter._prepare_mel = lambda wav, sample_rate: np.zeros((80, 3000), dtype=np.float32)
 
         [result] = adapter.transcribe(["utt"], [(16000, np.zeros(8000, dtype=np.float32))])
 
-        self.assertEqual(result["text"], "ok")
-        self.assertEqual(adapter.model.kwargs["language"], "ar")
-        self.assertEqual(adapter.model.kwargs["beam_size"], 5)
-        self.assertEqual(adapter.model.kwargs["length_penalty"], 0.0)
-        self.assertEqual(adapter.model.kwargs["temperature"], 0.0)
+        self.assertEqual(result["text"], "text-0")
+        self.assertEqual(adapter.model.options.language, "ar")
+        self.assertEqual(adapter.model.options.beam_size, 5)
+        self.assertEqual(adapter.model.options.length_penalty, 0.0)
+        self.assertEqual(adapter.model.options.temperature, 0.0)
+
+    def test_whisper_batches_decode_without_word_timestamps(self):
+        adapter = object.__new__(WhisperLarge)
+        adapter.config = WhisperLargeConfig(language="ru_ru")
+        adapter.model = _BatchWhisperModel()
+        adapter._prepare_mel = lambda wav, sample_rate: np.zeros((80, 3000), dtype=np.float32)
+
+        results = adapter.transcribe(
+            ["utt1", "utt2"],
+            [(16000, np.zeros(16000, dtype=np.float32)), (16000, np.zeros(16000, dtype=np.float32))],
+        )
+
+        self.assertEqual(adapter.model.decode_batch_size, 2)
+        self.assertEqual([item["text"] for item in results], ["text-0", "text-1"])
+        self.assertEqual(results[0]["timestamp"], [])
+
+    def test_whisper_recommends_configured_batch_size(self):
+        adapter = object.__new__(WhisperLarge)
+        adapter.config = WhisperLargeConfig(batch_size=24)
+        adapter._set_recommended_batch_size()
+
+        self.assertEqual(adapter.recommended_batch_size, 24)
+
+    def test_gigaam_adapter_batches_text_and_word_timestamps(self):
+        adapter = object.__new__(GigaAmV3Asr)
+        adapter.config = GigaAmV3Config(batch_size=2)
+        adapter._set_recommended_batch_size()
+        calls = []
+        adapter._transcribe_paths = lambda paths: calls.append(paths) or [
+            ("привет.", [["привет", 0.0, 0.4]]),
+            ("пока.", [["пока", 0.0, 0.3]]),
+        ]
+
+        results = adapter.transcribe(
+            ["utt1", "utt2"],
+            [(16000, np.zeros(16000, dtype=np.float32)), (16000, np.zeros(16000, dtype=np.float32))],
+        )
+
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(adapter.recommended_batch_size, 2)
+        self.assertEqual([item["text"] for item in results], ["привет.", "пока."])
+        self.assertEqual(results[0]["timestamp"], [["привет", 0.0, 0.4]])
+
+    def test_gigaam_normalizes_word_timestamp_objects(self):
+        word = type("Word", (), {"text": "тест", "start": 0.1, "end": 0.5})()
+
+        self.assertEqual(_normalize_words([word]), [["тест", 0.1, 0.5]])
 
 
 if __name__ == "__main__":

@@ -10,10 +10,7 @@
       }
     },
     "asr": {
-      "name": "whisper_large",
-      "params": {
-        "word_timestamps": false
-      }
+      "name": "whisper_large"
     },
     "timestamp": {
       "name": "mms_forced_aligner"

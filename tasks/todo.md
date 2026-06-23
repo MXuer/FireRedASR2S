@@ -1,5 +1,7 @@
 # Todo
 
+- [x] Current work: add Whisper batch decode and GigaAM-v3 ASR adapter.
+
 - [x] Current work: align current repository documentation structure with the standalone repository.
 
 - [x] Current work: fix batch worker lifecycle, result validation, parallel timestamp empty returns, service lease, wav.scp parsing, and package hygiene.

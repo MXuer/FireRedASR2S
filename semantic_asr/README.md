@@ -23,8 +23,7 @@ Timestamp is a mandatory stage, but its source is configurable per adapter:
 
 - ASR-native timestamp provider: for models with built-in token timestamps, such
   as CTC/alignment-branch ASR or non-autoregressive timestamp-capable ASR. The
-  provider validates and normalizes `asr_result["timestamp"]`. Whisper large is
-  also handled this way when `word_timestamps=True`.
+  provider validates and normalizes `asr_result["timestamp"]`.
 - Forced-aligner timestamp provider: for models without token timestamps, such
   as Qwen3-ASR when used without an ASR-native timestamp path. The provider
   receives both ASR text and the matching `SpeechSegment` audio, then writes

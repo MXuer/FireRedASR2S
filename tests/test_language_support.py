@@ -62,6 +62,20 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("dolphin", names)
         self.assertIn("seamless_m4t_v2_large", names)
         self.assertIn("firered_asr", names)
+        self.assertIn("gigaam_v3", names)
+
+    def test_gigaam_is_russian_batch_asr_with_native_punctuation_and_timestamps(self):
+        ru_result = list_models_by_language("ru_ru", role="asr")
+        en_result = list_models_by_language("en_us", role="asr")
+        gigaam = list_languages_by_model("gigaam_v3", role="asr")
+        whisper = list_languages_by_model("whisper_large", role="asr")
+
+        self.assertIn("gigaam_v3", {item["name"] for item in ru_result["asr"]})
+        self.assertNotIn("gigaam_v3", {item["name"] for item in en_result["asr"]})
+        self.assertTrue(gigaam["supports_batch"])
+        self.assertTrue(gigaam["has_native_punctuation"])
+        self.assertTrue(gigaam["has_native_timestamps"])
+        self.assertFalse(whisper["has_native_timestamps"])
 
     def test_ten_vad_is_registered(self):
         registry = create_default_registry()
@@ -109,6 +123,8 @@ class LanguageSupportTest(unittest.TestCase):
         zh_result = list_models_by_language("zh_cn", role="timestamp")
 
         self.assertIn("mms_forced_aligner", names)
+        self.assertNotIn("whisper_native", names)
+        self.assertIn("gigaam_v3_native", names)
         self.assertIn("mms_forced_aligner", {item["name"] for item in zh_result["timestamp"]})
 
     def test_firered_asr_and_native_timestamp_are_chinese_components(self):

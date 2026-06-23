@@ -24,12 +24,15 @@ The local model file is available at:
 ## Capabilities
 
 - ASR text: yes
-- Word-level timestamp: yes, with `word_timestamps=True`
+- Word-level timestamp: not used in this project
 - Native punctuation: yes
-- Batch inference: no native batch API in `openai-whisper`; set `num_workers`
-  to run multiple segment-level worker processes on the same visible GPU.
+- Batch inference: yes, via `model.decode()` on batched mel features
 
-## Parallel Segment Workers
+Whisper's `transcribe(..., word_timestamps=True)` path is intentionally not
+used. Whisper profiles should use a forced aligner such as `mms_forced_aligner`
+or `qwen3_forced_aligner` for timestamps.
+
+## Batch Decode And Parallel Workers
 
 For long audio with many VAD segments, configure:
 
@@ -92,8 +95,8 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 conda run -n fireredasr2s \
 
 ## Full Pipeline Example
 
-This uses Silero VAD, Whisper large native word timestamps and ASR-native
-punctuation splitting.
+This uses Silero VAD, Whisper large batch ASR, MMS forced alignment and
+ASR-native punctuation splitting.
 
 ```bash
 CUDA_VISIBLE_DEVICES=4,5,6,7 conda run -n fireredasr2s \

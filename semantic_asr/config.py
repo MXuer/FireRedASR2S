@@ -12,6 +12,7 @@ REQUIRED_ROLES = ("vad", "asr", "timestamp", "punc")
 LANGUAGE_COMPONENTS = {
     "asr": {
         "dolphin",
+        "gigaam_v3",
         "funasr_nano",
         "qwen3_asr_1_7b",
         "seamless_m4t_v2_large",
@@ -19,6 +20,7 @@ LANGUAGE_COMPONENTS = {
     },
     "timestamp": {
         "mms_forced_aligner",
+        "gigaam_v3_native",
         "qwen3_forced_aligner",
     },
     "punc": {

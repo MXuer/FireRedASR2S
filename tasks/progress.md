@@ -2,6 +2,14 @@
 
 Current state:
 
+- Whisper ASR now uses batched mel decoding through `model.decode()` and no
+  longer exposes Whisper word timestamps; Whisper profiles should use forced
+  aligners. GigaAM-v3 was added as a Russian PyTorch ASR adapter using native
+  word timestamps, punctuation and ITN from the official model path
+  `pretrained_models/gigaam_v3`; the ONNX path was intentionally dropped
+  because it returns text only. Unit/config validation passed, but a real
+  GigaAM smoke is still pending because the `gigaam` Python package is not
+  installed in `fireredasr2s`.
 - The current repository documentation structure has been aligned with the
   standalone `/data/duhu/semantic-asr` layout for next week's sync:
   `AGENT.md` is now `AGENTS.md`, root `PROGRESS.md` and `DECISIONS.md` now live

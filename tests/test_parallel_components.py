@@ -5,6 +5,7 @@ from semantic_asr.core import PipelineConfig, SemanticAsrPipeline, SpeechSegment
 from semantic_asr.parallel_components import ParallelAsrModel, ParallelTimestampProvider
 from semantic_asr.registry import create_default_registry
 from semantic_asr.adapters.whisper_large import WhisperLarge
+from semantic_asr.adapters.gigaam_v3 import GigaAmV3Asr
 from semantic_asr.adapters.mms_forced_aligner import MmsForcedAlignerTimestampProvider
 
 
@@ -127,6 +128,17 @@ class ParallelComponentsTest(unittest.TestCase):
 
         self.assertIsInstance(component, ParallelAsrModel)
         self.assertIs(component.component_cls, WhisperLarge)
+        self.assertEqual(component.num_workers, 2)
+
+    def test_registry_wraps_gigaam_when_num_workers_is_set(self):
+        component = create_default_registry().build(
+            "asr",
+            "gigaam_v3",
+            {"model_workers": 2},
+        )
+
+        self.assertIsInstance(component, ParallelAsrModel)
+        self.assertIs(component.component_cls, GigaAmV3Asr)
         self.assertEqual(component.num_workers, 2)
 
     def test_registry_wraps_mms_when_num_workers_is_set(self):

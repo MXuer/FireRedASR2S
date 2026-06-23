@@ -21,7 +21,8 @@ For canonical language ids and model-native language mapping, see
 | --- | --- | --- | --- |
 | FireRedASR2 | `firered_asr` | Chinese ASR adapter using the vendored FireRed runtime. Can return native timestamps when configured. | [firered_asr.md](firered_asr.md) |
 | Fun-ASR-Nano-2512 | `funasr_nano` | Chinese, English and Japanese ASR with native timestamps and punctuation. Supports batch inference. | [funasr_nano.md](funasr_nano.md) |
-| Whisper large | `whisper_large` | Multilingual ASR with native word timestamps and punctuation. Good baseline for many languages. | [whisper_large.md](whisper_large.md) |
+| Whisper large | `whisper_large` | Multilingual batched ASR with native punctuation. Use forced alignment for timestamps. | [whisper_large.md](whisper_large.md) |
+| GigaAM-v3 | `gigaam_v3` | Russian e2e RNNT ASR with native punctuation, text normalization, word timestamps and batched inference. | [gigaam_v3.md](gigaam_v3.md) |
 | Qwen3-ASR-1.7B | `qwen3_asr_1_7b` | Multilingual ASR covering 30 languages. Uses model-native full language names internally. | [qwen3_asr.md](qwen3_asr.md) |
 | Dolphin | `dolphin` | Eastern-language ASR with word timestamp support through `word_timestamp`. | [dolphin.md](dolphin.md) |
 | Seamless M4T v2 large | `seamless_m4t_v2_large` | Multilingual speech model currently mapped for selected validated languages. | [seamless_m4t_v2_large.md](seamless_m4t_v2_large.md) |
@@ -30,7 +31,7 @@ For canonical language ids and model-native language mapping, see
 
 | Model | Component | Summary | Details |
 | --- | --- | --- | --- |
-| ASR native timestamp | `funasr_native`, `firered_asr_native`, `whisper_native` | Validates timestamps already emitted by the ASR model. | [funasr_nano.md](funasr_nano.md), [firered_asr.md](firered_asr.md), [whisper_large.md](whisper_large.md) |
+| ASR native timestamp | `funasr_native`, `firered_asr_native`, `gigaam_v3_native` | Validates timestamps already emitted by the ASR model. | [funasr_nano.md](funasr_nano.md), [firered_asr.md](firered_asr.md), [gigaam_v3.md](gigaam_v3.md) |
 | MMS forced aligner | `mms_forced_aligner` | Forced alignment provider using vendored MMS runtime. Important for ASR models without reliable token timestamps. | [mms_forced_aligner.md](mms_forced_aligner.md) |
 | Qwen3 ForcedAligner | `qwen3_forced_aligner` | Qwen forced-alignment model for supported languages. | [qwen3_forced_aligner.md](qwen3_forced_aligner.md) |
 
