@@ -1,5 +1,7 @@
 # Todo
 
+- [x] Current work: record GPU resource strategy and benchmark single-GPU ASR batch-size scaling.
+
 - [x] Current work: remove bad `ru_ru_gigaam_v3` Web DB imports, document the mismatch cause, rerun fixed GigaAM batch recognition, import clean jobs, and translate them.
 
 - [x] Current work: install GigaAM, benchmark Russian Whisper batch decode, run GigaAM pipeline smoke, import translated results into WebUI DB, and probe GPU 2/3/4 concurrency.
