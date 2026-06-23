@@ -29,7 +29,7 @@ def main() -> None:
     parser.add_argument("--config", required=True)
     parser.add_argument("--wav_scp", required=True)
     parser.add_argument("--outdir", required=True)
-    parser.add_argument("--num_workers", type=int, default=8)
+    parser.add_argument("--num_workers", type=int, default=1)
     parser.add_argument("--max_seconds", type=float, default=0)
     args = parser.parse_args()
 
@@ -47,7 +47,7 @@ def run_batch(
     config_path: str,
     wav_scp: str,
     outdir: str,
-    num_workers: int = 8,
+    num_workers: int = 1,
     max_seconds: float = 0,
 ) -> list[dict]:
     items = read_wav_scp(wav_scp)

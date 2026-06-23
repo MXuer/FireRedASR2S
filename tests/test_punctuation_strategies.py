@@ -4,6 +4,7 @@ from semantic_asr.core import (
     add_sentence_cut_segments,
     remove_sentence_cut_overlaps,
     remove_sentence_overlaps,
+    remove_word_overlaps,
     SemanticAsrPipeline,
     validate_sentence_intervals,
 )
@@ -396,6 +397,15 @@ class PunctuationStrategyTest(unittest.TestCase):
 
         self.assertEqual(sentences[0]["end_ms"], 181972)
         self.assertEqual(sentences[1]["start_ms"], 181972)
+
+    def test_word_overlap_is_resolved_at_overlap_midpoint(self):
+        words = remove_word_overlaps([
+            {"start_ms": 230453, "end_ms": 230613, "text": "говорит:"},
+            {"start_ms": 230573, "end_ms": 230773, "text": "«Да"},
+        ])
+
+        self.assertEqual(words[0]["end_ms"], 230593)
+        self.assertEqual(words[1]["start_ms"], 230593)
 
     def test_sentence_overlap_merges_when_split_would_create_zero_width_sentence(self):
         sentences = remove_sentence_overlaps([

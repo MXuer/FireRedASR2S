@@ -138,7 +138,7 @@ GPU assignment behavior as `semantic_asr/run_batch.py`:
 results = asr.transcribe_batch(
     wav_scp="data/test/wav.scp",
     outdir="output/sdk/batch",
-    num_workers=8,
+    num_workers=1,
     devices="4,5,6,7",
 )
 ```
@@ -180,14 +180,16 @@ semantic-asr batch \
   --config configs/hakka.json \
   --wav-scp data/test/wav.scp \
   --outdir output/cli/hakka \
-  --num-workers 8 \
+  --num-workers 1 \
   --devices 4,5,6,7
 ```
 
 `--num-workers` is exposed by the unified CLI and is passed through to the
-existing batch runner. `--devices` temporarily sets `CUDA_VISIBLE_DEVICES`
-before model loading or worker assignment. Without installation, the same CLI
-can be called as `python -m semantic_asr.cli ...`.
+existing batch runner. It means pipeline worker processes per visible GPU and
+defaults to `1`; model throughput should normally come from VAD-segment batch
+decode inside the ASR adapter. `--devices` temporarily sets
+`CUDA_VISIBLE_DEVICES` before model loading or worker assignment. Without
+installation, the same CLI can be called as `python -m semantic_asr.cli ...`.
 
 Model queries:
 
@@ -259,11 +261,12 @@ CUDA_VISIBLE_DEVICES=4,5,6,7 python semantic_asr/run_batch.py \
   --config configs/hakka.json \
   --wav_scp data/test/wav.scp \
   --outdir output/hakka \
-  --num_workers 8
+  --num_workers 1
 ```
 
-Workers are assigned round-robin across visible GPUs. With four visible GPUs
-and eight workers, each GPU gets two worker processes. If
+Workers are assigned round-robin across visible GPUs. `--num_workers` means
+workers per visible GPU and defaults to `1`; increase it only when a single
+model instance does not saturate the GPU. If
 `CUDA_VISIBLE_DEVICES` is unset, the batch runner assumes eight device slots
 `0..7`.
 

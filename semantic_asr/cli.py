@@ -45,7 +45,7 @@ def build_parser() -> argparse.ArgumentParser:
     batch.add_argument("--config", required=True)
     batch.add_argument("--wav-scp", required=True)
     batch.add_argument("--outdir", required=True)
-    batch.add_argument("--num-workers", type=int, default=8)
+    batch.add_argument("--num-workers", type=int, default=1)
     batch.add_argument("--max-seconds", type=float, default=0)
     batch.add_argument("--devices", default=None)
 

@@ -9,6 +9,7 @@ import soundfile as sf
 
 @dataclass
 class GigaAmV3Config:
+    language: str = "ru_ru"
     model_name: str = "v3_e2e_rnnt"
     model_dir: str = "pretrained_models/gigaam_v3"
     repo_dir: str | None = None
@@ -18,6 +19,7 @@ class GigaAmV3Config:
     model_workers: int = 1
     fp16_encoder: bool = True
     use_flash: bool | None = False
+    disable_torch_sdpa: bool = True
 
 
 class GigaAmV3Asr:
@@ -36,6 +38,8 @@ class GigaAmV3Asr:
             device=self.config.device,
             download_root=self.config.model_dir,
         )
+        if self.config.disable_torch_sdpa:
+            _disable_encoder_sdpa(self.model)
         self._set_recommended_batch_size()
 
     def _set_recommended_batch_size(self) -> None:
@@ -104,6 +108,13 @@ def _normalize_words(words: Sequence[Any]) -> list[list]:
         if text:
             timestamps.append([text, float(word.start), float(word.end)])
     return timestamps
+
+
+def _disable_encoder_sdpa(model: Any) -> None:
+    for layer in getattr(getattr(model, "encoder", None), "layers", []):
+        self_attn = getattr(layer, "self_attn", None)
+        if self_attn is not None and hasattr(self_attn, "torch_sdpa_attn"):
+            self_attn.torch_sdpa_attn = False
 
 
 def _write_temp_wav(wav: Any, sample_rate: int) -> str:

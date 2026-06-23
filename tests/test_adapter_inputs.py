@@ -4,7 +4,12 @@ import numpy as np
 
 from semantic_asr.adapters.dolphin import _get_text, _normalize_timestamps
 from semantic_asr.adapters.funasr_nano import FunAsrNano, FunAsrNanoConfig
-from semantic_asr.adapters.gigaam_v3 import GigaAmV3Asr, GigaAmV3Config, _normalize_words
+from semantic_asr.adapters.gigaam_v3 import (
+    GigaAmV3Asr,
+    GigaAmV3Config,
+    _disable_encoder_sdpa,
+    _normalize_words,
+)
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig, _to_float32, normalize_qwen3_asr_language
 from semantic_asr.adapters.whisper_large import WhisperLarge, WhisperLargeConfig
 
@@ -166,6 +171,16 @@ class AdapterInputTest(unittest.TestCase):
         word = type("Word", (), {"text": "тест", "start": 0.1, "end": 0.5})()
 
         self.assertEqual(_normalize_words([word]), [["тест", 0.1, 0.5]])
+
+    def test_gigaam_disables_encoder_sdpa_for_variable_length_batches(self):
+        attn = type("Attention", (), {"torch_sdpa_attn": True})()
+        layer = type("Layer", (), {"self_attn": attn})()
+        encoder = type("Encoder", (), {"layers": [layer]})()
+        model = type("Model", (), {"encoder": encoder})()
+
+        _disable_encoder_sdpa(model)
+
+        self.assertFalse(attn.torch_sdpa_attn)
 
 
 if __name__ == "__main__":

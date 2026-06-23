@@ -2,14 +2,49 @@
 
 Current state:
 
+- 2026-06-23: Diagnosed and removed the bad `ru_ru_gigaam_v3` Web DB records.
+  They were imported from pressure-test outputs generated with
+  `--max_seconds 60`, so the result JSON referenced temporary clipped wav
+  paths while the DB rows referenced full source wavs. Those records were not
+  suitable for waveform review.
+- 2026-06-23: Fixed GigaAM-v3 TextGrid failures caused by slight adjacent word
+  timestamp overlaps by normalizing word intervals at the shared pipeline
+  result layer before writers run.
+- 2026-06-23: Reran 12 full Russian wavs with `configs/ru_ru_gigaam_v3.json`
+  into `output/experiments/ru_gigaam_v3_web_batch_fixed_20260623`, imported
+  the clean jobs into `service_data/demo/jobs.sqlite3`, and verified 12 JSON
+  outputs with zero word overlaps and zero `<unk>` tokens.
+- 2026-06-23: Started HY-MT translation services on GPUs 2/3/4/5
+  (`10087-10090`) and translated all 12 imported `ru_ru_gigaam_v3` jobs to
+  `zh_cn`; translation cache validation reports 12/12 succeeded and no bad
+  caches.
+- 2026-06-23: Paused Hunyuan-MT translation services on ports `10087`,
+  `10096`, `10097` and `10098` after the user requested translation pause.
+- 2026-06-23: Rechecked Whisper batching in the intended shape: one long
+  Russian wav, FireRed VAD first, then batch the resulting VAD segments inside
+  one Whisper model. On a 180s clip with 8 VAD segments, segment-serial decode
+  took 46.304s and segment-batch decode took 8.692s, a 5.33x speedup.
+- 2026-06-23: Root-caused GigaAM-v3 variable-length batch `<unk>` output. The
+  bad batches were not an output-order or punctuation issue: non-longest padded
+  samples became NaN in the GigaAM encoder. Equal-length batches were fine.
+  Disabling the encoder PyTorch SDPA path fixed the NaNs while preserving
+  batch inference.
+- 2026-06-23: Updated `semantic_asr.adapters.gigaam_v3` to disable encoder
+  SDPA by default (`disable_torch_sdpa=true`), restored GigaAM `batch_size=16`,
+  and kept Russian GigaAM punctuation on `asr_text` so word spacing is
+  preserved.
+- 2026-06-23: Real GigaAM smoke passed on three Russian 60s samples with
+  FireRed VAD + GigaAM native timestamps + ASR text punctuation; outputs had
+  zero `<unk>` occurrences in the checked sentence text.
+- 2026-06-23: Validation passed after the GigaAM SDPA fix: 89 focused unit
+  tests, `git diff --check`, and `compileall semantic_asr semantic_asr_service
+  tests`.
 - Whisper ASR now uses batched mel decoding through `model.decode()` and no
   longer exposes Whisper word timestamps; Whisper profiles should use forced
-  aligners. GigaAM-v3 was added as a Russian PyTorch ASR adapter using native
-  word timestamps, punctuation and ITN from the official model path
+  aligners. GigaAM-v3 is a Russian PyTorch ASR adapter using native word
+  timestamps, punctuation and ITN from the official model path
   `pretrained_models/gigaam_v3`; the ONNX path was intentionally dropped
-  because it returns text only. Unit/config validation passed, but a real
-  GigaAM smoke is still pending because the `gigaam` Python package is not
-  installed in `fireredasr2s`.
+  because it returns text only.
 - The current repository documentation structure has been aligned with the
   standalone `/data/duhu/semantic-asr` layout for next week's sync:
   `AGENT.md` is now `AGENTS.md`, root `PROGRESS.md` and `DECISIONS.md` now live

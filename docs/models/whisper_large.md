@@ -32,7 +32,7 @@ Whisper's `transcribe(..., word_timestamps=True)` path is intentionally not
 used. Whisper profiles should use a forced aligner such as `mms_forced_aligner`
 or `qwen3_forced_aligner` for timestamps.
 
-## Batch Decode And Parallel Workers
+## VAD Segment Batch Decode
 
 For long audio with many VAD segments, configure:
 
@@ -43,19 +43,16 @@ For long audio with many VAD segments, configure:
       "name": "whisper_large",
       "params": {
         "device": "cuda:0",
-        "num_workers": 2
+        "batch_size": 24
       }
     }
-  },
-  "pipeline": {
-    "asr_batch_size": 8
   }
 }
 ```
 
-Each worker process loads one Whisper model instance. This can improve
-throughput on a large GPU, but GPU memory usage increases roughly with
-`num_workers`.
+The main speed path is batching VAD segments from the same long audio inside
+one Whisper model. `num_workers` loads extra model processes and should stay at
+the default `1` unless a single model instance leaves the GPU underused.
 
 ## Short Segment Decode Settings
 

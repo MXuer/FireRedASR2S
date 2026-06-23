@@ -21,7 +21,7 @@
       "name": "gigaam_v3_native"
     },
     "punc": {
-      "name": "asr_native"
+      "name": "asr_text"
     }
   },
   "pipeline": {

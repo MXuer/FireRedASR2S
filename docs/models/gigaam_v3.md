@@ -65,11 +65,18 @@ Sources:
       "name": "gigaam_v3_native"
     },
     "punc": {
-      "name": "asr_native"
+      "name": "asr_text"
     }
   }
 }
 ```
+
+In smoke tests, variable-length VAD-segment batches produced `<unk>` output
+because shorter padded samples became NaN inside the encoder when PyTorch SDPA
+handled fully masked padded query rows. The adapter disables the encoder SDPA
+path by default (`disable_torch_sdpa=true`) and keeps batch inference enabled.
+Use `asr_text` punctuation so Russian word spacing from the ASR text is
+preserved.
 
 `num_workers` controls CPU DataLoader workers. `model_workers` controls how many
 separate GigaAM model processes are loaded through the existing ASR parallel

@@ -110,7 +110,7 @@ class SemanticASR:
         self,
         wav_scp: str,
         outdir: str,
-        num_workers: int = 8,
+        num_workers: int = 1,
         max_seconds: float = 0,
         devices: str | Sequence[str] | None = None,
     ) -> list[dict]:
