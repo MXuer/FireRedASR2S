@@ -173,7 +173,7 @@ class ConfigRunnerTest(unittest.TestCase):
     def test_new_minimal_model_profiles_parse(self):
         for path, asr_name, punc_name in [
             ("configs/vi_vn_phowhisper.json", "phowhisper_large", "asr_text"),
-            ("configs/th_th_whisper_th.json", "whisper_th_large_v3_combined", "asr_text"),
+            ("configs/th_th_whisper_th.json", "whisper_th_large_v3_combined", "wtpsplit_boundary"),
             ("configs/hi_in_cadence.json", "seamless_m4t_v2_large", "cadence_fast"),
         ]:
             with self.subTest(path=path):

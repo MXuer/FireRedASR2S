@@ -18,7 +18,12 @@
       "name": "mms_forced_aligner"
     },
     "punc": {
-      "name": "asr_text"
+      "name": "wtpsplit_boundary",
+      "params": {
+        "base_url": "http://127.0.0.1:11001",
+        "max_length": 35,
+        "min_span_s": 2.0
+      }
     }
   },
   "pipeline": {

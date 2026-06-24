@@ -10,6 +10,12 @@ from semantic_asr.adapters.gigaam_v3 import (
     _disable_encoder_sdpa,
     _normalize_words,
 )
+from semantic_asr.adapters.hf_whisper import HfWhisperAsr, HfWhisperAsrConfig
+from semantic_asr.adapters.nvidia_fastconformer import (
+    NvidiaFastConformerAsr,
+    NvidiaFastConformerConfig,
+    NvidiaFastConformerTimestampProvider,
+)
 from semantic_asr.adapters.qwen3_asr import Qwen3Asr, Qwen3AsrConfig, _to_float32, normalize_qwen3_asr_language
 from semantic_asr.adapters.seamless_m4t import SeamlessM4TAsr, SeamlessM4TConfig
 from semantic_asr.adapters.whisper_large import WhisperLarge, WhisperLargeConfig
@@ -58,6 +64,78 @@ class _BatchWhisperModel:
             })()
             for index in range(len(mel_batch))
         ]
+
+
+class _BeamSensitiveWhisperModel:
+    device = "cpu"
+
+    def __init__(self):
+        self.decode_batch_sizes = []
+
+    def decode(self, mel_batch, options):
+        batch_size = len(mel_batch)
+        self.decode_batch_sizes.append(batch_size)
+        if options.beam_size and batch_size > 1:
+            raise RuntimeError("batched beam decode is unsafe")
+        return [
+            type("Result", (), {
+                "text": f"text-{index}",
+                "avg_logprob": -0.1,
+                "compression_ratio": 1.0,
+                "no_speech_prob": 0.0,
+            })()
+            for index in range(batch_size)
+        ]
+
+
+class _HfWhisperProcessor:
+    def __init__(self):
+        self.padding = None
+
+    def __call__(self, audios, sampling_rate, return_tensors, padding):
+        self.padding = padding
+        return _HfWhisperInputs()
+
+    def batch_decode(self, generated, skip_special_tokens):
+        return ["ok" for _ in generated]
+
+
+class _HfWhisperInputs(dict):
+    def to(self, device, dtype):
+        return self
+
+
+class _HfWhisperModel:
+    def generate(self, **kwargs):
+        return [[1]]
+
+
+class _NvidiaFastConformerModel:
+    def __init__(self):
+        self.calls = []
+
+    def transcribe(self, paths, batch_size, timestamps):
+        self.calls.append((paths, batch_size, timestamps))
+        return [
+            type("Hypothesis", (), {
+                "text": f"نص {index}.",
+                "timestamp": {
+                    "word": [
+                        {"word": "نص", "start": 0.1, "end": 0.2},
+                        {"word": f"{index}.", "start": 0.2, "end": 0.3},
+                    ],
+                },
+            })()
+            for index in range(len(paths))
+        ]
+
+
+class _NoopContext:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
 
 
 class AdapterInputTest(unittest.TestCase):
@@ -166,7 +244,7 @@ class AdapterInputTest(unittest.TestCase):
 
     def test_whisper_batches_decode_without_word_timestamps(self):
         adapter = object.__new__(WhisperLarge)
-        adapter.config = WhisperLargeConfig(language="ru_ru")
+        adapter.config = WhisperLargeConfig(language="ru_ru", short_audio_threshold_s=0.0)
         adapter.model = _BatchWhisperModel()
         adapter._prepare_mel = lambda wav, sample_rate: np.zeros((80, 3000), dtype=np.float32)
 
@@ -179,12 +257,42 @@ class AdapterInputTest(unittest.TestCase):
         self.assertEqual([item["text"] for item in results], ["text-0", "text-1"])
         self.assertEqual(results[0]["timestamp"], [])
 
+    def test_whisper_splits_batched_beam_decode(self):
+        adapter = object.__new__(WhisperLarge)
+        adapter.config = WhisperLargeConfig(
+            language="ar_sa",
+            short_audio_threshold_s=10.0,
+            short_beam_size=5,
+        )
+        adapter.model = _BeamSensitiveWhisperModel()
+        adapter._prepare_mel = lambda wav, sample_rate: np.zeros((80, 3000), dtype=np.float32)
+
+        results = adapter.transcribe(
+            ["utt1", "utt2"],
+            [(16000, np.zeros(16000, dtype=np.float32)), (16000, np.zeros(16000, dtype=np.float32))],
+        )
+
+        self.assertEqual(adapter.model.decode_batch_sizes, [1, 1])
+        self.assertEqual([item["text"] for item in results], ["text-0", "text-0"])
+
     def test_whisper_recommends_configured_batch_size(self):
         adapter = object.__new__(WhisperLarge)
         adapter.config = WhisperLargeConfig(batch_size=24)
         adapter._set_recommended_batch_size()
 
         self.assertEqual(adapter.recommended_batch_size, 24)
+
+    def test_hf_whisper_pads_features_to_model_context(self):
+        adapter = object.__new__(HfWhisperAsr)
+        adapter.config = HfWhisperAsrConfig(model_name_or_path="mock", device="cpu")
+        adapter.dtype = None
+        adapter.processor = _HfWhisperProcessor()
+        adapter.model = _HfWhisperModel()
+        adapter.torch = type("Torch", (), {"no_grad": staticmethod(lambda: _NoopContext())})
+
+        adapter.transcribe(["utt"], [(16000, np.zeros(8000, dtype=np.float32))])
+
+        self.assertEqual(adapter.processor.padding, "max_length")
 
     def test_gigaam_adapter_batches_text_and_word_timestamps(self):
         adapter = object.__new__(GigaAmV3Asr)
@@ -220,6 +328,29 @@ class AdapterInputTest(unittest.TestCase):
         _disable_encoder_sdpa(model)
 
         self.assertFalse(attn.torch_sdpa_attn)
+
+    def test_nvidia_fastconformer_transcribes_batch_with_native_punctuation(self):
+        adapter = object.__new__(NvidiaFastConformerAsr)
+        adapter.config = NvidiaFastConformerConfig(batch_size=2)
+        adapter.model = _NvidiaFastConformerModel()
+        adapter._set_recommended_batch_size()
+
+        results = adapter.transcribe(
+            ["utt1", "utt2"],
+            [(16000, np.zeros(16000, dtype=np.float32)), (16000, np.zeros(16000, dtype=np.float32))],
+        )
+
+        self.assertEqual(adapter.model.calls[0][1], 2)
+        self.assertTrue(adapter.model.calls[0][2])
+        self.assertEqual(len(adapter.model.calls[0][0]), 2)
+        self.assertEqual([item["text"] for item in results], ["نص 0.", "نص 1."])
+        self.assertEqual(results[0]["timestamp"], [["نص", 0.1, 0.2], ["0.", 0.2, 0.3]])
+
+    def test_nvidia_fastconformer_native_timestamp_provider_requires_words(self):
+        provider = NvidiaFastConformerTimestampProvider()
+
+        with self.assertRaisesRegex(ValueError, "must return word timestamps"):
+            provider.add_timestamps([{"uttid": "utt", "timestamp": []}], [])
 
 
 if __name__ == "__main__":

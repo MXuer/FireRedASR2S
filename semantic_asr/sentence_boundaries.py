@@ -400,8 +400,8 @@ def _boundary_candidate(
         )
 
     semantic_complete, semantic_reason = _semantic_boundary(
-        previous["text"],
-        current["text"],
+        previous,
+        current,
         previous["end_ms"] - previous["start_ms"],
         current["end_ms"] - current["start_ms"],
         combined_duration_ms,
@@ -496,19 +496,22 @@ def _decide_boundary(candidate: BoundaryCandidate, config: SentenceBoundaryFusio
 
 
 def _semantic_boundary(
-    previous_text: str,
-    current_text: str,
+    previous_sentence: dict,
+    current_sentence: dict,
     previous_duration_ms: int,
     current_duration_ms: int,
     combined_duration_ms: int,
     config: SentenceBoundaryFusionConfig,
 ) -> tuple[bool, str]:
-    previous = previous_text.strip()
-    current = _LEADING_BOUNDARY_PUNCTUATION.sub("", current_text).strip()
+    previous = str(previous_sentence.get("text", "")).strip()
+    current = _LEADING_BOUNDARY_PUNCTUATION.sub("", str(current_sentence.get("text", ""))).strip()
     if not previous:
         return False, "empty_previous"
     if not current:
         return True, "empty_current"
+    if previous_sentence.get("semantic_boundary"):
+        source = str(previous_sentence.get("boundary_source") or "unknown")
+        return True, f"semantic_boundary_tag:{source}"
     if _TRAILING_CONTINUATION_PUNCTUATION.search(previous):
         return False, "previous_continuation_punctuation"
     if _TERMINAL_SENTENCE_PUNCTUATION.search(previous):

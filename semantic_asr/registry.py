@@ -55,9 +55,11 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("asr", "dolphin", _build_dolphin)
     registry.register("asr", "seamless_m4t_v2_large", _build_seamless_m4t)
     registry.register("asr", "gigaam_v3", _build_gigaam_v3)
+    registry.register("asr", "nvidia_ar_fastconformer", _build_nvidia_ar_fastconformer)
     registry.register("timestamp", "funasr_native", _build_funasr_native_timestamp)
     registry.register("timestamp", "firered_asr_native", _build_firered_asr_native_timestamp)
     registry.register("timestamp", "gigaam_v3_native", _build_gigaam_v3_native_timestamp)
+    registry.register("timestamp", "nvidia_ar_fastconformer_native", _build_nvidia_ar_fastconformer_native_timestamp)
     registry.register("timestamp", "qwen3_forced_aligner", _build_qwen3_forced_aligner)
     registry.register("timestamp", "mms_forced_aligner", _build_mms_forced_aligner)
     registry.register("punc", "firered_punc", _build_firered_punc)
@@ -67,6 +69,7 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("punc", "naqta", _build_naqta_punctuation)
     registry.register("punc", "cadence_fast", _build_cadence_fast)
     registry.register("punc", "qwen_semantic_boundary", _build_qwen_semantic_boundary)
+    registry.register("punc", "wtpsplit_boundary", _build_wtpsplit_boundary)
     registry.register("punc", "xlm_roberta_punctuation", _build_xlm_roberta_punctuation)
     registry.register("punc", "yue_punctuation", _build_yue_punctuation)
     return registry
@@ -170,6 +173,12 @@ def _build_gigaam_v3(params: Mapping[str, Any]) -> AsrModel:
     return GigaAmV3Asr(config)
 
 
+def _build_nvidia_ar_fastconformer(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.nvidia_fastconformer import NvidiaFastConformerAsr, NvidiaFastConformerConfig
+
+    return NvidiaFastConformerAsr(_dataclass_from_mapping(NvidiaFastConformerConfig, params))
+
+
 def _build_funasr_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
     from semantic_asr.adapters.funasr_nano import FunAsrNanoTimestampProvider
 
@@ -188,6 +197,12 @@ def _build_gigaam_v3_native_timestamp(params: Mapping[str, Any]) -> TimestampPro
     from semantic_asr.adapters.gigaam_v3 import GigaAmV3TimestampProvider
 
     return GigaAmV3TimestampProvider()
+
+
+def _build_nvidia_ar_fastconformer_native_timestamp(params: Mapping[str, Any]) -> TimestampProvider:
+    from semantic_asr.adapters.nvidia_fastconformer import NvidiaFastConformerTimestampProvider
+
+    return NvidiaFastConformerTimestampProvider()
 
 
 def _build_qwen3_forced_aligner(params: Mapping[str, Any]) -> TimestampProvider:
@@ -274,6 +289,12 @@ def _build_qwen_semantic_boundary(params: Mapping[str, Any]) -> PuncModel:
     )
 
     return QwenSemanticBoundaryPunc(_dataclass_from_mapping(QwenSemanticBoundaryConfig, params))
+
+
+def _build_wtpsplit_boundary(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.adapters.wtpsplit_boundary import WtpsplitBoundaryConfig, WtpsplitBoundaryPunc
+
+    return WtpsplitBoundaryPunc(_dataclass_from_mapping(WtpsplitBoundaryConfig, params))
 
 
 def _dataclass_from_mapping(cls, values: Mapping[str, Any]):

@@ -99,9 +99,10 @@ class OutputWriterTest(unittest.TestCase):
                     5.0,
                     [{"start_ms": 0, "end_ms": 3000, "text": "sentence"}],
                     words=words,
+                    write_tokens=True,
                 )
 
-    def test_write_all_outputs_includes_token_tier(self):
+    def test_write_all_outputs_omits_token_tier_by_default(self):
         result = {
             "dur_s": 2.0,
             "sentences": [{"start_ms": 0, "end_ms": 1000, "text": "hello"}],
@@ -109,6 +110,25 @@ class OutputWriterTest(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory() as tmpdir:
             outputs = write_all_outputs(tmpdir, "sample", result, write_srt_output=False, write_csv_output=False)
+            tg = TextGrid.fromFile(outputs["textgrid"])
+
+        self.assertNotIn("token", [tier.name for tier in tg])
+
+    def test_write_all_outputs_can_include_token_tier(self):
+        result = {
+            "dur_s": 2.0,
+            "sentences": [{"start_ms": 0, "end_ms": 1000, "text": "hello"}],
+            "words": [{"start_ms": 0, "end_ms": 500, "text": "hello"}],
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            outputs = write_all_outputs(
+                tmpdir,
+                "sample",
+                result,
+                write_srt_output=False,
+                write_csv_output=False,
+                write_textgrid_tokens=True,
+            )
             tg = TextGrid.fromFile(outputs["textgrid"])
 
         self.assertIsNotNone(tg.getFirst("token"))

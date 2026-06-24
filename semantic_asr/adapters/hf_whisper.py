@@ -30,6 +30,7 @@ class HfWhisperAsr:
         self.config = config
         self.torch = torch
         dtype = getattr(torch, config.torch_dtype) if config.torch_dtype else None
+        self.dtype = dtype
         model_path = os.path.expanduser(config.model_name_or_path)
         self.processor = AutoProcessor.from_pretrained(model_path)
         self.model = AutoModelForSpeechSeq2Seq.from_pretrained(
@@ -45,8 +46,8 @@ class HfWhisperAsr:
             audios,
             sampling_rate=16000,
             return_tensors="pt",
-            padding=True,
-        ).to(self.config.device)
+            padding="max_length",
+        ).to(self.config.device, dtype=self.dtype)
         kwargs = {}
         if self.config.max_new_tokens is not None:
             kwargs["max_new_tokens"] = self.config.max_new_tokens

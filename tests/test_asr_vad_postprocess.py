@@ -78,6 +78,23 @@ class WrongUttidPunc(FakePunc):
         return [{"uttid": "wrong_s0_e1000", "punc_sentences": []}]
 
 
+class TaggedBoundaryPunc(FakePunc):
+    def process_with_timestamp(self, batch_timestamp, batch_uttid):
+        return [
+            {
+                "uttid": uttid,
+                "punc_sentences": [{
+                    "start_s": 0.0,
+                    "end_s": timestamp[-1][2],
+                    "punc_text": "hello",
+                    "semantic_boundary": True,
+                    "boundary_source": "wtpsplit",
+                }],
+            }
+            for uttid, timestamp in zip(batch_uttid, batch_timestamp)
+        ]
+
+
 class AsrVadPostprocessTest(unittest.TestCase):
     def test_merges_tiny_island_to_nearest_neighbor(self):
         segments = prepare_asr_vad_segments(
@@ -203,6 +220,24 @@ class AsrVadPostprocessTest(unittest.TestCase):
 
         self.assertEqual(result["sentences"], [])
         self.assertEqual(result["discarded_asr_segments"][0]["reason"], "short_segment_hallucination")
+
+    def test_pipeline_preserves_semantic_boundary_metadata_from_punc(self):
+        pipeline = SemanticAsrPipeline(
+            vad=FakeVad(),
+            asr=RecordingAsr(),
+            timestamp_provider=FakeTimestamp(),
+            punc=TaggedBoundaryPunc(),
+            config=PipelineConfig(
+                asr_vad_min_segment_s=0.5,
+                asr_vad_max_merge_silence_s=1.0,
+                output_vad_pad_s=0.0,
+            ),
+        )
+
+        result = pipeline.process(self._write_silence_wav(), "sample")
+
+        self.assertTrue(result["semantic_sentences"][0]["semantic_boundary"])
+        self.assertEqual(result["semantic_sentences"][0]["boundary_source"], "wtpsplit")
 
     def test_pipeline_rejects_mismatched_asr_uttid(self):
         pipeline = SemanticAsrPipeline(

@@ -14,7 +14,14 @@ def write_result_jsonl(outdir: str, result: dict) -> str:
     return output_path
 
 
-def write_textgrid(tg_dir: str, name: str, wav_dur: float, sentences: list[dict], words: list[dict] | None = None) -> str:
+def write_textgrid(
+    tg_dir: str,
+    name: str,
+    wav_dur: float,
+    sentences: list[dict],
+    words: list[dict] | None = None,
+    write_tokens: bool = False,
+) -> str:
     os.makedirs(tg_dir, exist_ok=True)
     output_path = os.path.join(tg_dir, name + ".TextGrid")
     textgrid = TextGrid(maxTime=wav_dur)
@@ -24,7 +31,7 @@ def write_textgrid(tg_dir: str, name: str, wav_dur: float, sentences: list[dict]
         tier.add(minTime=start_s, maxTime=end_s, mark=text)
     textgrid.append(tier)
 
-    if words:
+    if write_tokens and words:
         tier = IntervalTier(name="token", maxTime=wav_dur)
         for start_s, end_s, text in _textgrid_intervals(words, wav_dur, _word_output_ms):
             tier.add(minTime=start_s, maxTime=end_s, mark=text)
@@ -96,6 +103,7 @@ def write_all_outputs(
     write_textgrid_output: bool = True,
     write_srt_output: bool = True,
     write_csv_output: bool = True,
+    write_textgrid_tokens: bool = False,
 ) -> dict:
     outputs = {"jsonl": write_result_jsonl(outdir, result)}
     if write_textgrid_output:
@@ -105,6 +113,7 @@ def write_all_outputs(
             result["dur_s"],
             result["sentences"],
             result.get("words"),
+            write_tokens=write_textgrid_tokens,
         )
     if write_srt_output:
         outputs["srt"] = write_srt(os.path.join(outdir, "asr_srt"), name, result["sentences"])

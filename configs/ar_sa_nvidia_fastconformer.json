@@ -1,0 +1,28 @@
+{
+  "name": "ar_sa_nvidia_fastconformer",
+  "language": "ar_sa",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "use_gpu": true,
+        "extend_speech_frame": 5
+      }
+    },
+    "asr": {
+      "name": "nvidia_ar_fastconformer",
+      "params": {
+        "batch_size": 8
+      }
+    },
+    "timestamp": {
+      "name": "nvidia_ar_fastconformer_native"
+    },
+    "punc": {
+      "name": "asr_text"
+    }
+  },
+  "output": {
+    "outdir": "output/experiments/ar_sa_nvidia_fastconformer"
+  }
+}

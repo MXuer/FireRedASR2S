@@ -25,6 +25,7 @@ LANGUAGE_COMPONENTS = {
     },
     "punc": {
         "qwen_semantic_boundary",
+        "wtpsplit_boundary",
     },
 }
 
@@ -39,6 +40,7 @@ class ComponentSpec:
 class OutputConfig:
     outdir: str = "output/experiments/config_runner"
     write_textgrid: bool = True
+    write_textgrid_tokens: bool = False
     write_srt: bool = True
     write_csv: bool = True
     copy_resolved_config: bool = True

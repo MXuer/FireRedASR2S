@@ -146,6 +146,7 @@ def write_missing_outputs(
                 uttid,
                 result,
                 write_textgrid_output=write_textgrid_output,
+                write_textgrid_tokens=profile.output.write_textgrid_tokens,
                 write_srt_output=write_srt_output,
                 write_csv_output=write_csv_output,
             )

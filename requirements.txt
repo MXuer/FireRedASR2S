@@ -21,6 +21,7 @@ openai-whisper==20250625
 qwen-asr @ git+https://github.com/QwenLM/Qwen3-ASR.git
 dolphin @ git+https://github.com/DataoceanAI/Dolphin.git
 punctuators
+cadence-punctuation==1.1.0
 
 cn2an==0.5.23
 kaldiio==2.18.0

@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import os
 from typing import Sequence
 
+from semantic_asr.compat import patch_torch_pytree_for_transformers
 from semantic_asr.punctuation import split_text_by_punctuation
 
 
@@ -18,12 +19,16 @@ class CadenceFastConfig:
 class CadenceFastPunctuation:
     def __init__(self, config: CadenceFastConfig | None = None):
         self.config = config or CadenceFastConfig()
+        patch_torch_pytree_for_transformers()
         try:
-            from Cadence import PunctuationModel
+            from cadence import PunctuationModel
         except ImportError as exc:
-            raise ImportError(
-                "Cadence-Fast requires the cadence-punctuation package; install it in the active model environment."
-            ) from exc
+            try:
+                from Cadence import PunctuationModel
+            except ImportError:
+                raise ImportError(
+                    "Cadence-Fast requires the cadence-punctuation package; install it in the active model environment."
+                ) from exc
 
         self.model = PunctuationModel(
             model=self.config.model,

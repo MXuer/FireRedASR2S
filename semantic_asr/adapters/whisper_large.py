@@ -73,16 +73,18 @@ class WhisperLarge:
             groups.setdefault(key, []).append((index, mel))
 
         for key, items in groups.items():
+            decode_chunks = [[item] for item in items] if dict(key).get("beam_size") is not None else [items]
             options = DecodingOptions(
                 language=model_language("whisper_large", self.config.language) if self.config.language else None,
                 task=self.config.task,
                 fp16=self.config.fp16,
                 **dict(key),
             )
-            mel_batch = torch.stack([torch.as_tensor(mel) for _index, mel in items]).to(self.model.device)
-            decoded = self.model.decode(mel_batch, options)
-            for (index, _mel), raw_result in zip(items, decoded):
-                results[index] = raw_result
+            for chunk in decode_chunks:
+                mel_batch = torch.stack([torch.as_tensor(mel) for _index, mel in chunk]).to(self.model.device)
+                decoded = self.model.decode(mel_batch, options)
+                for (index, _mel), raw_result in zip(chunk, decoded):
+                    results[index] = raw_result
         return results
 
     def _decode_kwargs(self, sample_rate: int, wav: Any) -> dict:

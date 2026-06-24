@@ -114,6 +114,16 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="asr",
+        name="nvidia_ar_fastconformer",
+        languages=("ar",),
+        aliases={"ar": ("arabic", "ar-sa", "ar-iq", "ar-eg", "ar-ae")},
+        notes="NVIDIA Arabic FastConformer Hybrid RNNT/CTC ASR with RNNT decoding, built-in punctuation/diacritics and NeMo word timestamps.",
+        has_native_timestamps=True,
+        has_native_punctuation=True,
+        supports_batch=True,
+    ),
+    ModelLanguageSupport(
+        role="asr",
         name="qwen3_asr_1_7b",
         languages=(
             "ar", "cs", "da", "de", "el", "en", "es", "fa", "fi", "fil", "fr",
@@ -215,6 +225,13 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
     ),
     ModelLanguageSupport(
         role="timestamp",
+        name="nvidia_ar_fastconformer_native",
+        languages=("ar",),
+        aliases={"ar": ("arabic", "ar-sa", "ar-iq", "ar-eg", "ar-ae")},
+        notes="Validates NeMo word timestamps from NVIDIA Arabic FastConformer.",
+    ),
+    ModelLanguageSupport(
+        role="timestamp",
         name="qwen3_forced_aligner",
         languages=("de", "en", "es", "fr", "it", "ja", "ko", "pt", "ru", "th", "zh"),
         aliases={
@@ -279,6 +296,17 @@ MODEL_LANGUAGE_SUPPORT: tuple[ModelLanguageSupport, ...] = (
             "Uses Qwen3.6 text understanding to return index-only semantic "
             "sentence boundaries. It does not rewrite ASR text and should be "
             "validated per target language/domain."
+        ),
+        supports_batch=False,
+    ),
+    ModelLanguageSupport(
+        role="punc",
+        name="wtpsplit_boundary",
+        languages=(ANY_LANGUAGE,),
+        notes=(
+            "HTTP sidecar for segment-any-text/wtpsplit semantic sentence "
+            "boundaries. Official SaT models are multilingual; validate "
+            "quality per language/domain. It does not rewrite ASR text."
         ),
         supports_batch=False,
     ),

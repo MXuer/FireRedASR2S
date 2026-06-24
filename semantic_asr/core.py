@@ -297,7 +297,7 @@ class SemanticAsrPipeline:
                     start_ms = segment_start_ms
                 if i == len(punc_sentences) - 1:
                     end_ms = segment_end_ms
-                sentences.append(self._sentence(start_ms, end_ms, punc_text, asr_result))
+                sentences.append(self._sentence(start_ms, end_ms, punc_text, asr_result, punc_sentence))
 
             for token, start_s, end_s in asr_result.get("timestamp", []):
                 words.append({
@@ -364,13 +364,18 @@ class SemanticAsrPipeline:
             raise ValueError(f"Timestamp provider returned uttids {returned}, expected {expected}")
 
     @staticmethod
-    def _sentence(start_ms: int, end_ms: int, text: str, asr_result: dict) -> dict:
-        return {
+    def _sentence(start_ms: int, end_ms: int, text: str, asr_result: dict, punc_sentence: dict | None = None) -> dict:
+        sentence = {
             "start_ms": start_ms,
             "end_ms": end_ms,
             "text": text,
             "asr_confidence": asr_result.get("confidence", 0),
         }
+        punc_sentence = punc_sentence or {}
+        if punc_sentence.get("semantic_boundary"):
+            sentence["semantic_boundary"] = True
+            sentence["boundary_source"] = str(punc_sentence.get("boundary_source") or "unknown")
+        return sentence
 
     @staticmethod
     def _segments_ms(segments: Sequence[tuple[float, float]]) -> list[tuple[int, int]]:

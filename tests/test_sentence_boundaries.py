@@ -273,6 +273,43 @@ class SentenceBoundaryFusionTest(unittest.TestCase):
         self.assertEqual(decisions[0]["reason"], "merged_semantic_incomplete")
         self.assertEqual(decisions[0]["semantic_reason"], "previous_short_incomplete_fragment")
 
+    def test_semantic_boundary_tag_counts_as_semantic_complete(self):
+        sentences = [
+            {
+                "start_ms": 0,
+                "end_ms": 9000,
+                "text": "วันนี้เราจะพูดถึงความคืบหน้า",
+                "asr_confidence": 0.8,
+                "semantic_boundary": True,
+                "boundary_source": "wtpsplit",
+            },
+            {
+                "start_ms": 9300,
+                "end_ms": 17000,
+                "text": "ถ้าไม่มีคำถามเราจะเริ่มหัวข้อแรก",
+                "asr_confidence": 0.7,
+                "semantic_boundary": True,
+                "boundary_source": "wtpsplit",
+            },
+        ]
+        words = [
+            {"start_ms": 8500, "end_ms": 9000, "text": "หน้า"},
+            {"start_ms": 9300, "end_ms": 9600, "text": "ถ้า"},
+        ]
+
+        fused, decisions = fuse_sentence_boundaries(
+            sentences,
+            words,
+            [(0, 8900), (9200, 18000)],
+            np.ones(16000 * 20, dtype=np.float32),
+            16000,
+            self.config,
+        )
+
+        self.assertEqual(len(fused), 2)
+        self.assertEqual(decisions[0]["action"], "keep")
+        self.assertEqual(decisions[0]["semantic_reason"], "semantic_boundary_tag:wtpsplit")
+
     def test_high_probability_terminal_boundary_caps_max_duration(self):
         sentences = [
             {"start_ms": 0, "end_ms": 29950, "text": "first.", "asr_confidence": 0.8},

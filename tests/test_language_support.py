@@ -65,6 +65,7 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("gigaam_v3", names)
         self.assertIn("phowhisper_large", names)
         self.assertIn("whisper_th_large_v3_combined", names)
+        self.assertIn("nvidia_ar_fastconformer", names)
 
     def test_gigaam_is_russian_batch_asr_with_native_punctuation_and_timestamps(self):
         ru_result = list_models_by_language("ru_ru", role="asr")
@@ -95,6 +96,7 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("naqta", names)
         self.assertIn("yue_punctuation", names)
         self.assertIn("ct_punc", names)
+        self.assertIn("wtpsplit_boundary", names)
         self.assertIn("cadence_fast", names)
 
     def test_phowhisper_and_thai_whisper_are_language_specific_batch_asr(self):
@@ -111,6 +113,23 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertTrue(phowhisper["has_native_punctuation"])
         self.assertFalse(phowhisper["has_native_timestamps"])
         self.assertTrue(thai_whisper["supports_batch"])
+
+    def test_nvidia_fastconformer_is_arabic_batch_asr_with_native_punctuation(self):
+        ar_result = list_models_by_language("ar_sa", role="asr")
+        ar_iq_result = list_models_by_language("ar_iq", role="asr")
+        en_result = list_models_by_language("en_us", role="asr")
+        model = list_languages_by_model("nvidia_ar_fastconformer", role="asr")
+
+        self.assertIn("nvidia_ar_fastconformer", {item["name"] for item in ar_result["asr"]})
+        self.assertIn("nvidia_ar_fastconformer", {item["name"] for item in ar_iq_result["asr"]})
+        self.assertNotIn("nvidia_ar_fastconformer", {item["name"] for item in en_result["asr"]})
+        self.assertTrue(model["supports_batch"])
+        self.assertTrue(model["has_native_punctuation"])
+        self.assertTrue(model["has_native_timestamps"])
+        self.assertIn(
+            "nvidia_ar_fastconformer_native",
+            {item["name"] for item in list_models_by_language("ar_iq", role="timestamp")["timestamp"]},
+        )
 
     def test_cadence_fast_supports_english_and_indic_languages(self):
         en_result = list_models_by_language("en_us", role="punc")
@@ -182,6 +201,13 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("xlm_roberta_punctuation", {item["name"] for item in zh_result["punc"]})
         self.assertIn("xlm_roberta_punctuation", {item["name"] for item in am_result["punc"]})
         self.assertIn("xlm_roberta_punctuation", {item["name"] for item in rw_result["punc"]})
+
+    def test_wtpsplit_boundary_is_multilingual_boundary_strategy(self):
+        th_result = list_models_by_language("th_th", role="punc")
+        de_result = list_models_by_language("de_de", role="punc")
+
+        self.assertIn("wtpsplit_boundary", {item["name"] for item in th_result["punc"]})
+        self.assertIn("wtpsplit_boundary", {item["name"] for item in de_result["punc"]})
 
 
 if __name__ == "__main__":
