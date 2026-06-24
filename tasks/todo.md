@@ -1,5 +1,12 @@
 # Todo
 
+- [x] Current work: add minimal adapters/config/docs/tests for `phowhisper_large`,
+  `whisper_th_large_v3_combined`, and `cadence_fast` without changing existing
+  production profiles.
+- [ ] Current work: after local model downloads complete, run real smoke tests
+  for `configs/vi_vn_phowhisper.json`, `configs/th_th_whisper_th.json`, and
+  `configs/hi_in_cadence.json`.
+
 - [x] Current work: apply single-worker ASR batch-size settings, switch Dolphin/Seamless adapters to native batch, and restart the demo service.
 
 - [x] Current work: measure ASR batch-size upper bounds, including native Dolphin and Seamless batch probes, and update the benchmark report.
@@ -1704,3 +1711,31 @@ Review:
 - `conda run -n fireredasr2s python -m unittest discover -s tests -p 'test_*.py' tests` passed.
 - `semantic_asr/query_models.py language zh_cn --role timestamp` returns `mms_forced_aligner`.
 - Refactored MMS forced aligner to use vendored `semantic_asr.mms_runtime` and align in-memory `SpeechSegment.wav` audio without writing temporary segment wav files.
+# TODO: new ASR/Punctuation model onboarding
+
+- [x] Add `vinai/PhoWhisper-large` as a Vietnamese Whisper-family ASR profile.
+- [ ] After local model downloads finish, verify `vinai/PhoWhisper-large`
+  batched VAD-segment decode, native punctuation behavior, and forced-aligner
+  compatibility.
+- [ ] After local model downloads finish, inspect gated local source for
+  `ai4bharat/indic-conformer-600m-multilingual` RNNT, especially batched RNNT
+  code, supported language ids, punctuation/ITN behavior, and ONNXRuntime
+  environment compatibility.
+- [ ] After local model downloads finish, evaluate `facebook/omniASR-LLM-7B`
+  in a separate-env or sidecar adapter first; verify `batch_size` behavior,
+  40s input limit, language-code mapping, punctuation/ITN behavior, and memory
+  use.
+- [ ] After local model downloads finish, evaluate
+  `CohereLabs/cohere-transcribe-03-2026` in a separate-env or sidecar adapter
+  first because it requires a newer Transformers stack than the current
+  `fireredasr2s` environment; verify batched chunking, punctuation control and
+  no-timestamp behavior.
+- [x] Add `biodatlab/whisper-th-large-v3-combined` as a Thai Whisper-family
+  ASR profile.
+- [ ] After local model downloads finish, verify Thai Whisper batched
+  VAD-segment decode and Thai punctuation behavior.
+- [x] Implement `ai4bharat/Cadence-Fast` as an Indic/English punctuation model.
+- [ ] After local model downloads finish, verify Cadence-Fast batch
+  punctuation, long-text sliding-window behavior, and no-ITN behavior.
+- [x] Add docs, `language_support.py` metadata, config examples, and model
+  matrix updates for each model enabled in the minimal path.

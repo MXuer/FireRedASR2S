@@ -1,0 +1,27 @@
+{
+  "name": "hi_in_cadence",
+  "language": "hi_in",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "use_gpu": true
+      }
+    },
+    "asr": {
+      "name": "seamless_m4t_v2_large"
+    },
+    "timestamp": {
+      "name": "mms_forced_aligner"
+    },
+    "punc": {
+      "name": "cadence_fast",
+      "params": {
+        "batch_size": 32
+      }
+    }
+  },
+  "output": {
+    "outdir": "output/experiments/hi_in_cadence"
+  }
+}

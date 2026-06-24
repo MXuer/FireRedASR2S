@@ -19,10 +19,12 @@ and this document when adding or changing a model.
 | `funasr_nano` | `zh`, `en`, `ja` | yes | yes | yes | Fun-ASR-Nano-2512. |
 | `firered_asr` | `zh` | yes | yes | no | FireRedASR2 AED Chinese ASR. Use `return_timestamp=true` with `firered_asr_native`. |
 | `whisper_large` | multilingual Whisper set | yes | no | yes | Batched mel decode; use forced aligner for timestamps. |
+| `phowhisper_large` | `vi` | yes | no | yes | Vietnamese Whisper-family ASR through batched Transformers generation. |
+| `whisper_th_large_v3_combined` | `th` | yes | no | yes | Thai Whisper-family ASR through batched Transformers generation. |
 | `gigaam_v3` | `ru` | yes | yes | yes | Russian GigaAM-v3 e2e RNNT PyTorch path; keeps official word timestamps. |
 | `qwen3_asr_1_7b` | `ar`, `cs`, `da`, `de`, `el`, `en`, `es`, `fa`, `fi`, `fil`, `fr`, `hi`, `hu`, `id`, `it`, `ja`, `ko`, `mk`, `ms`, `nl`, `pl`, `pt`, `ro`, `ru`, `sv`, `th`, `tr`, `vi`, `yue`, `zh` | yes | no | yes | Adapter maps canonical ids to full model language names. |
-| `dolphin` | 40 Eastern languages plus Chinese dialect aliases | no | yes | yes | Word timestamps require `word_timestamp`; `predict_time` is sentence-level only. |
-| `seamless_m4t_v2_large` | currently mapped: `ar`, `en`, `hi`, `ja`, `ko`, `pt`, `ru`, `th`, `vi`, `zh` | no | no | yes | Adapter maps canonical ids to Seamless/FLORES codes. |
+| `dolphin` | 40 Eastern languages plus Chinese dialect aliases | yes | yes | yes | Word timestamps require `word_timestamp`; `predict_time` is sentence-level only. |
+| `seamless_m4t_v2_large` | currently mapped: `ar`, `en`, `hi`, `ja`, `ko`, `pt`, `ru`, `th`, `vi`, `zh` | yes | no | yes | Adapter maps canonical ids to Seamless/FLORES codes. |
 
 ## Timestamp Providers
 
@@ -45,6 +47,7 @@ and this document when adding or changing a model.
 | `qwen_semantic_boundary` | `*` | no | no | boundary strategy | Uses Qwen to return index-only semantic boundaries. Must validate JSON coverage and never trust rewritten text. |
 | `naqta` | `ar` | no | no | external | Arabic punctuation restoration. |
 | `yue_punctuation` | `yue` | no | no | external | Cantonese punctuation restoration. |
+| `cadence_fast` | English + 22 official Indian languages | yes | no | external | AI4Bharat Cadence-Fast punctuation restoration. No ITN. |
 | `xlm_roberta_punctuation` | 47 languages including `zh`, `en`, `ar`, `de`, `ja`, `ko`, `pt`, `ru`, `vi` | no | no | external | Quality must be validated per language/domain. |
 
 ## Translation

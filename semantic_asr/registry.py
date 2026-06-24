@@ -49,6 +49,8 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("asr", "funasr_nano", _build_funasr_nano)
     registry.register("asr", "firered_asr", _build_firered_asr)
     registry.register("asr", "whisper_large", _build_whisper_large)
+    registry.register("asr", "phowhisper_large", _build_phowhisper_large)
+    registry.register("asr", "whisper_th_large_v3_combined", _build_whisper_th_large_v3_combined)
     registry.register("asr", "qwen3_asr_1_7b", _build_qwen3_asr)
     registry.register("asr", "dolphin", _build_dolphin)
     registry.register("asr", "seamless_m4t_v2_large", _build_seamless_m4t)
@@ -63,6 +65,7 @@ def create_default_registry() -> ComponentRegistry:
     registry.register("punc", "asr_native", _build_asr_native_punc)
     registry.register("punc", "asr_text", _build_asr_text_punc)
     registry.register("punc", "naqta", _build_naqta_punctuation)
+    registry.register("punc", "cadence_fast", _build_cadence_fast)
     registry.register("punc", "qwen_semantic_boundary", _build_qwen_semantic_boundary)
     registry.register("punc", "xlm_roberta_punctuation", _build_xlm_roberta_punctuation)
     registry.register("punc", "yue_punctuation", _build_yue_punctuation)
@@ -123,6 +126,20 @@ def _build_whisper_large(params: Mapping[str, Any]) -> AsrModel:
     if config.num_workers > 1:
         return ParallelAsrModel(WhisperLarge, config, config.num_workers)
     return WhisperLarge(config)
+
+
+def _build_phowhisper_large(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.hf_whisper import HfWhisperAsr, HfWhisperAsrConfig
+
+    params = {"model_name_or_path": "vinai/PhoWhisper-large", **dict(params)}
+    return HfWhisperAsr(_dataclass_from_mapping(HfWhisperAsrConfig, params))
+
+
+def _build_whisper_th_large_v3_combined(params: Mapping[str, Any]) -> AsrModel:
+    from semantic_asr.adapters.hf_whisper import HfWhisperAsr, HfWhisperAsrConfig
+
+    params = {"model_name_or_path": "biodatlab/whisper-th-large-v3-combined", **dict(params)}
+    return HfWhisperAsr(_dataclass_from_mapping(HfWhisperAsrConfig, params))
 
 
 def _build_qwen3_asr(params: Mapping[str, Any]) -> AsrModel:
@@ -236,6 +253,12 @@ def _build_naqta_punctuation(params: Mapping[str, Any]) -> PuncModel:
     from semantic_asr.adapters.naqta_punctuation import NaqtaPunctuation, NaqtaPunctuationConfig
 
     return NaqtaPunctuation(_dataclass_from_mapping(NaqtaPunctuationConfig, params))
+
+
+def _build_cadence_fast(params: Mapping[str, Any]) -> PuncModel:
+    from semantic_asr.adapters.cadence_fast import CadenceFastConfig, CadenceFastPunctuation
+
+    return CadenceFastPunctuation(_dataclass_from_mapping(CadenceFastConfig, params))
 
 
 def _build_yue_punctuation(params: Mapping[str, Any]) -> PuncModel:

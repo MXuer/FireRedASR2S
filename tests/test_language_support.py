@@ -63,6 +63,8 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("seamless_m4t_v2_large", names)
         self.assertIn("firered_asr", names)
         self.assertIn("gigaam_v3", names)
+        self.assertIn("phowhisper_large", names)
+        self.assertIn("whisper_th_large_v3_combined", names)
 
     def test_gigaam_is_russian_batch_asr_with_native_punctuation_and_timestamps(self):
         ru_result = list_models_by_language("ru_ru", role="asr")
@@ -93,6 +95,35 @@ class LanguageSupportTest(unittest.TestCase):
         self.assertIn("naqta", names)
         self.assertIn("yue_punctuation", names)
         self.assertIn("ct_punc", names)
+        self.assertIn("cadence_fast", names)
+
+    def test_phowhisper_and_thai_whisper_are_language_specific_batch_asr(self):
+        vi_result = list_models_by_language("vi_vn", role="asr")
+        th_result = list_models_by_language("th_th", role="asr")
+        en_result = list_models_by_language("en_us", role="asr")
+        phowhisper = list_languages_by_model("phowhisper_large", role="asr")
+        thai_whisper = list_languages_by_model("whisper_th_large_v3_combined", role="asr")
+
+        self.assertIn("phowhisper_large", {item["name"] for item in vi_result["asr"]})
+        self.assertNotIn("phowhisper_large", {item["name"] for item in en_result["asr"]})
+        self.assertIn("whisper_th_large_v3_combined", {item["name"] for item in th_result["asr"]})
+        self.assertTrue(phowhisper["supports_batch"])
+        self.assertTrue(phowhisper["has_native_punctuation"])
+        self.assertFalse(phowhisper["has_native_timestamps"])
+        self.assertTrue(thai_whisper["supports_batch"])
+
+    def test_cadence_fast_supports_english_and_indic_languages(self):
+        en_result = list_models_by_language("en_us", role="punc")
+        hi_result = list_models_by_language("hi_in", role="punc")
+        ta_result = list_models_by_language("ta_in", role="punc")
+        ru_result = list_models_by_language("ru_ru", role="punc")
+        cadence = list_languages_by_model("cadence_fast", role="punc")
+
+        self.assertIn("cadence_fast", {item["name"] for item in en_result["punc"]})
+        self.assertIn("cadence_fast", {item["name"] for item in hi_result["punc"]})
+        self.assertIn("cadence_fast", {item["name"] for item in ta_result["punc"]})
+        self.assertNotIn("cadence_fast", {item["name"] for item in ru_result["punc"]})
+        self.assertTrue(cadence["supports_batch"])
 
     def test_ct_punc_is_chinese_only(self):
         zh_result = list_models_by_language("zh_cn", role="punc")

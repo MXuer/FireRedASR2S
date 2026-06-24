@@ -22,6 +22,8 @@ For canonical language ids and model-native language mapping, see
 | FireRedASR2 | `firered_asr` | Chinese ASR adapter using the vendored FireRed runtime. Can return native timestamps when configured. | [firered_asr.md](firered_asr.md) |
 | Fun-ASR-Nano-2512 | `funasr_nano` | Chinese, English and Japanese ASR with native timestamps and punctuation. Supports batch inference. | [funasr_nano.md](funasr_nano.md) |
 | Whisper large | `whisper_large` | Multilingual batched ASR with native punctuation. Use forced alignment for timestamps. | [whisper_large.md](whisper_large.md) |
+| PhoWhisper large | `phowhisper_large` | Vietnamese Whisper-family ASR with batched Transformers inference. Use forced alignment for timestamps. | [phowhisper_large.md](phowhisper_large.md) |
+| Thai Whisper large v3 combined | `whisper_th_large_v3_combined` | Thai Whisper-family ASR with batched Transformers inference. Use forced alignment for timestamps. | [whisper_th_large_v3_combined.md](whisper_th_large_v3_combined.md) |
 | GigaAM-v3 | `gigaam_v3` | Russian e2e RNNT ASR with native punctuation, text normalization, word timestamps and batched inference. | [gigaam_v3.md](gigaam_v3.md) |
 | Qwen3-ASR-1.7B | `qwen3_asr_1_7b` | Multilingual ASR covering 30 languages. Uses model-native full language names internally. | [qwen3_asr.md](qwen3_asr.md) |
 | Dolphin | `dolphin` | Eastern-language ASR with word timestamp support through `word_timestamp`. | [dolphin.md](dolphin.md) |
@@ -45,6 +47,7 @@ For canonical language ids and model-native language mapping, see
 | XLM-R punctuation | `xlm_roberta_punctuation` | Multilingual punctuation/fullstop/truecase model supporting 47 languages. Quality should be verified per language/domain. | [xlm_roberta_punctuation_fullstop_truecase.md](xlm_roberta_punctuation_fullstop_truecase.md) |
 | Naqta | `naqta` | Arabic punctuation restoration model. | [naqta.md](naqta.md) |
 | Yue punctuation | `yue_punctuation` | Cantonese punctuation restoration model. | [yue_punctuation.md](yue_punctuation.md) |
+| Cadence-Fast | `cadence_fast` | English and Indian-language punctuation restoration model with batch inference. | [cadence_fast.md](cadence_fast.md) |
 | Qwen semantic boundary | `qwen_semantic_boundary` | LLM-based boundary strategy for languages or domains where punctuation models are weak. It must return validated spans and must not rewrite text. | [qwen_semantic_boundary.md](qwen_semantic_boundary.md) |
 
 ## Translation Models

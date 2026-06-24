@@ -17,6 +17,8 @@ class LanguageMappingTest(unittest.TestCase):
         self.assertEqual(model_language("qwen3_forced_aligner", "ru_ru"), "Russian")
         self.assertEqual(model_language("funasr_nano", "ja_jp"), "Japanese")
         self.assertEqual(model_language("whisper_large", "zh_cn"), "zh")
+        self.assertEqual(model_language("phowhisper_large", "vi_vn"), "vi")
+        self.assertEqual(model_language("whisper_th_large_v3_combined", "th_th"), "th")
         self.assertEqual(model_language("seamless_m4t_v2_large", "ar_sa"), "arb")
         self.assertEqual(dolphin_language("th_th"), ("th", "TH"))
         self.assertEqual(dolphin_language("yue_hk"), ("ct", "HK"))

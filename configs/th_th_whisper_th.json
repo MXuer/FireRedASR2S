@@ -1,0 +1,30 @@
+{
+  "name": "th_th_whisper_th",
+  "language": "th_th",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "use_gpu": true
+      }
+    },
+    "asr": {
+      "name": "whisper_th_large_v3_combined",
+      "params": {
+        "batch_size": 64
+      }
+    },
+    "timestamp": {
+      "name": "mms_forced_aligner"
+    },
+    "punc": {
+      "name": "asr_text"
+    }
+  },
+  "pipeline": {
+    "strip_punctuation_before_punc": false
+  },
+  "output": {
+    "outdir": "output/experiments/th_th_whisper_th"
+  }
+}

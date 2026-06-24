@@ -10,6 +10,7 @@ from semantic_asr.core import (
 )
 from semantic_asr.adapters.naqta_punctuation import punctuate_tokens_from_labels
 from semantic_asr.adapters.ct_punc import CtPunc
+from semantic_asr.adapters.cadence_fast import CadenceFastPunctuation, _gpu_id
 from semantic_asr.adapters.yue_punctuation import (
     punctuate_timestamp_from_labels as punctuate_yue_timestamp_from_labels,
     punctuate_tokens_from_labels as punctuate_yue_tokens_from_labels,
@@ -162,6 +163,38 @@ class PunctuationStrategyTest(unittest.TestCase):
         self.assertEqual(len(result["punc_sentences"]), 1)
         self.assertEqual(result["punc_sentences"][0]["punc_text"], "那今天的会就到这里吧，happy new year,明年见。")
         self.assertEqual(result["punc_sentences"][0]["end_s"], 2.1)
+
+    def test_cadence_fast_maps_batch_punctuation_to_timestamps(self):
+        class FakeModel:
+            def __init__(self):
+                self.calls = []
+
+            def punctuate(self, texts, batch_size=8):
+                self.calls.append((texts, batch_size))
+                return ["hello world.", "नमस्ते दुनिया।"]
+
+        adapter = object.__new__(CadenceFastPunctuation)
+        adapter.model = FakeModel()
+        adapter.config = type("Config", (), {"batch_size": 2})()
+
+        result = adapter.process_with_timestamp(
+            [
+                [["hello", 0.0, 0.2], ["world", 0.2, 0.5]],
+                [["नमस्ते", 0.0, 0.4], ["दुनिया", 0.4, 0.8]],
+            ],
+            ["en", "hi"],
+        )
+
+        self.assertEqual(adapter.model.calls, [(["hello world", "नमस्ते दुनिया"], 2)])
+        self.assertEqual(result[0]["punc_sentences"][0]["punc_text"], "hello world.")
+        self.assertEqual(result[0]["punc_sentences"][0]["end_s"], 0.5)
+        self.assertEqual(result[1]["punc_sentences"][0]["punc_text"], "नमस्ते दुनिया।")
+        self.assertEqual(result[1]["punc_sentences"][0]["end_s"], 0.8)
+
+    def test_cadence_fast_gpu_id_parses_device_string(self):
+        self.assertEqual(_gpu_id("cuda"), 0)
+        self.assertEqual(_gpu_id("cuda:5"), 5)
+        self.assertIsNone(_gpu_id("cpu"))
 
     def test_text_punctuation_does_not_create_standalone_punctuation_sentence(self):
         sentences = split_text_by_punctuation(

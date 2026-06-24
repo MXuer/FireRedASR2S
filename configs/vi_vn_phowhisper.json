@@ -1,0 +1,32 @@
+{
+  "name": "vi_vn_phowhisper",
+  "language": "vi_vn",
+  "components": {
+    "vad": {
+      "name": "firered_vad",
+      "params": {
+        "use_gpu": true,
+        "extend_speech_frame": 5
+      }
+    },
+    "asr": {
+      "name": "phowhisper_large",
+      "params": {
+        "batch_size": 64
+      }
+    },
+    "timestamp": {
+      "name": "mms_forced_aligner"
+    },
+    "punc": {
+      "name": "asr_text"
+    }
+  },
+  "pipeline": {
+    "strip_punctuation_before_punc": false,
+    "output_vad_pad_s": 0.4
+  },
+  "output": {
+    "outdir": "output/experiments/vi_vn_phowhisper"
+  }
+}

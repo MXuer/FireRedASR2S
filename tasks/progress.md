@@ -2,6 +2,15 @@
 
 Current state:
 
+- 2026-06-24: Added the minimal new-model path for `vinai/PhoWhisper-large`,
+  `biodatlab/whisper-th-large-v3-combined`, and `ai4bharat/Cadence-Fast`.
+  `phowhisper_large` and `whisper_th_large_v3_combined` use a shared thin
+  Transformers Whisper ASR adapter with batched audio generation and forced
+  aligner timestamps. `cadence_fast` uses the official `Cadence.PunctuationModel`
+  batch punctuation interface and maps output back through the shared
+  timestamp punctuation splitter. Added `vi_vn_phowhisper`,
+  `th_th_whisper_th`, and `hi_in_cadence` profiles plus model docs, capability
+  metadata and tests. Real smoke tests are still pending local model downloads.
 - 2026-06-23: Reconfigured ASR batch defaults for the single-worker-per-GPU
   service shape: Whisper large 96, Qwen3-ASR 256, GigaAM-v3 192, FireRedASR
   128, Dolphin 16, Seamless 128. Dolphin and Seamless adapters now use native
