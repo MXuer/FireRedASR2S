@@ -6,6 +6,9 @@ commands for individual model adapters.
 For the full capability table, see [../model_matrix.md](../model_matrix.md).
 For canonical language ids and model-native language mapping, see
 [../language_configuration.md](../language_configuration.md).
+For machine and conda environment notes, see [../environment.md](../environment.md).
+For dependency-isolated model serving, see
+[../architecture/model_lifecycle_sidecar.md](../architecture/model_lifecycle_sidecar.md).
 
 ## VAD Models
 
@@ -24,7 +27,10 @@ For canonical language ids and model-native language mapping, see
 | Whisper large | `whisper_large` | Multilingual batched ASR with native punctuation. Use forced alignment for timestamps. | [whisper_large.md](whisper_large.md) |
 | PhoWhisper large | `phowhisper_large` | Vietnamese Whisper-family ASR with batched Transformers inference. Use forced alignment for timestamps. | [phowhisper_large.md](phowhisper_large.md) |
 | Thai Whisper large v3 combined | `whisper_th_large_v3_combined` | Thai Whisper-family ASR with batched Transformers inference. Use forced alignment for timestamps. | [whisper_th_large_v3_combined.md](whisper_th_large_v3_combined.md) |
+| IndicConformer 600M multilingual | not registered yet | IN-22 ASR. Single-item RNNT smoke passed; downloaded assets do not match the provided batched RNNT source. | [indic_conformer_600m_multilingual.md](indic_conformer_600m_multilingual.md) |
+| Cohere Transcribe 03 2026 | not registered yet | 14-language ASR. Local smoke works with current-env workarounds; use independent env before adapter registration. | [cohere_transcribe_03_2026.md](cohere_transcribe_03_2026.md) |
 | GigaAM-v3 | `gigaam_v3` | Russian e2e RNNT ASR with native punctuation, text normalization, word timestamps and batched inference. | [gigaam_v3.md](gigaam_v3.md) |
+| NVIDIA Arabic FastConformer | `nvidia_ar_fastconformer` | Arabic NeMo ASR with native punctuation, diacritics and word timestamps. | [nvidia_ar_fastconformer.md](nvidia_ar_fastconformer.md) |
 | Qwen3-ASR-1.7B | `qwen3_asr_1_7b` | Multilingual ASR covering 30 languages. Uses model-native full language names internally. | [qwen3_asr.md](qwen3_asr.md) |
 | Dolphin | `dolphin` | Eastern-language ASR with word timestamp support through `word_timestamp`. | [dolphin.md](dolphin.md) |
 | Seamless M4T v2 large | `seamless_m4t_v2_large` | Multilingual speech model currently mapped for selected validated languages. | [seamless_m4t_v2_large.md](seamless_m4t_v2_large.md) |
@@ -49,6 +55,7 @@ For canonical language ids and model-native language mapping, see
 | Yue punctuation | `yue_punctuation` | Cantonese punctuation restoration model. | [yue_punctuation.md](yue_punctuation.md) |
 | Cadence-Fast | `cadence_fast` | English and Indian-language punctuation restoration model with batch inference. | [cadence_fast.md](cadence_fast.md) |
 | Qwen semantic boundary | `qwen_semantic_boundary` | LLM-based boundary strategy for languages or domains where punctuation models are weak. It must return validated spans and must not rewrite text. | [qwen_semantic_boundary.md](qwen_semantic_boundary.md) |
+| wtpsplit boundary | `wtpsplit_boundary` | Multilingual SaT/wtpsplit sidecar boundary strategy. Useful for Thai and other weak-punctuation languages. | [wtpsplit_boundary.md](wtpsplit_boundary.md) |
 
 ## Translation Models
 

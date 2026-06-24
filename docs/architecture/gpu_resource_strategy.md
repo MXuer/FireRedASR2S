@@ -5,6 +5,9 @@
 This is a design note, not an implemented scheduler. It records the current
 resource-management direction for later implementation.
 
+For dependency-isolated model serving and lazy load/unload policy, see
+[`model_lifecycle_sidecar.md`](model_lifecycle_sidecar.md).
+
 ## Problem
 
 Semantic ASR pipelines contain four model stages:
@@ -132,4 +135,3 @@ The main unresolved question is when to release ASR memory before timestamping.
 - For batch ASR service throughput, keeping ASR warm is usually faster.
 
 This should become a profile-level policy rather than a hard-coded behavior.
-

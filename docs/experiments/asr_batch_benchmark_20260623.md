@@ -243,6 +243,33 @@ Result:
 
 ## Failed Probe
 
+NVIDIA Arabic FastConformer:
+
+- Model: `nvidia/stt_ar_fastconformer_hybrid_large_pcd_v1.0`
+- Adapter: `nvidia_ar_fastconformer`
+- Environment: `qwen3-asr`
+- Device: A40 GPU4
+- Input: repeated `data/ar_sa/wav/725e7538-0207-45b9-9e14-f6b5cc993052.wav`,
+  duration `254.488s`
+- Decode: RNNT, `timestamps=True`
+
+| Batch size | Result | Time | Peak allocated MB |
+| ---: | --- | ---: | ---: |
+| 1 | ok | 0.8718s | 2828.8 |
+| 2 | ok | 5.8092s | 5074.4 |
+| 4 | ok | 3.8767s | 9590.2 |
+| 8 | ok | 5.6497s | 18605.6 |
+| 16 | ok | 9.7562s | 36620.0 |
+| 24 | OOM | n/a | about 39936.0 |
+
+Result:
+
+- Largest successful batch size on this long input: `16`
+- Failed batch size: `24`, CUDA OOM.
+- Practical default for unknown segment duration: `batch_size=8`
+- The benchmark input is much longer than normal VAD segments, so rerun with
+  10-30s segments before raising the production default.
+
 Fun-ASR-Nano:
 
 - Probe failed in the current environment with
@@ -263,6 +290,7 @@ For ASR-heavy workers on A40-class GPUs:
 | FireRedASR | 16 | 32-64 | 128 |
 | Dolphin native | 8 | 16 | 24 |
 | Seamless native | 48 | 96-128 | 256 |
+| NVIDIA Arabic FastConformer | 8 | 16 on long input | pending 10-30s segment retest |
 
 Operational guidance:
 

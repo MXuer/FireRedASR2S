@@ -1,5 +1,15 @@
 # Todo
 
+- [x] Current work: verify newly installed optional model packages in `qwen3-asr` and record exact versions.
+- [x] Current work: probe current model adapter compatibility in the newer `qwen3-asr` environment before deciding whether to switch the main runtime.
+- [x] Current work: install `kaldi_native_fbank` in `qwen3-asr` and retry FireRed ASR/VAD compatibility probe.
+- [x] Current work: add NVIDIA Arabic FastConformer ASR adapter, config, docs, language metadata, and tests.
+- [x] Current work: benchmark maximum supported batch size for `nvidia/stt_ar_fastconformer_hybrid_large_pcd_v1.0` after NeMo runtime is available.
+
+- [x] Current work: test downloaded non-omni models: PhoWhisper, Thai Whisper,
+  IndicConformer RNNT, Cohere Transcribe, and Cadence-Fast.
+- [ ] Current work: resume `facebook/omniASR-LLM-7B` probe after user finishes
+  installing `omnilingual-asr` in the `semantic-asr` environment.
 - [x] Current work: add minimal adapters/config/docs/tests for `phowhisper_large`,
   `whisper_th_large_v3_combined`, and `cadence_fast` without changing existing
   production profiles.
@@ -1714,6 +1724,15 @@ Review:
 # TODO: new ASR/Punctuation model onboarding
 
 - [x] Add `vinai/PhoWhisper-large` as a Vietnamese Whisper-family ASR profile.
+- [x] Record the future lazy-loading model sidecar lifecycle plan.
+- [x] Add multilingual `wtpsplit_boundary` service/adapter for semantic boundary candidates.
+- [x] Add Thai config using `wtpsplit_boundary`.
+- [x] Verify unit tests and one Thai short-audio smoke if local sidecar/model is runnable.
+- [x] Run long-audio Thai wtpsplit smoke for Web job `1b83a3158dbf47328fd3dd4fcfa89322`.
+- [x] Add `wtpsplit_boundary.min_span_s`, rerun the Thai long-audio case, and import raw/minspan results with translations into the Web demo DB.
+- [x] Fix Whisper batch decode crash when beam search is used for short VAD segments.
+- [x] Make TextGrid token tier opt-in instead of default output.
+- [x] Document Whisper short-segment beam decode defaults and tradeoffs.
 - [ ] After local model downloads finish, verify `vinai/PhoWhisper-large`
   batched VAD-segment decode, native punctuation behavior, and forced-aligner
   compatibility.
@@ -1739,3 +1758,20 @@ Review:
   punctuation, long-text sliding-window behavior, and no-ITN behavior.
 - [x] Add docs, `language_support.py` metadata, config examples, and model
   matrix updates for each model enabled in the minimal path.
+
+Review:
+- Root cause for the Arabic batch failure was OpenAI Whisper's batched beam
+  decode path. Short VAD segments used `short_beam_size=5`, so `model.decode()`
+  expanded token beams without matching the batched audio-feature dimension,
+  producing errors such as `50` vs `10` in decoder cross attention.
+- `whisper_large` now keeps normal non-beam decode batched, but splits
+  beam-search groups into single-item decode calls.
+- Validation passed: focused Whisper adapter regression tests,
+  `tests.test_adapter_inputs`, `git diff --check`, and a real GPU ASR-only
+  smoke using the reported Arabic wav with two short beam-decoded items.
+- TextGrid token timestamp tiers are now opt-in via
+  `output.write_textgrid_tokens=true`; default TextGrid output only contains
+  the sentence tier.
+- Whisper large docs now record that segments at or under
+  `short_audio_threshold_s=1.0` use `short_beam_size=5` by default, why that
+  exists, and how to disable it.

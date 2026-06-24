@@ -11,6 +11,14 @@ Role: `asr`
 Use the existing `fireredasr2s` environment first. The adapter is the same thin
 Transformers Whisper adapter used by `phowhisper_large`.
 
+Verified in `fireredasr2s`:
+
+```text
+torch: 2.1.0+cu118
+transformers: 4.57.6
+weight format: safetensors
+```
+
 The model should be downloaded outside Codex with `hf download`:
 
 ```bash
@@ -35,6 +43,9 @@ existing `qwen_semantic_boundary` strategy instead of trusting punctuation.
 Profile: [../../configs/th_th_whisper_th.json](../../configs/th_th_whisper_th.json)
 
 ## Smoke
+
+ASR-only smoke passed on the first 15 seconds of
+`data/test/short/th_th-short.wav` on GPU4.
 
 ```bash
 CUDA_VISIBLE_DEVICES=4 conda run -n fireredasr2s \

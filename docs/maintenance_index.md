@@ -17,6 +17,8 @@ This is the recommended reading order for future maintainers and Codex sessions.
 - `docs/architecture/sentence_boundary_strategy.md`
 - `docs/architecture/service_runtime.md`
 - `docs/architecture/service_runtime.drawio`
+- `docs/architecture/gpu_resource_strategy.md`
+- `docs/architecture/model_lifecycle_sidecar.md`
 
 ## Debugging
 

@@ -8,9 +8,19 @@ Role: `asr`
 
 ## Environment
 
-Use the existing `fireredasr2s` environment first. This adapter uses
-Transformers, so it calls the project pytree compatibility patch before
-importing Transformers.
+Do not use the current `fireredasr2s` environment for this checkpoint unless
+the weight file is converted to safetensors. The downloaded model contains
+`pytorch_model.bin`; with `transformers==4.57.6`, loading `.bin` weights requires
+`torch>=2.6`.
+
+Verified environment:
+
+```text
+conda env: qwen3-asr
+torch: 2.6.0+cu124
+transformers: 4.57.6
+torchaudio: 2.6.0+cu124
+```
 
 The model should be downloaded outside Codex with `hf download`:
 
@@ -53,6 +63,12 @@ Use `mms_forced_aligner` for timestamps.
 Profile: [../../configs/vi_vn_phowhisper.json](../../configs/vi_vn_phowhisper.json)
 
 ## Smoke
+
+ASR-only smoke passed on the first 15 seconds of
+`data/test/short/vi_vn-short.wav` in `qwen3-asr`, producing Vietnamese text.
+
+The full pipeline profile below still needs either a torch>=2.6 runtime or a
+safetensors conversion before it can run in `fireredasr2s`.
 
 ```bash
 CUDA_VISIBLE_DEVICES=4 conda run -n fireredasr2s \

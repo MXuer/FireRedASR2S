@@ -15,6 +15,13 @@ already present:
 pip install cadence-punctuation
 ```
 
+Verified package:
+
+```text
+cadence-punctuation==1.1.0
+import name: cadence
+```
+
 Download the model outside Codex with `hf download`:
 
 ```bash
@@ -39,20 +46,27 @@ Cadence-Fast, then maps punctuation back with the shared
 
 Profile: [../../configs/hi_in_cadence.json](../../configs/hi_in_cadence.json)
 
-Use `model_path` when loading from a pre-downloaded local directory:
+`model_path` is passed to the official package as a Hugging Face `cache_dir`.
+For the normal shared HF cache, leave it unset. Do not pass a snapshot directory
+such as `.../snapshots/<sha>` to the official wrapper; it will try to resolve
+`ai4bharat/Cadence-Fast` inside that directory and fail.
 
 ```json
 {
   "name": "cadence_fast",
-  "params": {
-    "model": "Cadence-Fast",
-    "model_path": "/path/to/Cadence-Fast",
-    "batch_size": 32
+    "params": {
+      "model": "Cadence-Fast",
+      "model_path": null,
+      "batch_size": 32
+    }
   }
-}
 ```
 
 ## Smoke
+
+Adapter smoke passed with default HF cache and `HF_HUB_OFFLINE=1` on GPU4. It
+accepted a two-item English/Hindi batch and returned punctuation-mapped
+sentence spans.
 
 ```bash
 CUDA_VISIBLE_DEVICES=4 conda run -n fireredasr2s \

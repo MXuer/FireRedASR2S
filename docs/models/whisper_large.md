@@ -76,6 +76,14 @@ override the normal settings with:
 }
 ```
 
+A "short" segment means `duration <= short_audio_threshold_s`; the default is
+`1.0` second. The default short path uses `short_beam_size=5` to make very short
+clips less greedy and usually more stable, but beam search is slower. Because
+OpenAI Whisper's batched beam decode is unsafe, the adapter keeps normal
+non-beam decode batched and decodes short beam-search items one by one.
+Disable this path with `"short_beam_size": null` if throughput matters more
+than short-segment stability.
+
 A focused Arabic 500ms hallucination test showed that length penalty can shorten
 hallucinated output, but it does not eliminate hallucination. Keep the MMS
 pre-alignment feasibility check enabled as the main guard for tiny VAD islands.

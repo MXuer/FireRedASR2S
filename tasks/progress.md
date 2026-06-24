@@ -2,6 +2,119 @@
 
 Current state:
 
+- 2026-06-24: Verified the newly installed optional packages in `qwen3-asr`.
+  Current versions are recorded in `docs/environment.md`: `openai-whisper`
+  20250625, `dataoceanai-dolphin` 20260513, `gigaam` 0.1.0, `punctuators`
+  0.0.7, `cadence-punctuation` 1.1.0 and `onnxruntime-gpu` 1.22.0. The ORT GPU
+  providers are available (`TensorrtExecutionProvider`,
+  `CUDAExecutionProvider`, `CPUExecutionProvider`). NeMo remains uninstalled.
+  Lightweight validation in `qwen3-asr` passed 110 tests across adapter inputs,
+  MMS, punctuation strategies, config runner, language support and outputs.
+- 2026-06-24: Probed whether the newer `qwen3-asr` environment can become the
+  main runtime. Pure config/language/output tests passed there
+  (`tests.test_config_runner`, `tests.test_language_support`,
+  `tests.test_outputs`). MMS and punctuation-strategy unit tests also passed.
+  Current blockers are missing optional model packages rather than core torch
+  incompatibility: `openai-whisper`, Dolphin, GigaAM, NeMo, `punctuators`,
+  Cadence and ONNXRuntime are not installed in `qwen3-asr`. Qwen3-ASR, FunASR,
+  ModelScope, FireRed VAD/ASR/Punc, Transformers, Torch/Torchaudio and MMS code
+  import in the environment after installing `kaldi_native_fbank`.
+- 2026-06-24: Installed `kaldi_native_fbank==1.22.3` into the `qwen3-asr`
+  environment and retried FireRed compatibility. `qwen3-asr` is Python 3.12
+  with `torch==2.6.0+cu124` and `transformers==4.57.6`. After installing the
+  missing fbank package, `semantic_asr.adapters.firered`, FireRed VAD, FireRed
+  ASR2 and FireRedPunc all import. CPU model-load probes passed for FireRed VAD,
+  FireRedASR2-AED and FireRedPunc; a 5s FireRed VAD smoke on
+  `data/test/short.wav` returned `timestamps`, `dur` and
+  `frame_speech_probs`, and FireRedPunc restored punctuation for a Chinese
+  sample.
+- 2026-06-24: Updated `docs/models/whisper_large.md` to explain the
+  short-segment decode defaults: `duration <= short_audio_threshold_s` means
+  short, the default threshold is 1.0s, and short segments use
+  `short_beam_size=5` for more stable decoding at the cost of speed and
+  one-by-one beam decode.
+- 2026-06-24: Changed TextGrid token timestamp output to opt-in. By default,
+  generated TextGrid files now include only the `sentence` tier even when JSON
+  contains `words`; set `output.write_textgrid_tokens=true` in a profile to
+  include the `token` tier. Validation passed with `tests.test_outputs`,
+  `tests.test_config_runner`, `tests.test_run_pipeline_resume`, and
+  `git diff --check`.
+- 2026-06-24: Added the NVIDIA Arabic FastConformer ASR adapter
+  `nvidia_ar_fastconformer` for
+  `nvidia/stt_ar_fastconformer_hybrid_large_pcd_v1.0`. In `qwen3-asr`, NeMo
+  loads the model as `EncDecHybridRNNTCTCBPEModel`; `transcribe(...,
+  timestamps=True)` returns `Hypothesis.timestamp["word"]`, so the adapter now
+  uses native word timestamps through `nvidia_ar_fastconformer_native` and
+  `asr_text` punctuation splitting. Real adapter smoke on
+  `data/ar_sa/wav/725e7538-0207-45b9-9e14-f6b5cc993052.wav` produced
+  `text_len=3353` and `timestamp_len=659`. A40 GPU4 long-input benchmark
+  succeeded up to batch `16` and OOMed at `24`; default batch is `8`.
+- 2026-06-24: Fixed an Arabic batch crash in `whisper_large` triggered by
+  short VAD segments using `short_beam_size=5`. OpenAI Whisper's
+  `model.decode()` is unsafe for batched beam search because beam-expanded
+  token state can diverge from the original audio-feature batch dimension
+  (`50` vs `10` in the reported failure). The adapter now preserves batched
+  decode for non-beam groups and splits only beam-search groups into single
+  items. Validation passed with focused Whisper adapter tests, the full
+  `tests.test_adapter_inputs` module, `git diff --check`, and a real GPU
+  ASR-only smoke using the reported Arabic wav.
+- 2026-06-24: Added `wtpsplit_boundary.min_span_s` and set Thai profiles to
+  `min_span_s=2.0`. Very short wtpsplit spans now merge into the previous span
+  when possible, otherwise into the following span. On Web job
+  `1b83a3158dbf47328fd3dd4fcfa89322`, the raw wtpsplit result had 19 final
+  sentences with one 0.49s fragment; the min-span rerun has 18 final sentences
+  and no fragment under 2s. Both comparison results were imported into the demo
+  DB as `1b83a3158dbf47328fd3dd4fcfa89322_wtpsplit_raw` and
+  `1b83a3158dbf47328fd3dd4fcfa89322_wtpsplit_minspan`, user `dev`, config
+  `th_th`, with `zh_cn` translation caches generated.
+- 2026-06-24: Recorded wtpsplit GPU guidance. For the current
+  `wtpsplit_boundary` sidecar, GPU is not required because the service only
+  segments ASR text/tokens. Keep it on CPU or a low-priority shared device by
+  default, and move it to GPU only if long transcripts or concurrent requests
+  make it a measured bottleneck.
+- 2026-06-24: Ran a long Thai wtpsplit smoke using Web job
+  `1b83a3158dbf47328fd3dd4fcfa89322` (274.307s). To keep the comparison close
+  to the original Web output, the temporary config reused `configs/th_th.json`
+  (FireRed VAD + Whisper large + MMS) and only swapped `punc` to
+  `wtpsplit_boundary`. Output was written to
+  `output/experiments/th_th_wtpsplit_job_1b83a315`. Compared with the original
+  Web result, final segments changed from 13 to 19, average duration dropped
+  from 20.58s to 14.08s, and max duration stayed under 30s. The run exposed one
+  bad short 0.49s segment around Thai/numeric text, so future tuning should add
+  a minimum semantic-boundary span or merge very short wtpsplit fragments back
+  into a neighbor.
+- 2026-06-24: Added a multilingual `wtpsplit_boundary` semantic-boundary
+  strategy for Thai and future weak-punctuation languages. The main pipeline
+  calls a local HTTP sidecar (`semantic_asr.sidecars.wtpsplit_server`) instead
+  of importing wtpsplit in the main environment. Boundary output is carried as
+  `semantic_boundary=true` and `boundary_source=wtpsplit`, not fake `。`
+  punctuation. `configs/th_th_whisper_th.json` now uses `wtpsplit_boundary`;
+  a real Thai smoke on `data/test/short/th_th-short.wav` passed and wrote
+  JSON/SRT/CSV/TextGrid under `output/experiments/th_th_wtpsplit_smoke`.
+- 2026-06-24: Fixed the shared HF Whisper adapter to use
+  `padding="max_length"` so short VAD segments produce the fixed 3000-frame
+  mel features expected by the Transformers Whisper generation path.
+- 2026-06-24: Recorded the future lazy-loaded sidecar lifecycle plan in
+  `docs/architecture/model_lifecycle_sidecar.md`. The recommended direction is
+  to keep the main `fireredasr2s` environment stable and route
+  dependency-heavy models through local HTTP sidecars that load models on first
+  request, keep them warm briefly, then unload after an idle TTL.
+- 2026-06-24: Created the `semantic-asr` conda environment for future omniASR
+  testing with `python=3.10`; the user will finish installing
+  `omnilingual-asr`. Added `docs/environment.md` with machine, GPU, CUDA, conda
+  and model-environment notes.
+- 2026-06-24: Tested downloaded non-omni models. Thai Whisper safetensors runs
+  in `fireredasr2s` after casting HF Whisper processor inputs to model dtype.
+  PhoWhisper uses `pytorch_model.bin` and cannot load in `fireredasr2s`
+  (`torch<2.6` CVE guard); it runs in `qwen3-asr` with torch 2.6. Cohere
+  Transcribe loads in `fireredasr2s` with `HF_MODULES_CACHE=/tmp/hf_modules`,
+  bfloat16 and a manual `decoder_attention_mask`, including a 2-item batch, but
+  should still use a newer independent environment before adapter registration.
+  IndicConformer single-item Hindi RNNT runs with CPU ONNXRuntime; the downloaded
+  assets do not match `model_onnx_1b_batched_rnnt.py`, so batch RNNT is not
+  directly usable. Cadence-Fast adapter runs after installing
+  `cadence-punctuation==1.1.0`; leave `model_path` unset for the default HF
+  cache because the package treats it as `cache_dir`, not a snapshot path.
 - 2026-06-24: Added the minimal new-model path for `vinai/PhoWhisper-large`,
   `biodatlab/whisper-th-large-v3-combined`, and `ai4bharat/Cadence-Fast`.
   `phowhisper_large` and `whisper_th_large_v3_combined` use a shared thin
